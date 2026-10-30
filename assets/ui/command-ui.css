@@ -1,0 +1,38 @@
+/* Formara: conquest command UI — LANDSCAPE ONLY. px/clamp sizes only. Wrapper needs position:relative. */
+:root{--wc-ink:#221a14;--wc-parch:#e8d9b5;--wc-parch-d:#c9b48a;--wc-gold:#d9a441;--wc-ok:#6fa04a;--wc-bad:#d0533f;
+ --wc-sl:max(8px,env(safe-area-inset-left));--wc-sr:max(8px,env(safe-area-inset-right));--wc-st:max(6px,env(safe-area-inset-top));--wc-sb:max(6px,env(safe-area-inset-bottom))}
+/* slim top HUD, between the notch insets */
+.wc-hud{position:absolute;top:var(--wc-st);left:calc(var(--wc-sl) + 72px);right:calc(var(--wc-sr) + 72px);height:34px;display:flex;gap:6px;align-items:center;justify-content:center;pointer-events:none;font:800 12px/1 system-ui,sans-serif;color:var(--wc-ink)}
+.wc-chip{display:flex;align-items:center;gap:4px;height:30px;background:var(--wc-parch);border:2px solid var(--wc-ink);border-radius:9px;padding:0 7px;box-shadow:0 2px 0 var(--wc-ink);white-space:nowrap}
+.wc-chip img{width:18px;height:18px;object-fit:contain}
+.wc-chip.enemy{background:#e7c3b5}
+.wc-chip .bar{width:clamp(40px,6vw,70px);height:8px;background:#0003;border-radius:4px;overflow:hidden}
+.wc-chip .bar i{display:block;height:100%;background:var(--wc-ok)}
+.wc-chip.low .bar i{background:var(--wc-bad)}.wc-chip.low{color:#8a2a1e}
+.wc-army span{display:flex;align-items:center;gap:2px}
+.wc-ico{width:18px;height:18px}
+/* thumb rails on left and right edges */
+.wc-rail{position:absolute;top:calc(var(--wc-st) + 44px);bottom:var(--wc-sb);width:64px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px}
+.wc-rail.left{left:var(--wc-sl)}.wc-rail.right{right:var(--wc-sr)}
+.wc-btn{width:64px;height:clamp(56px,16vh,68px);flex:none;border:2px solid var(--wc-ink);border-radius:14px;background:var(--wc-parch);box-shadow:0 3px 0 var(--wc-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;font:800 11px system-ui,sans-serif;color:var(--wc-ink);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.wc-btn svg{width:24px;height:24px;stroke:var(--wc-ink);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.wc-btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--wc-ink)}
+.wc-btn[aria-pressed=true]{background:var(--wc-gold)}
+.wc-btn.retreat{background:#e7c3b5}
+.wc-formations{position:absolute;right:calc(var(--wc-sr) + 74px);bottom:calc(var(--wc-sb) + 76px);display:none;flex-direction:column;gap:6px}
+.wc-formations.open{display:flex}
+.wc-formations .wc-btn{width:96px;height:44px;flex-direction:row}
+/* world-space overlays */
+.wc-ring{position:absolute;width:56px;height:20px;transform:translate(-50%,-50%);border:3px solid var(--wc-gold);border-radius:50%;box-shadow:0 0 8px var(--wc-gold);animation:wc-pulse 1.2s ease-in-out infinite;pointer-events:none}
+@keyframes wc-pulse{50%{transform:translate(-50%,-50%) scale(1.12);opacity:.75}}
+.wc-hp{position:absolute;width:34px;height:6px;transform:translateX(-50%);background:var(--wc-ink);border-radius:3px;padding:1px;pointer-events:none}
+.wc-hp i{display:block;height:100%;border-radius:2px;background:var(--wc-ok)}
+.wc-hp.enemy i{background:var(--wc-bad)}.wc-hp.low i{background:var(--wc-gold)}
+/* turn-your-phone overlay: portrait is never laid out */
+.wc-rotate{display:none}
+@media (orientation:portrait){
+ .wc-rotate{display:flex;position:fixed;inset:0;z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:radial-gradient(circle at 50% 40%,#3a2c1e,#140e0a 75%);color:var(--wc-parch);font:800 22px/1.2 Georgia,serif;text-align:center;padding:24px}
+ .wc-rotate img{width:160px;height:160px;animation:wc-tilt 2.4s ease-in-out infinite}
+ .wc-hud,.wc-rail,.wc-formations{display:none!important}
+}
+@keyframes wc-tilt{0%,25%{transform:rotate(0)}55%,85%{transform:rotate(-90deg)}100%{transform:rotate(0)}}

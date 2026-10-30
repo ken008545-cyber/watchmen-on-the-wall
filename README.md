@@ -15,3 +15,8 @@ Sprites load from the atlas `assets/sprites.png` (rebuild: `python3 art_src/cut.
 - **Scores**: best scores are saved locally under `gxhub_wotw_levels_v1` (stars, per-level best, endless best, daily best). `lastScore` is kept so it can be sent to a future GX Hub leaderboard.
 - **Battle Pass and Profile**: see `data/progression.json`. Only the free track exists. The paid track is reserved in the data and disabled.
 - **Tokens**: every Grokonian earn and spend goes through `js/tokens.js`, which mirrors to the GX Hub through `js/gxhub.js` (postMessage) and falls back to localStorage.
+
+## Conquest mode (current)
+Tap-around-a-map army conquest. Menu → Conquer → pick a world → Campaign (territory map: recruit, barracks, drill, march/attack, End turn) → real-time Battles (tap to move the general, army follows in formation; command bar: Follow/Charge/Hold/Flank L/R/Fall Back/Shield Wall/Volley/Ride Down; type chips target a unit type; tap a squad to command it alone). Lore and rules: CONQUEST.md.
+Files: js/conq_state.js (campaign/AI/economy), js/conquest.js (Campaign, Battle, BattleEnd scenes), data/conquest.json (units, counters, difficulty).
+Test: `PW=/path/to/playwright node tests/smoke.js` (includes a simulated GX Hub iframe check of the persisted Grokonians queue).

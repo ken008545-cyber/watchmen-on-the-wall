@@ -232,22 +232,22 @@
      "goal": 150
     },
     {
-     "id": "d_wave8",
-     "text": "Clear 8 waves",
-     "stat": "waves",
+     "id": "d_win3",
+     "text": "Win 3 battles",
+     "stat": "battles",
+     "goal": 3
+    },
+    {
+     "id": "d_rout6",
+     "text": "Rout 6 enemy squads",
+     "stat": "routs",
+     "goal": 6
+    },
+    {
+     "id": "d_recruit8",
+     "text": "Recruit 8 squads",
+     "stat": "recruits",
      "goal": 8
-    },
-    {
-     "id": "d_perfect4",
-     "text": "Clear 4 waves without a leak",
-     "stat": "perfectWaves",
-     "goal": 4
-    },
-    {
-     "id": "d_build12",
-     "text": "Build 12 towers",
-     "stat": "towersBuilt",
-     "goal": 12
     },
     {
      "id": "d_ult3",
@@ -256,10 +256,10 @@
      "goal": 3
     },
     {
-     "id": "d_fly40",
-     "text": "Swat 40 flyers",
-     "stat": "flyKills",
-     "goal": 40
+     "id": "d_flawless1",
+     "text": "Win a battle without losing a squad",
+     "stat": "flawless",
+     "goal": 1
     }
    ]
   },
@@ -268,22 +268,22 @@
    "xp": 600,
    "pool": [
     {
-     "id": "w_boss3",
-     "text": "Topple Goliath 3 times",
+     "id": "w_boss2",
+     "text": "Defeat a world champion twice",
      "stat": "bossKills",
-     "goal": 3
+     "goal": 2
     },
     {
-     "id": "w_clear5",
-     "text": "Win 5 battles",
-     "stat": "clears",
+     "id": "w_lands15",
+     "text": "Conquer 15 lands",
+     "stat": "lands",
+     "goal": 15
+    },
+    {
+     "id": "w_drill5",
+     "text": "Drill your troops 5 times",
+     "stat": "drills",
      "goal": 5
-    },
-    {
-     "id": "w_branch6",
-     "text": "Raise 6 towers to tier 4",
-     "stat": "branches",
-     "goal": 6
     },
     {
      "id": "w_kill1000",
@@ -297,9 +297,9 @@
  "achievements": [
   {
    "id": "a_first",
-   "name": "First Watch",
+   "name": "First Battle",
    "text": "Clear your first wave",
-   "stat": "waves",
+   "stat": "battles",
    "goal": 1,
    "grok": 5
   },
@@ -315,23 +315,23 @@
    "id": "a_perfect",
    "name": "Not One Lost",
    "text": "Win a battle with no leaks",
-   "stat": "perfectClears",
+   "stat": "flawless",
    "goal": 1,
    "grok": 15
   },
   {
    "id": "a_build50",
-   "name": "Wall Builder",
+   "name": "Army Builder",
    "text": "Build 50 towers",
-   "stat": "towersBuilt",
-   "goal": 50,
+   "stat": "recruits",
+   "goal": 40,
    "grok": 10
   },
   {
    "id": "a_branch",
-   "name": "Fully Armed",
+   "name": "Drill Sergeant",
    "text": "Raise a tower to tier 4",
-   "stat": "branches",
+   "stat": "drills",
    "goal": 1,
    "grok": 5
   },

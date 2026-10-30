@@ -17,8 +17,8 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   c.label=t; c.redraw=draw; return c; }
 
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
-  preload(){ this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.image('logo','assets/logo.png'); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); }
-  create(){ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); makeArt(this); makeArt2(this); this.scene.start('Menu'); } }
+  preload(){ this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); this.load.json('conq','data/conquest.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.image('logo','assets/logo-512.png'); this.load.image('food','assets/food-icon.png'); this.load.json('surv','data/survival.json'); this.load.atlas('ua','assets/units_atlas.png','assets/units_atlas.json'); this.load.atlas('up','assets/units_painted_atlas.png','assets/units_painted_atlas.json'); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); }
+  create(){ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); makeArt(this); makeArt2(this); Conq.init(this.cache.json.get('conq')); window.__SV=this.cache.json.get('surv'); this.scene.start('Menu'); } }
 
 function backdrop(s,dim,key){ s.add.image(W/2,H/2,key||'bg').setDisplaySize(W,H); s.add.rectangle(W/2,H/2,W,H,0x0d0906,dim); }
 
@@ -26,13 +26,17 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
   create(){ backdrop(this,0.55);
     const lg=this.add.image(W/2,128,'logo'); lg.setScale(232/lg.height); this.tweens.add({targets:lg,scale:lg.scale*1.03,duration:1800,yoyo:true,repeat:-1,ease:'Sine.inOut'});
     txt(this,W/2,262,'"I have set watchmen upon thy walls, O Jerusalem" Isaiah 62:6',20).setOrigin(0.5);
-    const ds=Levels.dailySpec(), db=Levels.dailyBest(); txt(this,W/2,300,'Daily Challenge: '+Levels.world(ds.world).name+' '+(ds.index+1)+' (Hard)'+(db?'  •  best '+db.score:''),22).setOrigin(0.5);
-    button(this,W/2-160,370,300,58,'Play',()=>this.scene.start('WorldMap'),{size:28});
-    button(this,W/2+160,370,300,58,'Heroes',()=>this.scene.start('HeroSelect',{browse:true}),{size:26});
-    button(this,W/2-160,440,300,58,'Battle Pass',()=>this.scene.start('BattlePass'),{size:26});
-    button(this,W/2+160,440,300,58,'Profile & Level',()=>this.scene.start('Profile'),{size:24});
-    button(this,W/2-160,510,300,50,'Unlocks',()=>this.scene.start('Unlocks'),{size:22});
-    const m=button(this,W/2+160,510,300,50,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); });
+    const sv=SVsave.get(), dk=new Date(), dd=dk.getFullYear()+'-'+String(dk.getMonth()+1).padStart(2,'0')+'-'+String(dk.getDate()).padStart(2,'0');
+    txt(this,W/2,296,'Survive as many waves as you can  •  Best wave '+sv.best+'  •  Today\'s daily best '+(sv.daily[dd]||0),22).setOrigin(0.5);
+    const hero=()=>{ for(const k of ['elah','jericho']){ const c=Conq.camp(k); if(c) return c.hero; } return 'david'; };
+    button(this,W/2-160,352,300,62,'⚔ Survival',()=>this.scene.start('Survival',{hero:hero()}),{size:30});
+    button(this,W/2+160,352,300,62,'Daily Survival',()=>this.scene.start('Survival',{daily:true,hero:hero()}),{size:26});
+    button(this,W/2-160,420,300,52,'Conquer (campaign)',()=>this.scene.start('WorldMap'),{size:22});
+    button(this,W/2+160,420,300,52,'Heroes',()=>this.scene.start('HeroSelect',{browse:true}),{size:22});
+    button(this,W/2-160,480,300,50,'Battle Pass',()=>this.scene.start('BattlePass'),{size:22});
+    button(this,W/2+160,480,300,50,'Profile & Level',()=>this.scene.start('Profile'),{size:22});
+    button(this,W/2-160,538,300,48,'Unlocks',()=>this.scene.start('Unlocks'),{size:20});
+    const m=button(this,W/2+160,538,300,48,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); });
     const L=Progress.level(), T=Progress.state.title;
     txt(this,W/2,585,'Level '+L.lv+'  •  Account '+Progress.accountLevel()+'  •  Battle Pass tier '+Progress.bpTier()+'/30'+(T?'  •  "'+Progress.titleName(T)+'"':''),20).setOrigin(0.5);
     txt(this,W/2,630,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,680,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':''),18).setOrigin(0.5);
@@ -52,11 +56,14 @@ class HeroSelect extends Phaser.Scene{ constructor(){super('HeroSelect');}
       txt(this,x,y-6,h.name,16,ok?PARCH:'#8a7a6a',{align:'center',wordWrap:{width:190}}).setOrigin(0.5);
       txt(this,x,y+20,h.role+' • HP '+h.hp+(ok?' • M'+M.lv:''),14).setOrigin(0.5);
       txt(this,x,y+56,h.skills.map(k=>k.name).join(', ')+'\nUlt: '+h.ult.name,13,'#cdbd95',{align:'center',wordWrap:{width:186}}).setOrigin(0.5);
-      if(ok) button(this,x,y+108,170,40,this.browse?'Mastery '+M.lv+(M.max?' (max)':''):'Lead',()=>{ if(!this.browse) this.scene.start('Game',{hero:h.id,level:this.level}); },{size:16,disabled:this.browse});
+      if(ok) button(this,x,y+108,170,40,this.browse?'Mastery '+M.lv+(M.max?' (max)':''):'Lead',()=>{ if(!this.browse) this.lead(h.id); },{size:16,disabled:this.browse});
       else if(h.unlock.type==='grokonians') button(this,x,y+108,186,40,'Unlock '+h.unlock.cost+' G',()=>{ if(Tokens.spend('hero:'+h.id,h.unlock.cost)){Tokens.grant(h.id);Progress.checkAch();SFX.build();this.scene.restart({browse:this.browse,level:this.level});} },{disabled:Tokens.balance()<h.unlock.cost,size:15});
       else txt(this,x,y+108,'🔒 '+lockLabel(h),14,'#a08a6a',{align:'center',wordWrap:{width:186}}).setOrigin(0.5);
     });
-    button(this,90,680,140,46,'Back',()=>this.browse?this.scene.start('Menu'):this.scene.start('LevelMap',{world:this.level.world,diff:this.level.diff}));
+    button(this,90,680,140,46,'Back',()=>this.browse?this.scene.start('Menu'):this.back());
+    }
+  lead(id){ const L=this.level; if(L.mode==='cdaily') this.scene.start('Battle',{spec:Object.assign(Conq.dailySpec(),{hero:id})}); else this.scene.start('Campaign',{world:L.world,setHero:id}); }
+  back(){ const L=this.level; if(L.mode==='cdaily') this.scene.start('WorldMap'); else this.scene.start('Campaign',{world:L.world});
   } }
 
 class Unlocks extends Phaser.Scene{ constructor(){super('Unlocks');}
@@ -79,15 +86,15 @@ class Unlocks extends Phaser.Scene{ constructor(){super('Unlocks');}
 class WorldMap extends Phaser.Scene{ constructor(){super('WorldMap');}
   create(){ backdrop(this,0.72); const WD=Levels.data, acc=Progress.accountLevel();
     txt(this,W/2,40,'Choose a World',40,GOLD).setOrigin(0.5);
-    txt(this,W/2,84,'Account level '+acc+'   •   Stars '+Levels.totalStars(),19).setOrigin(0.5);
+    txt(this,W/2,84,'Account level '+acc+'   •   Conquest stars '+Conq.totalStars(),19).setOrigin(0.5);
     WD.worlds.forEach((w,i)=>{ const x=225+(i%3)*415, y=235+Math.floor(i/3)*250, open=Levels.worldOpen(w);
       const im=this.add.image(x,y,'bg_'+w.id).setDisplaySize(380,214); if(!open) im.setTint(0x555555);
       const g=this.add.graphics(); g.lineStyle(3,open?0xd9a441:0x5a4a3a); g.strokeRoundedRect(x-190,y-107,380,214,8); g.fillStyle(0x140c07,0.8); g.fillRect(x-188,y+44,376,61);
       txt(this,x,y+60,w.name,22,open?PARCH:'#9a8a7a').setOrigin(0.5);
-      txt(this,x,y+88,open?(w.levels+' levels  •  ★ '+Levels.worldStars(w.id)+'/'+(w.levels*9)+'  •  Boss: '+w.boss.name):(!w.playable?'🔒 Coming soon (account '+w.reqAccount+')  •  '+w.boss.name:'🔒 Reach account level '+w.reqAccount),14,open?'#cdbd95':'#a08a6a').setOrigin(0.5);
-      const z=this.add.zone(x,y,380,214).setInteractive({useHandCursor:open}); z.on('pointerup',()=>{ SFX.unlock(); if(open) this.scene.start('LevelMap',{world:w.id}); else this.toast(w.playable?'Reach account level '+w.reqAccount+' to open '+w.name:w.name+' is coming in a later update'); }); });
-    const ds=Levels.dailySpec(), db=Levels.dailyBest();
-    button(this,W/2,680,420,50,'Daily Challenge: '+Levels.world(ds.world).name+' '+(ds.index+1)+(db?'  (best '+db.score+')':''),()=>this.scene.start('HeroSelect',{level:ds}),{size:17});
+      txt(this,x,y+88,open?('Conquest ★ '+['normal','hard','nightmare'].reduce((a,d)=>a+Conq.stars(w.id,d),0)+'/9'+(Conq.camp(w.id)?'  •  campaign turn '+Conq.camp(w.id).turn:'')+'  •  Champion: '+w.boss.name):(!w.playable?'🔒 Coming soon (account '+w.reqAccount+')  •  '+w.boss.name:'🔒 Reach account level '+w.reqAccount),14,open?'#cdbd95':'#a08a6a').setOrigin(0.5);
+      const z=this.add.zone(x,y,380,214).setInteractive({useHandCursor:open}); z.on('pointerup',()=>{ SFX.unlock(); if(open) this.scene.start('Campaign',{world:w.id}); else this.toast(w.playable?'Reach account level '+w.reqAccount+' to open '+w.name:w.name+' is coming in a later update'); }); });
+    const ds=Conq.dailySpec(), db=Conq.dailyBest();
+    button(this,W/2,680,420,50,'Daily Skirmish: '+Levels.world(ds.world).name+(db?'  (best '+db.score+')':''),()=>this.scene.start('HeroSelect',{level:{mode:'cdaily'}}),{size:17});
     button(this,90,680,140,46,'Back',()=>this.scene.start('Menu'));
     this.msg=txt(this,W/2,620,'',18,'#f2c14e').setOrigin(0.5); }
   toast(m){ this.msg.setText(m); } }
@@ -394,4 +401,4 @@ class End extends Phaser.Scene{ constructor(){super('End');}
 
 window.__game=new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#0d0906',
   scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{activePointers:3},
-  scene:[Boot,Menu,WorldMap,LevelMap,HeroSelect,Unlocks,BattlePass,Profile,Game,End]});
+  scene:[Boot,Menu,WorldMap,LevelMap,HeroSelect,Unlocks,BattlePass,Profile,Game,End,Campaign,Battle,BattleEnd,Survival]});

@@ -1,0 +1,3370 @@
+{
+"_doc": "Survival data: roster (Radix roster.json), waves (Radix waves.json), upgrades (Radix progression.json; renamed Horseman Charge->Lance, Medic Reach->Long Tend). Built by tools in conquest; source files untouched.",
+"classes": [
+"infantry",
+"shield",
+"spear",
+"cavalry",
+"ranged",
+"flyer",
+"siege",
+"support",
+"giant"
+],
+"counters": {
+"infantry": {
+"infantry": 1.0,
+"shield": 1.0,
+"spear": 1.25,
+"cavalry": 1.0,
+"ranged": 0.8,
+"flyer": 1.0,
+"siege": 1.0,
+"support": 1.0,
+"giant": 0.8
+},
+"shield": {
+"infantry": 1.0,
+"shield": 1.0,
+"spear": 1.0,
+"cavalry": 1.25,
+"ranged": 1.0,
+"flyer": 1.0,
+"siege": 0.8,
+"support": 1.0,
+"giant": 1.0
+},
+"spear": {
+"infantry": 0.8,
+"shield": 1.0,
+"spear": 1.0,
+"cavalry": 1.25,
+"ranged": 1.0,
+"flyer": 1.0,
+"siege": 1.0,
+"support": 1.0,
+"giant": 1.0
+},
+"cavalry": {
+"infantry": 1.0,
+"shield": 0.8,
+"spear": 0.8,
+"cavalry": 1.0,
+"ranged": 1.25,
+"flyer": 1.0,
+"siege": 1.25,
+"support": 1.25,
+"giant": 1.0
+},
+"ranged": {
+"infantry": 1.25,
+"shield": 1.0,
+"spear": 1.0,
+"cavalry": 0.8,
+"ranged": 1.0,
+"flyer": 1.25,
+"siege": 1.0,
+"support": 1.0,
+"giant": 1.0
+},
+"flyer": {
+"infantry": 1.0,
+"shield": 1.0,
+"spear": 1.0,
+"cavalry": 1.0,
+"ranged": 0.8,
+"flyer": 1.0,
+"siege": 1.25,
+"support": 1.25,
+"giant": 1.0
+},
+"siege": {
+"infantry": 1.0,
+"shield": 1.25,
+"spear": 1.0,
+"cavalry": 0.8,
+"ranged": 1.0,
+"flyer": 0.8,
+"siege": 1.0,
+"support": 1.0,
+"giant": 1.25
+},
+"support": {
+"infantry": 1.0,
+"shield": 1.0,
+"spear": 1.0,
+"cavalry": 0.8,
+"ranged": 1.0,
+"flyer": 0.8,
+"siege": 1.0,
+"support": 1.0,
+"giant": 1.0
+},
+"giant": {
+"infantry": 1.25,
+"shield": 1.0,
+"spear": 1.0,
+"cavalry": 1.0,
+"ranged": 1.0,
+"flyer": 1.0,
+"siege": 0.8,
+"support": 1.0,
+"giant": 1.0
+}
+},
+"counterRule": {
+"source": "Mythorion MECHANICS.md triangle + Dotorion ruling",
+"hardCounter": 1.25,
+"counteredSide": 0.8,
+"siege": "kept (Dotorion ruling)"
+},
+"mechanics": {
+"_doc": "Numbers from mythorion/MECHANICS.md; null = not yet set there",
+"formations": {
+"line": {},
+"wedge": {
+"note": "horse charge"
+},
+"shieldWall": {
+"arrowDamageMul": 0.5,
+"note": "slow"
+},
+"scatter": {
+"note": "good vs splash"
+}
+},
+"morale": {
+"dropWhenArmyLostFraction": 0.3333,
+"retreatAtZeroWithinSec": 2,
+"restore": "rally near hero",
+"nearHeroBonus": 0.1
+},
+"food": {
+"source": "held villages, per turn",
+"capsArmySize": true,
+"perVillage": 5
+},
+"night": {
+"archerRangeLoss": 0.3,
+"cavalryAmbushBonus": 0.25
+}
+},
+"exchangeRate": {
+"mannaPerBudgetPoint": 3,
+"why": "levels.js spends wave budget at max(6,hp/6) per enemy. Equal-cost fight value (hp x dps / cost^2) of enemies at budget cost is ~7.7x the player median, so sqrt(7.7) ~= 2.8 -> 3 manna per budget point. Enemy 'cost' below = 3 x budgetCost; levels.js keeps using budgetCost."
+},
+"armorPerPoint": 0.06,
+"units": {
+"militia": {
+"id": "militia",
+"name": "Shepherd Militia",
+"side": "player",
+"role": "Infantry",
+"cost": 45,
+"hp": 110,
+"damage": 9,
+"attackSpeed": 1.0,
+"range": 40,
+"moveSpeed": 95,
+"armor": 1,
+"dmgType": "physical",
+"strengths": [
+"spear"
+],
+"weaknesses": [
+"ranged",
+"giant"
+],
+"unlockLevel": 1,
+"flavor": "Brave boys with staffs and borrowed courage.",
+"class": "infantry"
+},
+"slinger": {
+"id": "slinger",
+"name": "Shepherd Slinger",
+"side": "player",
+"role": "Ranged",
+"cost": 55,
+"hp": 80,
+"damage": 11,
+"attackSpeed": 1.0,
+"range": 170,
+"moveSpeed": 90,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"infantry",
+"flyer"
+],
+"weaknesses": [
+"cavalry"
+],
+"unlockLevel": 1,
+"flavor": "One smooth stone, one careful aim.",
+"class": "ranged",
+"playNote": "Ranged: meant to kite from 170 range and never trade in melee. The range-blind sim undervalues it on purpose; do not buff its melee."
+},
+"shieldman": {
+"id": "shieldman",
+"name": "Shieldman of Judah",
+"side": "player",
+"role": "Shield",
+"cost": 65,
+"hp": 300,
+"damage": 7,
+"attackSpeed": 1.2,
+"range": 40,
+"moveSpeed": 70,
+"armor": 4,
+"dmgType": "physical",
+"strengths": [
+"cavalry"
+],
+"weaknesses": [
+"siege"
+],
+"unlockLevel": 2,
+"flavor": "He doesn't move. That's the point.",
+"class": "shield"
+},
+"spearman_p": {
+"id": "spearman_p",
+"name": "Spearman of the Wall",
+"side": "player",
+"role": "Spear",
+"cost": 60,
+"hp": 190,
+"damage": 13,
+"attackSpeed": 1.1,
+"range": 60,
+"moveSpeed": 80,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"cavalry"
+],
+"weaknesses": [
+"infantry"
+],
+"unlockLevel": 3,
+"flavor": "Long pole, short temper for horses.",
+"class": "spear"
+},
+"swordsman": {
+"id": "swordsman",
+"name": "Swordsman of Gideon",
+"side": "player",
+"role": "Infantry",
+"cost": 85,
+"hp": 190,
+"damage": 17,
+"attackSpeed": 0.9,
+"range": 45,
+"moveSpeed": 95,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"spear"
+],
+"weaknesses": [
+"ranged",
+"giant"
+],
+"unlockLevel": 4,
+"flavor": "Sword in one hand, torch-jar in the other.",
+"class": "infantry",
+"note": "elite infantry"
+},
+"archer": {
+"id": "archer",
+"name": "Benjamite Archer",
+"side": "player",
+"role": "Ranged",
+"cost": 70,
+"hp": 90,
+"damage": 15,
+"attackSpeed": 0.9,
+"range": 210,
+"moveSpeed": 85,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"infantry",
+"flyer"
+],
+"weaknesses": [
+"cavalry"
+],
+"unlockLevel": 5,
+"flavor": "Left-handed, never misses the barn.",
+"class": "ranged",
+"playNote": "Ranged: same as slinger, longer range."
+},
+"horseman": {
+"id": "horseman",
+"name": "Horseman of the Watch",
+"side": "player",
+"role": "Cavalry",
+"cost": 110,
+"hp": 260,
+"damage": 22,
+"attackSpeed": 1.0,
+"range": 45,
+"moveSpeed": 165,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"ranged",
+"siege",
+"support"
+],
+"weaknesses": [
+"shield",
+"spear"
+],
+"unlockLevel": 6,
+"flavor": "Gallops in, gallops out, nobody's sure what happened.",
+"class": "cavalry"
+},
+"trumpeter": {
+"id": "trumpeter",
+"name": "Trumpeter of Jericho",
+"side": "player",
+"role": "Siege",
+"cost": 120,
+"hp": 140,
+"damage": 30,
+"attackSpeed": 2.0,
+"range": 150,
+"moveSpeed": 65,
+"armor": 1,
+"dmgType": "sonic",
+"strengths": [
+"shield",
+"giant"
+],
+"weaknesses": [
+"cavalry",
+"flyer"
+],
+"unlockLevel": 8,
+"flavor": "Seven laps and one very loud note.",
+"class": "support",
+"armorBreak": 4,
+"playNote": "Siege/support: its counter is armor break (4) and stun vs shields and giants, a support effect, not raw damage. Propose the sim excludes it or models armorBreak.",
+"counterType": "support effect",
+"strengthNote": "support effect: armor break + stun on shields and giants"
+},
+"medic": {
+"id": "medic",
+"name": "Camp Healer",
+"side": "player",
+"role": "Support",
+"cost": 80,
+"hp": 110,
+"damage": 4,
+"attackSpeed": 1.2,
+"range": 140,
+"moveSpeed": 85,
+"armor": 0,
+"dmgType": "holy",
+"strengths": [
+"infantry",
+"shield"
+],
+"weaknesses": [
+"cavalry",
+"flyer"
+],
+"unlockLevel": 7,
+"flavor": "Bandages, broth and a kind word.",
+"class": "support",
+"healPerSec": 10,
+"healRange": 120,
+"strengthNote": "support: strength = the allies it heals, not raw damage",
+"playNote": "Support: counters nothing by damage. Its value is 10 HP/s healing to infantry and shields. Propose the sim excludes it or models heals.",
+"counterType": "support effect"
+},
+"chariot_p": {
+"id": "chariot_p",
+"name": "Bronze Chariot",
+"side": "player",
+"role": "Cavalry",
+"cost": 150,
+"hp": 360,
+"damage": 26,
+"attackSpeed": 1.1,
+"range": 50,
+"moveSpeed": 180,
+"armor": 3,
+"dmgType": "physical",
+"strengths": [
+"ranged",
+"siege",
+"support"
+],
+"weaknesses": [
+"shield",
+"spear"
+],
+"unlockLevel": 10,
+"flavor": "Squeaky wheels, serious business.",
+"class": "cavalry",
+"slowImmuneWhileCharging": true
+}
+},
+"enemies": {
+"locust": {
+"id": "locust",
+"name": "Locust Swarm",
+"side": "enemy",
+"role": "Flyer",
+"cost": 18,
+"hp": 22,
+"damage": 4,
+"attackSpeed": 0.8,
+"range": 30,
+"moveSpeed": 95,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"siege",
+"support"
+],
+"weaknesses": [
+"ranged"
+],
+"unlockLevel": 1,
+"flavor": "Crunchy, loud and always hungry.",
+"class": "flyer",
+"bounty": 4,
+"flying": true,
+"armorType": "flesh",
+"budgetCost": 6
+},
+"frog": {
+"id": "frog",
+"name": "Frog",
+"side": "enemy",
+"role": "Infantry",
+"cost": 24,
+"hp": 45,
+"damage": 5,
+"attackSpeed": 1.0,
+"range": 30,
+"moveSpeed": 55,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"spear"
+],
+"weaknesses": [
+"ranged",
+"giant"
+],
+"unlockLevel": 1,
+"flavor": "Hops. Splits. Hops again.",
+"class": "infantry",
+"bounty": 6,
+"split": "froglet",
+"armorType": "flesh",
+"budgetCost": 8
+},
+"froglet": {
+"id": "froglet",
+"name": "Froglet",
+"side": "enemy",
+"role": "Infantry",
+"cost": 18,
+"hp": 15,
+"damage": 2,
+"attackSpeed": 1.0,
+"range": 25,
+"moveSpeed": 75,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"spear"
+],
+"weaknesses": [
+"ranged",
+"giant"
+],
+"unlockLevel": 1,
+"flavor": "Tiny, furious, mostly harmless.",
+"class": "infantry",
+"bounty": 2,
+"armorType": "flesh",
+"budgetCost": 6
+},
+"spearman": {
+"id": "spearman",
+"name": "Philistine Spearman",
+"side": "enemy",
+"role": "Spear",
+"cost": 54,
+"hp": 110,
+"damage": 11,
+"attackSpeed": 1.1,
+"range": 55,
+"moveSpeed": 42,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"cavalry"
+],
+"weaknesses": [
+"infantry"
+],
+"unlockLevel": 1,
+"flavor": "Polished helmet, unpolished manners.",
+"class": "spear",
+"bounty": 12,
+"armorType": "bronze",
+"budgetCost": 18
+},
+"priest": {
+"id": "priest",
+"name": "Baal Priest",
+"side": "enemy",
+"role": "Support",
+"cost": 45,
+"hp": 90,
+"damage": 6,
+"attackSpeed": 1.2,
+"range": 120,
+"moveSpeed": 40,
+"armor": 0,
+"dmgType": "fire",
+"strengths": [
+"infantry",
+"shield"
+],
+"weaknesses": [
+"cavalry",
+"flyer"
+],
+"unlockLevel": 2,
+"flavor": "Chants loudly to an idol that never answers.",
+"class": "support",
+"bounty": 14,
+"heals": true,
+"healPerSec": 7.5,
+"armorType": "flesh",
+"strengthNote": "support: strength = the allies it heals, not raw damage",
+"budgetCost": 15,
+"playNote": "Support: heals allies 7.5 HP/s; same sim caveat as the Camp Healer.",
+"counterType": "support effect"
+},
+"golem": {
+"id": "golem",
+"name": "Idol Golem",
+"side": "enemy",
+"role": "Giant",
+"cost": 189,
+"hp": 380,
+"damage": 24,
+"attackSpeed": 1.6,
+"range": 45,
+"moveSpeed": 26,
+"armor": 5,
+"dmgType": "physical",
+"strengths": [
+"infantry"
+],
+"weaknesses": [
+"siege"
+],
+"unlockLevel": 3,
+"flavor": "Carved stone that crumbles when it falls.",
+"class": "giant",
+"bounty": 25,
+"armorType": "idol",
+"budgetCost": 63
+},
+"wallguard": {
+"id": "wallguard",
+"name": "Wall Guard",
+"side": "enemy",
+"role": "Shield",
+"cost": 75,
+"hp": 150,
+"damage": 9,
+"attackSpeed": 1.2,
+"range": 40,
+"moveSpeed": 38,
+"armor": 4,
+"dmgType": "physical",
+"strengths": [
+"cavalry"
+],
+"weaknesses": [
+"siege"
+],
+"unlockLevel": 1,
+"flavor": "Guards the wall. Is mostly wall.",
+"class": "shield",
+"bounty": 14,
+"armorType": "bronze",
+"budgetCost": 25
+},
+"raider": {
+"id": "raider",
+"name": "Chariot Raider",
+"side": "enemy",
+"role": "Cavalry",
+"cost": 90,
+"hp": 180,
+"damage": 16,
+"attackSpeed": 1.0,
+"range": 45,
+"moveSpeed": 130,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"ranged",
+"siege",
+"support"
+],
+"weaknesses": [
+"shield",
+"spear"
+],
+"unlockLevel": 5,
+"flavor": "Rattles in fast, loses a wheel, rattles home.",
+"class": "cavalry",
+"bounty": 18,
+"armorType": "bronze",
+"slowImmuneWhileCharging": true,
+"budgetCost": 30
+},
+"bowman": {
+"id": "bowman",
+"name": "Gath Bowman",
+"side": "enemy",
+"role": "Ranged",
+"cost": 30,
+"hp": 60,
+"damage": 7,
+"attackSpeed": 1.0,
+"range": 180,
+"moveSpeed": 45,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"infantry",
+"flyer"
+],
+"weaknesses": [
+"cavalry"
+],
+"unlockLevel": 4,
+"flavor": "Shoots first, misses often.",
+"class": "ranged",
+"bounty": 10,
+"armorType": "flesh",
+"budgetCost": 10
+},
+"goliath": {
+"id": "goliath",
+"name": "Goliath of Gath",
+"side": "enemy",
+"role": "Boss",
+"cost": 1299,
+"hp": 2600,
+"damage": 60,
+"attackSpeed": 2.0,
+"range": 60,
+"moveSpeed": 20,
+"armor": 6,
+"dmgType": "physical",
+"strengths": [
+"infantry"
+],
+"weaknesses": [
+"siege"
+],
+"unlockLevel": 1,
+"flavor": "Very tall, very loud, very bad at ducking.",
+"class": "giant",
+"bounty": 150,
+"boss": true,
+"armorType": "bronze",
+"weakTo": "slinger x3",
+"budgetCost": 433
+},
+"gatekeeper": {
+"id": "gatekeeper",
+"name": "The Gatekeeper Colossus",
+"side": "enemy",
+"role": "Boss",
+"cost": 1599,
+"hp": 3200,
+"damage": 70,
+"attackSpeed": 2.2,
+"range": 60,
+"moveSpeed": 18,
+"armor": 7,
+"dmgType": "physical",
+"strengths": [
+"infantry"
+],
+"weaknesses": [
+"siege"
+],
+"unlockLevel": 5,
+"flavor": "A gate with legs and a grudge. Crumbles to rubble.",
+"class": "giant",
+"bounty": 160,
+"boss": true,
+"armorType": "idol",
+"weakTo": "trumpeter x2",
+"budgetCost": 533
+},
+"enemy_swordsman": {
+"id": "enemy_swordsman",
+"name": "Gath Bladebrute",
+"side": "enemy",
+"role": "Infantry",
+"cost": 81,
+"hp": 160,
+"damage": 14,
+"attackSpeed": 1.0,
+"range": 45,
+"moveSpeed": 45,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"spear"
+],
+"weaknesses": [
+"ranged",
+"giant"
+],
+"unlockLevel": 2,
+"flavor": "Swings first, thinks never.",
+"bounty": 14,
+"armorType": "bronze",
+"sprite": "enemy_swordsman",
+"class": "infantry",
+"budgetCost": 27
+},
+"enemy_spearman": {
+"id": "enemy_spearman",
+"name": "Pike-Poker of Ekron",
+"side": "enemy",
+"role": "Spear",
+"cost": 69,
+"hp": 140,
+"damage": 12,
+"attackSpeed": 1.1,
+"range": 60,
+"moveSpeed": 40,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"cavalry"
+],
+"weaknesses": [
+"infantry"
+],
+"unlockLevel": 3,
+"flavor": "Very proud of his very long stick.",
+"bounty": 12,
+"armorType": "bronze",
+"sprite": "enemy_spearman",
+"class": "spear",
+"budgetCost": 23
+},
+"enemy_slinger": {
+"id": "enemy_slinger",
+"name": "Pebble-Pelter",
+"side": "enemy",
+"role": "Ranged",
+"cost": 30,
+"hp": 60,
+"damage": 6,
+"attackSpeed": 1.0,
+"range": 170,
+"moveSpeed": 45,
+"armor": 0,
+"dmgType": "physical",
+"strengths": [
+"infantry",
+"flyer"
+],
+"weaknesses": [
+"cavalry"
+],
+"unlockLevel": 2,
+"flavor": "Brought a sack of rocks and a bad attitude.",
+"bounty": 9,
+"armorType": "flesh",
+"sprite": "enemy_slinger",
+"class": "ranged",
+"budgetCost": 10
+},
+"enemy_horseman": {
+"id": "enemy_horseman",
+"name": "Dust-Rider Raider",
+"side": "enemy",
+"role": "Cavalry",
+"cost": 99,
+"hp": 200,
+"damage": 17,
+"attackSpeed": 1.0,
+"range": 45,
+"moveSpeed": 125,
+"armor": 2,
+"dmgType": "physical",
+"strengths": [
+"ranged",
+"siege",
+"support"
+],
+"weaknesses": [
+"shield",
+"spear"
+],
+"unlockLevel": 5,
+"flavor": "All gallop, no brakes.",
+"bounty": 18,
+"armorType": "bronze",
+"sprite": "enemy_horseman",
+"class": "cavalry",
+"budgetCost": 33
+}
+},
+"waves": {
+"unlockWave": {
+"froglet": 1,
+"locust": 1,
+"frog": 2,
+"bowman": 3,
+"enemy_slinger": 4,
+"spearman": 6,
+"enemy_spearman": 8,
+"wallguard": 10,
+"priest": 12,
+"enemy_swordsman": 14,
+"raider": 16,
+"enemy_horseman": 18,
+"golem": 20,
+"goliath": 30,
+"gatekeeper": 50
+},
+"endless": {
+"formula": "budget(N) = budget(100) * 1.04^(N-100) for N>100",
+"budget100": 10067
+},
+"income": {
+"startManna": 150,
+"perWaveBase": 40,
+"bountyFraction": 0.5,
+"rule": "Start 150 manna. After each cleared wave: +40 manna + 50% of that wave's enemy value in manna (budget*3*0.5). Surviving units carry over. Affordability: cumulative manna at wave start >= wave budget in manna (budget*3), so every wave is beatable with an even-value army; skill (counters, formations, morale) is what keeps losses low."
+}
+},
+"waveList": [
+{
+"wave": 1,
+"budget": 20,
+"pool": [
+"froglet",
+"locust"
+],
+"boss": null
+},
+{
+"wave": 2,
+"budget": 22,
+"pool": [
+"froglet",
+"locust",
+"frog"
+],
+"boss": null
+},
+{
+"wave": 3,
+"budget": 24,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman"
+],
+"boss": null
+},
+{
+"wave": 4,
+"budget": 26,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger"
+],
+"boss": null
+},
+{
+"wave": 5,
+"budget": 28,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger"
+],
+"boss": null
+},
+{
+"wave": 6,
+"budget": 31,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman"
+],
+"boss": null
+},
+{
+"wave": 7,
+"budget": 34,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman"
+],
+"boss": null
+},
+{
+"wave": 8,
+"budget": 37,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman"
+],
+"boss": null
+},
+{
+"wave": 9,
+"budget": 40,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman"
+],
+"boss": null
+},
+{
+"wave": 10,
+"budget": 43,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard"
+],
+"boss": "wallguard"
+},
+{
+"wave": 11,
+"budget": 47,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard"
+],
+"boss": null
+},
+{
+"wave": 12,
+"budget": 52,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest"
+],
+"boss": null
+},
+{
+"wave": 13,
+"budget": 56,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest"
+],
+"boss": null
+},
+{
+"wave": 14,
+"budget": 61,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman"
+],
+"boss": null
+},
+{
+"wave": 15,
+"budget": 67,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman"
+],
+"boss": null
+},
+{
+"wave": 16,
+"budget": 73,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider"
+],
+"boss": null
+},
+{
+"wave": 17,
+"budget": 79,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider"
+],
+"boss": null
+},
+{
+"wave": 18,
+"budget": 87,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman"
+],
+"boss": null
+},
+{
+"wave": 19,
+"budget": 94,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman"
+],
+"boss": null
+},
+{
+"wave": 20,
+"budget": 103,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "golem"
+},
+{
+"wave": 21,
+"budget": 112,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 22,
+"budget": 122,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 23,
+"budget": 132,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 24,
+"budget": 144,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 25,
+"budget": 156,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 26,
+"budget": 169,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 27,
+"budget": 183,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 28,
+"budget": 198,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 29,
+"budget": 214,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 30,
+"budget": 231,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "golem"
+},
+{
+"wave": 31,
+"budget": 250,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 32,
+"budget": 269,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 33,
+"budget": 290,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 34,
+"budget": 312,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 35,
+"budget": 335,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 36,
+"budget": 360,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 37,
+"budget": 386,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 38,
+"budget": 414,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 39,
+"budget": 444,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 40,
+"budget": 475,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "golem"
+},
+{
+"wave": 41,
+"budget": 508,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 42,
+"budget": 542,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 43,
+"budget": 578,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 44,
+"budget": 616,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 45,
+"budget": 657,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 46,
+"budget": 699,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 47,
+"budget": 743,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 48,
+"budget": 789,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 49,
+"budget": 837,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 50,
+"budget": 887,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "goliath"
+},
+{
+"wave": 51,
+"budget": 940,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 52,
+"budget": 995,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 53,
+"budget": 1054,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 54,
+"budget": 1116,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 55,
+"budget": 1180,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 56,
+"budget": 1248,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 57,
+"budget": 1320,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 58,
+"budget": 1395,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 59,
+"budget": 1473,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 60,
+"budget": 1556,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "gatekeeper"
+},
+{
+"wave": 61,
+"budget": 1642,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 62,
+"budget": 1733,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 63,
+"budget": 1828,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 64,
+"budget": 1927,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 65,
+"budget": 2031,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 66,
+"budget": 2140,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 67,
+"budget": 2254,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 68,
+"budget": 2373,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 69,
+"budget": 2497,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 70,
+"budget": 2627,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "goliath"
+},
+{
+"wave": 71,
+"budget": 2763,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 72,
+"budget": 2904,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 73,
+"budget": 3052,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 74,
+"budget": 3206,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 75,
+"budget": 3366,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 76,
+"budget": 3533,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 77,
+"budget": 3707,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 78,
+"budget": 3888,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 79,
+"budget": 4076,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 80,
+"budget": 4271,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "gatekeeper"
+},
+{
+"wave": 81,
+"budget": 4475,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 82,
+"budget": 4686,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 83,
+"budget": 4905,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 84,
+"budget": 5133,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 85,
+"budget": 5369,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 86,
+"budget": 5614,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 87,
+"budget": 5868,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 88,
+"budget": 6130,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 89,
+"budget": 6403,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 90,
+"budget": 6684,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "goliath"
+},
+{
+"wave": 91,
+"budget": 6976,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 92,
+"budget": 7277,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 93,
+"budget": 7589,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 94,
+"budget": 7910,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 95,
+"budget": 8243,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 96,
+"budget": 8586,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 97,
+"budget": 8939,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 98,
+"budget": 9304,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 99,
+"budget": 9680,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 100,
+"budget": 10067,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "gatekeeper"
+},
+{
+"wave": 101,
+"budget": 10470,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 102,
+"budget": 10889,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 103,
+"budget": 11324,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 104,
+"budget": 11777,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 105,
+"budget": 12248,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 106,
+"budget": 12738,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 107,
+"budget": 13248,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 108,
+"budget": 13777,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 109,
+"budget": 14329,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 110,
+"budget": 14902,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "goliath"
+},
+{
+"wave": 111,
+"budget": 15498,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 112,
+"budget": 16118,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 113,
+"budget": 16762,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 114,
+"budget": 17433,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 115,
+"budget": 18130,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 116,
+"budget": 18855,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 117,
+"budget": 19610,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 118,
+"budget": 20394,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 119,
+"budget": 21210,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": null
+},
+{
+"wave": 120,
+"budget": 22058,
+"pool": [
+"froglet",
+"locust",
+"frog",
+"bowman",
+"enemy_slinger",
+"spearman",
+"enemy_spearman",
+"wallguard",
+"priest",
+"enemy_swordsman",
+"raider",
+"enemy_horseman",
+"golem"
+],
+"boss": "gatekeeper"
+}
+],
+"upgrades": {
+"militia": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Stout",
+"hp": 0.1
+},
+"B": {
+"name": "Rush",
+"moveSpeed": 0.1
+}
+},
+"t3": {
+"name": "Levy",
+"damage": 0.05
+}
+},
+"slinger": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Long Sling",
+"range": 0.1
+},
+"B": {
+"name": "Quick Hand",
+"attackSpeed": 0.08
+}
+},
+"t3": {
+"name": "Twin Stone",
+"everyNthShotDouble": 5
+}
+},
+"shieldman": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Iron Rim",
+"armor": 0.1
+},
+"B": {
+"name": "Shove",
+"damage": 0.08
+}
+},
+"t3": {
+"name": "Bulwark",
+"hp": 0.05
+}
+},
+"spearman_p": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Brace",
+"damageVsCavalry": 0.1
+},
+"B": {
+"name": "Phalanx",
+"armorInShieldWall": 0.1
+}
+},
+"t3": {
+"name": "Set Spears",
+"damage": 0.05
+}
+},
+"swordsman": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Gideon's Edge",
+"damage": 0.08
+},
+"B": {
+"name": "Buckler",
+"armor": 0.1
+}
+},
+"t3": {
+"name": "Cleave",
+"splashFraction": 0.15
+}
+},
+"archer": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Left-Handed",
+"attackSpeed": 0.08
+},
+"B": {
+"name": "High Arc",
+"range": 0.1
+}
+},
+"t3": {
+"name": "Volley",
+"damage": 0.05
+}
+},
+"horseman": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Lance",
+"chargeDamage": 0.1
+},
+"B": {
+"name": "Swift",
+"moveSpeed": 0.1
+}
+},
+"t3": {
+"name": "Ride Down",
+"damageVsSupport": 0.1
+}
+},
+"trumpeter": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Long Blast",
+"auraRange": 0.1
+},
+"B": {
+"name": "Sharp Note",
+"armorBreak": 0.1
+}
+},
+"t3": {
+"name": "Walls Fall",
+"armorBreak": 0.05
+}
+},
+"medic": {
+"t1": {
+"hp": 0.1,
+"healPerSec": 0.1
+},
+"t2": {
+"A": {
+"name": "Balm",
+"healPerSec": 0.08
+},
+"B": {
+"name": "Long Tend",
+"healRange": 0.1
+}
+},
+"t3": {
+"name": "Field Tent",
+"hp": 0.05
+}
+},
+"chariot_p": {
+"t1": {
+"hp": 0.1,
+"damage": 0.1
+},
+"t2": {
+"A": {
+"name": "Scythed Wheels",
+"damage": 0.08
+},
+"B": {
+"name": "Plated",
+"armor": 0.1
+}
+},
+"t3": {
+"name": "Trample",
+"splashFraction": 0.15
+}
+}
+},
+"upgradeCap": 0.2
+}

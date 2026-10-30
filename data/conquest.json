@@ -1,0 +1,43 @@
+{
+ "_doc": "Conquest v0.1 data. Unit stats are per man; a squad = men x stats. mult[att][def] = damage multiplier. bar = barracks level needed.",
+ "units": {
+  "sword":   {"name":"Swordsmen","short":"Sword","hp":30,"dmg":4.0,"rate":1.0,"range":0,"speed":48,"men":8,"gold":40,"food":6,"bar":1,"h":34},
+  "shield":  {"name":"Shieldmen","short":"Shield","hp":44,"dmg":2.6,"rate":1.0,"range":0,"speed":34,"men":8,"gold":55,"food":6,"bar":2,"block":0.7,"h":34},
+  "spear":   {"name":"Spearmen","short":"Spear","hp":30,"dmg":3.4,"rate":1.0,"range":0,"reach":8,"speed":44,"men":8,"gold":40,"food":6,"bar":1,"h":36},
+  "archer":  {"name":"Archers","short":"Archer","hp":18,"dmg":2.6,"rate":1.6,"range":230,"speed":46,"men":8,"gold":50,"food":6,"bar":1,"melee":0.4,"h":34},
+  "horse":   {"name":"Horsemen","short":"Horse","hp":42,"dmg":5.0,"rate":1.0,"range":0,"speed":100,"men":6,"gold":90,"food":14,"bar":2,"charge":2.0,"mounted":true,"h":40},
+  "slinger": {"name":"Slingers","short":"Sling","hp":18,"dmg":2.3,"rate":1.4,"range":175,"speed":52,"men":8,"gold":40,"food":5,"bar":2,"melee":0.5,"pierce":true,"h":34},
+  "chariot": {"name":"Chariots","short":"Chariot","hp":95,"dmg":9.0,"rate":1.0,"range":0,"speed":112,"men":3,"gold":140,"food":20,"bar":3,"charge":2.2,"mounted":true,"trample":true,"h":44},
+  "healer":  {"name":"Healers","short":"Healer","hp":18,"dmg":0.8,"rate":1.2,"range":0,"speed":44,"men":4,"gold":70,"food":6,"bar":3,"heal":7,"h":36}
+ },
+ "mult": {
+  "sword":  {"spear":1.5,"archer":1.3,"slinger":1.3,"healer":1.3,"shield":1.25,"horse":0.8,"chariot":0.8},
+  "shield": {"sword":0.9,"archer":1.3,"slinger":1.3},
+  "spear":  {"horse":2.5,"chariot":2.5,"sword":0.75},
+  "archer": {"spear":1.3,"sword":1.1,"healer":1.2,"horse":0.85},
+  "horse":  {"archer":2.0,"slinger":2.0,"healer":2.0,"spear":0.45,"sword":1.15},
+  "slinger":{"shield":1.6,"spear":1.2,"horse":0.8},
+  "chariot":{"sword":1.4,"archer":1.7,"slinger":1.7,"healer":1.7,"spear":0.4,"shield":0.7},
+  "healer": {}
+ },
+ "counter": {"horse":["spear","spear","archer"],"chariot":["spear","archer"],"archer":["horse","shield"],"slinger":["horse","sword"],"shield":["slinger","sword"],"sword":["horse","archer","shield"],"spear":["sword","archer","slinger"],"healer":["horse"]},
+ "barracks": [0,0,140,300],
+ "drill": {"cost":[120,220,360],"bonus":0.1},
+ "difficulty": {
+  "normal":   {"budget":0.95,"react":1.2,"counter":0.6,"hp":1.0,"growth":0.07,"aiAttackFrom":3},
+  "hard":     {"budget":1.15,"react":0.75,"counter":0.85,"hp":1.1,"growth":0.09,"aiAttackFrom":2,"focusHero":true},
+  "nightmare":{"budget":1.35,"react":0.4,"counter":1.0,"hp":1.2,"growth":0.11,"aiAttackFrom":2,"focusHero":true}
+ },
+ "start": {"gold":220,"food":80,"army":["sword","sword","spear","archer","archer"]},
+ "maxSquads": 9,
+ "factions": {
+  "elah":    [{"id":"a","name":"Philistine Host","color":"0xb8432f","champion":"goliath"},{"id":"b","name":"Amalekite Raiders","color":"0x3f6fb0"}],
+  "jericho": [{"id":"a","name":"Jericho Garrison","color":"0xb8432f","champion":"gatekeeper"},{"id":"b","name":"Canaanite League","color":"0x6a4fa0"}]
+ },
+ "names": {
+  "elah":["Socoh","Azekah","Ephes-dammim","Brook of Stones","Shaaraim","Gath Road","Adullam","Keilah","Bethlehem Ridge","Terebinth Vale","Ekron Gate","Lachish Hills","Zanoah"],
+  "jericho":["Gilgal","Palm Grove","Jordan Ford","Ai Heights","Bethel Road","Salt Flats","Achor Valley","Spring of Elisha","Red Cord House","Moab Pass","Wilderness Rim","Seven Stones","Jericho"]
+ },
+ "rewards": {"battleWin":3,"flawless":2,"champion":25,"conquest":30,"perStar":10,"daily":10},
+ "xp": {"battleWin":120,"flawless":60,"kill":1,"champion":200,"conquest":500}
+}

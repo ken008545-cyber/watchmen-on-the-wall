@@ -1,0 +1,30 @@
+<!-- Formara: drop-in markup (landscape only). Paste inside the game's positioned wrapper. Fix asset paths when wiring. -->
+<div class="wc-rotate" role="alert"><img src="rotate-icon.svg" alt="">Turn your phone sideways</div>
+<div class="wc-hud">
+  <div class="wc-chip wc-army" aria-label="Your army">
+    <span><img src="sprites/player_swordsman.png" alt="Swordsmen"><b data-u="swordsman">12</b></span>
+    <span><img src="sprites/player_shieldman.png" alt="Shieldmen"><b data-u="shieldman">8</b></span>
+    <span><img src="sprites/player_archer.png" alt="Archers"><b data-u="archer">10</b></span>
+    <span><img src="sprites/player_horseman.png" alt="Horsemen"><b data-u="horseman">4</b></span>
+    <span>⚔<b id="wcTotal">34</b></span>
+  </div>
+  <div class="wc-chip" id="wcMorale" title="Morale">⚑<span class="bar"><i style="width:72%"></i></span><b>72</b></div>
+  <div class="wc-chip" id="wcFood" title="Food used / cap"><img class="wc-ico" src="food-icon.svg" alt="Food"><b id="wcFoodVal">34/40</b></div>
+  <div class="wc-chip" id="wcFormNow">⛨ <b>Line</b></div>
+  <div class="wc-chip enemy" aria-label="Enemy army">⚔ <b id="wcFoes">41</b></div>
+</div>
+<nav class="wc-rail left" aria-label="Commands">
+  <button class="wc-btn" data-cmd="move" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 14l7 7 7-7"/></svg>Move</button>
+  <button class="wc-btn" data-cmd="attack"><svg viewBox="0 0 24 24"><path d="M4 20 18 6M14 4h6v6M6 14l4 4"/></svg>Attack</button>
+  <button class="wc-btn" data-cmd="hold"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 4 8 8 9 4-1 8-4 8-9V6z"/></svg>Hold</button>
+</nav>
+<div class="wc-formations" id="wcForms">
+  <button class="wc-btn" data-form="line">Line</button>
+  <button class="wc-btn" data-form="wedge">Wedge</button>
+  <button class="wc-btn" data-form="shieldwall">Shield Wall</button>
+  <button class="wc-btn" data-form="scatter">Scatter</button>
+</div>
+<nav class="wc-rail right" aria-label="Orders">
+  <button class="wc-btn" data-cmd="formation"><svg viewBox="0 0 24 24"><path d="M5 8h2M11 8h2M17 8h2M8 14h2M14 14h2M11 20h2"/></svg>Formation</button>
+  <button class="wc-btn retreat" data-cmd="retreat"><svg viewBox="0 0 24 24"><path d="M20 12H5M11 5l-7 7 7 7"/></svg>Retreat</button>
+</nav>

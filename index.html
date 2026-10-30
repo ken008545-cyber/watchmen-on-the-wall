@@ -1,8 +1,38 @@
 <!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Watchmen on the Wall — Chapter 1</title>
-<style>html,body{margin:0;height:100%;background:#0d0906;overflow:hidden;touch-action:none}#game{width:100%;height:100%}</style>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Watchmen on the Wall — Survival</title>
+<link rel="stylesheet" href="assets/ui/command-ui.css">
+<style>html,body{margin:0;height:100%;background:#0d0906;overflow:hidden;touch-action:none}body{position:relative}#game{width:100%;height:100%}
+#wcui .wc-hud,#wcui .wc-rail,#wcui .wc-formations{z-index:5}
+body:not(.wc-on) #wcui .wc-hud,body:not(.wc-on) #wcui .wc-rail,body:not(.wc-on) #wcui .wc-formations,body.wc-shop #wcui .wc-rail,body.wc-shop #wcui .wc-formations{display:none}</style>
 </head><body><div id="game"></div>
+<div id="wcui">
+<div class="wc-rotate" role="alert"><img src="assets/ui/rotate-icon.svg" alt="">Turn your phone sideways</div>
+<div class="wc-hud">
+  <div class="wc-chip" title="Wave">Wave <b id="wcWave">0</b></div>
+  <div class="wc-chip wc-army" aria-label="Your army"><span>⚔<b id="wcTotal">0</b></span></div>
+  <div class="wc-chip" id="wcMorale" title="Morale">⚑<span class="bar"><i style="width:100%"></i></span><b>100</b></div>
+  <div class="wc-chip" id="wcFood" title="Squads / cap"><img class="wc-ico" src="assets/food-icon.svg" alt="Food"><b id="wcFoodVal">0/8</b></div>
+  <div class="wc-chip" id="wcFormNow">⛨ <b>Line</b></div>
+  <div class="wc-chip enemy" aria-label="Enemy army">⚔ <b id="wcFoes">0</b></div>
+</div>
+<nav class="wc-rail left" aria-label="Commands">
+  <button class="wc-btn" data-cmd="move" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 14l7 7 7-7"/></svg>Move</button>
+  <button class="wc-btn" data-cmd="attack"><svg viewBox="0 0 24 24"><path d="M4 20 18 6M14 4h6v6M6 14l4 4"/></svg>Attack</button>
+  <button class="wc-btn" data-cmd="hold"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 4 8 8 9 4-1 8-4 8-9V6z"/></svg>Hold</button>
+</nav>
+<div class="wc-formations" id="wcForms">
+  <button class="wc-btn" data-form="line">Line</button>
+  <button class="wc-btn" data-form="wedge">Wedge</button>
+  <button class="wc-btn" data-form="shieldwall">Shield Wall</button>
+  <button class="wc-btn" data-form="scatter">Scatter</button>
+</div>
+<nav class="wc-rail right" aria-label="Orders">
+  <button class="wc-btn" data-cmd="formation"><svg viewBox="0 0 24 24"><path d="M5 8h2M11 8h2M17 8h2M8 14h2M14 14h2M11 20h2"/></svg>Formation</button>
+  <button class="wc-btn retreat" data-cmd="retreat"><svg viewBox="0 0 24 24"><path d="M20 12H5M11 5l-7 7 7 7"/></svg>Retreat</button>
+</nav>
+</div>
+<script type="module">import {mountCommandUI} from './assets/ui/command-ui.js'; let ui=null; window.WCUI=()=>ui||(ui=mountCommandUI(document.getElementById('wcui')));</script>
 <script src="vendor/phaser.min.js"></script>
 <script src="js/sfx.js"></script>
 <script src="js/gxhub.js"></script>
@@ -10,5 +40,8 @@
 <script src="js/progress.js"></script>
 <script src="js/levels.js"></script>
 <script src="js/art.js"></script>
+<script src="js/conq_state.js"></script>
+<script src="js/conquest.js"></script>
+<script src="js/survival.js"></script>
 <script src="js/main.js"></script>
 </body></html>
