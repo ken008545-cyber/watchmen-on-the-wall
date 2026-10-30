@@ -621,3 +621,6 @@ coin sparkle. One new loading tip names the orbs.
   short; whether the label countdown is legible at phone size; and the
   prices' feel against real Grokonian income (a clear pays ~30 + waves —
   Thunder at 25 G is priced as a run-saver, Strength as a habit).
+
+## Music ruling (kennin, 2026-10-30, voice)
+Kennin heard the generative pad on the loading screen, called it better than his own track — "that eerie music... that's perfect" — and ruled: his "demon diss" battle track is REMOVED and the pad is the game's music, in the menu and in battle alike (battle already falls back to the same pad when no file is cached; Boot now loads no music files at all). His original .m4a remains preserved untouched in ~/workspace/watchmen-conquest/music-inbox/. The file slots in js/music.js stay supported should he ever reverse the ruling. verify_upgrade3.js updated to assert the ruling (no loads, no shipped mp3) instead of the old wiring.

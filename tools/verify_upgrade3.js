@@ -19,15 +19,15 @@ ok(/Phaser\.Scale\.FIT/.test(main) && /CENTER_BOTH/.test(main), 'scale config: F
 ok((main.match(/startFullscreen/g) || []).length >= 2, 'fullscreen buttons (Menu + battle HUD) call startFullscreen');
 ok(index.includes('js/music.js'), 'index.html loads js/music.js');
 ok(/canvas\{[^}]*max-width:100vw/.test(index) && /max-height:100vh/.test(index), 'index.html CSS caps canvas at the viewport');
-ok(main.includes("assets/music/menu.mp3") && main.includes("assets/music/battle.mp3"), 'Boot queues both music slots');
+ok(!main.includes("load.audio('mus_menu'") && !main.includes("load.audio('mus_battle'"), "Boot loads no music files — the pad is the music (kennin's ruling, 2026-10-30)");
 ok(main.includes('LOAD_TIPS') && /progress/.test(main), 'loading screen: tips + progress bar wired');
 ok(art.includes("tex('coin'") && art.includes("tex('coing'"), 'coin + Grokonian coin textures drawn in makeArt');
 for (const m of ['enemyHit', 'enemyDie', 'enemyAttack', 'campHit', 'campWarning', 'coinPickup'])
   ok(sfx.includes(m + '('), 'SFX has ' + m);
 ok(music.includes('gxhub_wotw_music') && music.includes('startPad'), 'music: persisted toggle + generative pad fallback');
 const battleMp3 = path.join(ROOT, 'assets/music/battle.mp3');
-ok(fs.existsSync(battleMp3) && fs.statSync(battleMp3).size > 1000000, "kennin's battle.mp3 is in the build (" + (fs.existsSync(battleMp3) ? fs.statSync(battleMp3).size : 0) + ' bytes)');
-ok(!fs.existsSync(path.join(ROOT, 'assets/music/menu.mp3')), 'menu.mp3 not present yet -> menu uses the pad fallback');
+ok(!fs.existsSync(battleMp3), "kennin's battle.mp3 REMOVED from the build at his word (2026-10-30); his original stays in the music inbox");
+ok(!fs.existsSync(path.join(ROOT, 'assets/music/menu.mp3')), 'no menu.mp3 either — menu and battle both use the pad');
 ok(!fs.existsSync(path.join(ROOT, 'assets/music/demon-diss-original.m4a')), 'inbox .m4a is NOT shipped in the build');
 
 // ---------- data checks ----------

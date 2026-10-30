@@ -80,7 +80,10 @@ class Boot extends Phaser.Scene{ constructor(){super('Boot');}
     this.load.on('loaderror',()=>{}); // a missing optional file (music, a unit PNG) must never stall the load
     this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); this.load.json('eras','data/eras.json'); this.load.json('units','data/units.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); UNIT_IMGS.forEach(k=>this.load.image(k,'assets/units/'+k+'.png'));
     // Music slots (Upgrade 3): kennin's own tracks drop in here later. A 404 is fine — Music falls back to its pad.
-    try{ this.load.audio('mus_menu','assets/music/menu.mp3'); this.load.audio('mus_battle','assets/music/battle.mp3'); }catch(e){}
+    // No music files are loaded: kennin ruled 2026-10-30 that the generative
+    // pad he heard on the loading screen is the music he wants — his own
+    // battle track was removed at his word. Music.play() falls back to the
+    // pad whenever no track is cached, which is now always.
     this.load.once('complete',()=>{ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); ERAS=this.cache.json.get('eras'); UNITS=this.cache.json.get('units'); makeArt(this); makeArt2(this);
       const wait=Math.max(0,900-(performance.now()-t0));
       this.time.delayedCall(wait,()=>this.scene.start('Menu')); });

@@ -1,9 +1,11 @@
-// Music for Watchmen on the Wall — Conquest (Upgrade 3).
-// Slots: assets/music/menu.mp3 and assets/music/battle.mp3. Kennin will
-// supply his own tracks later; until a file exists (or if it fails to load),
-// a quiet generative WebAudio pad stands in so the game is never silent.
-// The pad is a placeholder, not a composition: two detuned oscillators per
-// chord tone through a lowpass, gain ~0.04, chords drifting every 7s.
+// Music for Watchmen on the Wall — Conquest (Upgrade 3, ruling 2026-10-30).
+// The music is the quiet generative WebAudio pad: two detuned oscillators
+// per chord tone through a lowpass, gain ~0.04, chords drifting every 7s.
+// Kennin heard it on the loading screen, preferred it, and ruled his own
+// battle track ("demon diss") removed — the game loads no music files.
+// The file slots (assets/music/menu.mp3, battle.mp3) remain supported by
+// play() below if he ever reverses the ruling; with nothing cached, the
+// pad always stands in so the game is never silent.
 // Toggle persists in localStorage and lives next to Sound on the Menu.
 window.Music = (function(){
   const KEY='gxhub_wotw_music';
