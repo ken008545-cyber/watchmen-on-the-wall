@@ -301,7 +301,7 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     button(this,W/2-160,440,300,58,'Battle Pass',()=>this.scene.start('BattlePass'),{size:26});
     button(this,W/2+160,440,300,58,'Profile & Level',()=>this.scene.start('Profile'),{size:24});
     button(this,W/2-160,510,300,50,'Unlocks',()=>this.scene.start('Unlocks'),{size:22});
-    const m=button(this,725,510,140,50,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); },{size:16});
+    const m=button(this,725,510,140,50,'Sound: '+((SFX.volume&&SFX.volume()===0)?'off':'on'),()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); },{size:16});
     const mu=button(this,875,510,140,50,'Music: '+(Music.enabled()?'on':'off'),()=>{ mu.label.setText('Music: '+(Music.toggle()?'on':'off')); },{size:16});
     // Upgrade 12: the Controls door — movement scheme, keybinds and the
     // button-layout editor live in the Settings scene.
@@ -411,6 +411,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.runXp=0; this.kills=0; this.pend={}; this.pendXp=0; this.shieldT=0; this.banquet=false; this.earned=0;
     // Upgrade 3: the camp is the defeat meter now — camp HP replaces lives.
     this.campHp=CAMP_MAX; this.campHurtThisWave=false; this.campHurtTotal=false; this.campWarnedWave=0;
+    this.campSndFirst=false; this.campSndHalf=false; this.campSndQuarter=false; // Upgrade 13: camp threshold drums, once per run each
     // Upgrade 4: campMax is the single source for the camp's current maximum
     // (CAMP_MAX is only the un-upgraded base). campUp holds this run's bought
     // camp upgrades; respawnTime is what hurtHero() actually waits.
@@ -704,7 +705,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       // lesson goes on. (Nothing in the tutorial deals real damage anyway
       // — the dummies deal 0 — so this is a promise kept, not a path taken.)
       if(this.tutorial){ h.hp=1; this.floatText(h.x,h.y-84,'You cannot fall here','#8fd06a'); }
-      else { h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } } }
+      else { h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; SFX.heroDown(); this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } } }
   // --- Upgrade 8: Held Power + button weight ---
   heldTierOf(b){ const s=b.held||0; return s>=HELD.perfectAt?2:(s>=HELD.temperAt?1:0); }
   // A press on a skill button: fires at once when ready; a press inside the
@@ -1098,8 +1099,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(!t) return;
     h.cd=hd.rate;
     if(h.blocking) this.setBlock(false);
-    if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); }
-    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); SFX.sling(); }
+    if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkMelee(true); }
+    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); if(hd.dmgType==='holy') SFX.atkBow(true); else SFX.atkSling(true); }
     if(this.tutorial) this.tutEvent('autofired'); } // Upgrade 11: proof the hero fired on his own
   pressDodge(){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
     if(h.dodgeCd>0){ if(h.dodgeCd<=INPUT_BUFFER) h.dodgeBuf=true; return 'buffered'; }
@@ -1171,6 +1172,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.campHp-=amt; this.campHurtThisWave=true; this.campHurtTotal=true;
     if(this.campSpr){ this.campSpr.setTintFill(0xff8a6a); this.time.delayedCall(90,()=>{ if(this.campSpr&&this.campSpr.active) this.campSpr.clearTint(); }); }
     SFX.campHit();
+    // Upgrade 13: the threshold drum — first blood, half, quarter camp.
+    // Each crossing is spoken once per run, however the HP got there.
+    { const f=this.campHp/this.campMax;
+      if(!this.campSndFirst){ this.campSndFirst=true; SFX.campAlarm(1); }
+      if(f<=0.5&&!this.campSndHalf){ this.campSndHalf=true; SFX.campAlarm(2); }
+      if(f<=0.25&&!this.campSndQuarter){ this.campSndQuarter=true; SFX.campAlarm(3); } }
     if(this.campWarnedWave!==this.wave){ this.campWarnedWave=this.wave; SFX.campWarning(); this.toast('The camp is under attack!',2600); }
     if(this.campHp<=0){ this.campHp=0; this.refreshHUD(); this.end(false); return; }
     this.refreshHUD(); }
@@ -1332,7 +1339,15 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     s.bar=this.add.graphics().setDepth(12); this.squads.push(s); return s; }
   hurtSquad(s,amt){ if(s.dead) return; let m=1-(s.armor||0); if(this.squadOrder(s)==='shieldwall') m*=0.55; s.hp-=amt*m;
     s.spr.setTint(0xff6a5a); this.time.delayedCall(60,()=>{ if(!s.dead&&s.spr.active){ s.spr.clearTint(); applyTint(s.spr,s.def); } });
-    if(s.hp<=0){ s.dead=true; if(this.selSquad===s) this.selSquad=null; s.spr.destroy(); s.bar.destroy(); this.toast(s.def.name+' has fallen. Squad lost — the fallen do not return this run',2800); } }
+    if(s.hp<=0){ s.dead=true; if(this.selSquad===s) this.selSquad=null; s.spr.destroy(); s.bar.destroy(); SFX.allyDie(); this.toast(s.def.name+' has fallen. Squad lost — the fallen do not return this run',2800); } }
+  // Upgrade 13: a squad's weapon has a voice — archers and bowmen loose
+  // a string, every other ranged hand a sling, spears stab, and the
+  // melee lines swing (with a grunt of effort under the swing, capped
+  // hard inside SFX so a full line never turns to noise).
+  squadAtkSfx(s){ const d=s.def;
+    if(d.role==='ranged'||d.role==='support'){ if(/archer|bowman/.test(d.id)) SFX.atkBow(false); else SFX.atkSling(false); }
+    else if(d.role==='spear') SFX.atkSpear(false);
+    else { SFX.atkMelee(false); SFX.exert(); } }
   formationOffset(i,ord){ ord=ord||this.order; const col=Math.floor(i/3), row=i%3;
     if(ord==='flank') return {dx:-16-col*30,dy:(row-1)*74};
     if(ord==='shieldwall') return {dx:(this.squads[i]&&this.squads[i].def.role==='shield'?26:-30-col*30),dy:(row-1)*40};
@@ -1368,7 +1383,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const e={def:d,hp:d.hp*hpM,max:d.hp*hpM,dmg:d.dmg*dmM,range:d.range,rate:d.rate,speed:d.speed*(this.wave%2===0?1.08:1),
       x:this.worldW+20+Math.random()*30,y:120+Math.random()*Math.max(60,this.worldH-280),cd:0,dead:false,boss:q.boss,armorType:'flesh',ph:Math.random()*6};
     e.spr=uspr(this,e.x,e.y,d,q.boss?120:(d.img?66:(SZ[d.sprite]||54))); applyTint(e.spr,d);
-    e.spr.setDepth(7); e.bar=this.add.graphics().setDepth(12); if(d.heals) e.healCd=1.5; if(q.boss) this.setupBoss(e); this.enemies.push(e); return e; }
+    e.spr.setDepth(7); e.bar=this.add.graphics().setDepth(12); if(d.heals) e.healCd=1.5; if(q.boss) this.setupBoss(e); this.enemies.push(e);
+    if(d.sprite==='golem') SFX.golemSpawn(); // Upgrade 13: stone announces itself — a rumble as it takes the field
+    return e; }
   // --- goal-wave champion: boss name + health bar (the old TD treatment) ---
   setupBoss(e){ this.boss=e; this.bossBar=this.add.graphics().setDepth(32).setScrollFactor(0);
     this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+' — GOAL-WAVE CHAMPION',20,GOLD).setOrigin(0.5).setDepth(32).setScrollFactor(0);
@@ -1400,6 +1417,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         this.bossHeavyStrike(e); } }
     else { e.heavyT-=dt;
       if(e.heavyT<=0){ if(this.bossEngaged(e)){ e.heavyWind=BOSS.heavyWindup; e.heavyT=this.bossHeavyEvery(e);
+          SFX.bossWarn(BOSS.heavyWindup); // Upgrade 13: the wind-up has a rising voice — pitch is the timer
           if(e.spr&&e.spr.active) e.spr.setTintFill(0xff5a3a);
           this.floatText(e.x,e.y-84,'!','#ff8a6a'); this.spark(e.x,e.y,0xff5a3a,4); }
         else e.heavyT=0.5; } }
@@ -1409,7 +1427,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         if(e.slam.t<=0){ const s=e.slam; e.slam=null; e.slamT=BOSS.slamEvery; this.bossSlamImpact(e,s); } }
       else { e.slamT-=dt;
         if(e.slamT<=0){ const pos=this.bossSlamTarget(e);
-          if(pos){ e.slam={x:pos.x,y:pos.y,t:BOSS.slamDelay}; this.spark(pos.x,pos.y,0xff8a3a,4); }
+          if(pos){ e.slam={x:pos.x,y:pos.y,t:BOSS.slamDelay}; SFX.bossWarn(BOSS.slamDelay); this.spark(pos.x,pos.y,0xff8a3a,4); }
           else e.slamT=1; } } } }
   clearBoss(){ if(this.bossBar){ this.bossBar.destroy(); this.bossBar=null; } if(this.bossName){ this.bossName.destroy(); this.bossName=null; } if(this.bossFx){ this.bossFx.destroy(); this.bossFx=null; } this.boss=null; }
   // --- Upgrade 7: champion phases ---
@@ -1480,19 +1498,19 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(h&&h.down<=0&&Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<=hr){ this.hurtHero(dmg,true); hit=true; }
     this.squads.slice().forEach(s=>{ if(!s.dead&&Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y)<=hr){ this.hurtSquad(s,dmg); hit=true; } });
     if(!hit&&Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34) this.hitCamp(dmg,e);
-    SFX.stomp(); this.cameras.main.shake(160,0.006); this.spark(e.x,e.y,0xff8a6a,8); }
+    SFX.bossBoom(1); this.cameras.main.shake(160,0.006); this.spark(e.x,e.y,0xff8a6a,8); }
   // The slam lands: slamMul x damage to everyone still inside the marked
   // circle; the camp, if the circle covers it, takes one normal camp blow.
   bossSlamImpact(e,s){ const dmg=e.dmg*BOSS.slamMul, h=this.hero;
     if(h&&h.down<=0&&Phaser.Math.Distance.Between(s.x,s.y,h.x,h.y)<=BOSS.slamRadius) this.hurtHero(dmg,true);
     this.squads.slice().forEach(q=>{ if(!q.dead&&Phaser.Math.Distance.Between(s.x,s.y,q.x,q.y)<=BOSS.slamRadius) this.hurtSquad(q,dmg); });
     if(Phaser.Math.Distance.Between(s.x,s.y,this.campPos.x,this.campPos.y)<=BOSS.slamRadius) this.hitCamp(e.dmg,e);
-    SFX.stomp(); this.cameras.main.shake(220,0.008);
+    SFX.bossBoom(1.2); this.cameras.main.shake(220,0.008);
     const c=this.add.circle(s.x,s.y,BOSS.slamRadius,0xff8a3a,0.3).setDepth(6); this.tweens.add({targets:c,alpha:0,scale:1.15,duration:320,onComplete:()=>c.destroy()}); }
   // --- combat core ---
   damage(e,amt,type,opt){ if(e.dead) return; opt=opt||{};
     let m=(DATA.armorTable[e.armorType]||{})[type]||1; if(opt.crit&&Math.random()<opt.crit){ m*=e.boss?2.5:2; this.floatText(e.x,e.y-20,'CRIT','#f2c14e'); }
-    e.hp-=amt*m; SFX.enemyHit();
+    e.hp-=amt*m; SFX.enemyHit(amt); if(e.def&&e.def.sprite==='golem') SFX.golemGroan(); // Upgrade 13: stone complains when it is struck
     if(e.boss&&e.hp>0) this.bossPhaseSync(e); // Upgrade 7: crossing a phase line changes the champion NOW, once
     if(opt.slow){ e.slow=Math.max(e.slow||0,opt.slow); e.slowT=Math.max(e.slowT||0,1.2); }
     if(opt.stun){ e.stun=Math.max(e.stun||0,opt.stun*(e.boss?0.3:1)); }
@@ -1500,7 +1518,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(e.spr.active){ e.spr.setTintFill(0xffffff); this.time.delayedCall(60,()=>{ if(!e.dead&&e.spr.active){ e.spr.clearTint(); applyTint(e.spr,e.def); } }); }
     if(e.hp<=0) this.kill(e); }
   kill(e){ e.dead=true; this.kills++; this.manna+=e.def.bounty||5; this.tr('kills'); if(e.def.sprite==='locust') this.tr('flyKills');
-    if(e.boss){ this.tr('bossKills'); this.clearBoss(); this.toast(e.def.name+' has fallen!',2400); } this.gx(DATA_P().xp.kill); SFX.enemyDie(); this.spark(e.x,e.y,0xcdbd95,8);
+    if(e.boss){ this.tr('bossKills'); this.clearBoss(); this.toast(e.def.name+' has fallen!',2400); } this.gx(DATA_P().xp.kill); if(e.def&&e.def.sprite==='golem') SFX.golemDie(); else SFX.enemyDie(); this.spark(e.x,e.y,0xcdbd95,8);
     this.tweens.add({targets:e.spr,alpha:0,scale:0.3,duration:250,onComplete:()=>e.spr.destroy()}); e.bar.destroy(); this.refreshHUD(); }
   shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); this.shots.push({s,target,opt,speed:speed||560,lx:target.x,ly:target.y}); }
   spark(x,y,col,n){ for(let i=0;i<(n||4);i++){ const p=this.add.image(x,y,'spark').setTint(col).setDepth(16).setScale(0.8); this.tweens.add({targets:p,x:x+Phaser.Math.Between(-24,24),y:y+Phaser.Math.Between(-24,24),alpha:0,scale:0.2,duration:350,onComplete:()=>p.destroy()}); } }
@@ -1528,9 +1546,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const ring=(r,col)=>{ const c=this.add.circle(h.x,h.y,10,col,0.3).setDepth(15); this.tweens.add({targets:c,radius:r,alpha:0,duration:500,onComplete:()=>c.destroy()}); };
     const buffSquads=(rate,dmg)=>this.squads.forEach(s=>{ if(rate) s.buffRateT=rate; if(dmg) s.buffDmgT=dmg; });
     switch(k.id){
-      case 'stone': { const t=strongest(1,near(h.def.range*2))[0]; if(!t) return this.toast('No target'); shootS(h.x,h.y,t,'stone',{dmg:120,type:'physical',stun:1.5,crit:0.2},700); break; }
-      case 'psalm': buffS(6,0); ring(240,0xd9a441); break;
-      case 'five': { const ts=strongest(5); if(!ts.length) return this.toast('No target'); ts.forEach((t,j)=>this.time.delayedCall(j*120,()=>shootS(h.x,h.y,t,'stone',{dmg:250*(t.boss?3:1),type:'physical',stun:0.5},800))); SFX.ult(); this.cameras.main.flash(200,217,164,65); break; }
+      case 'stone': { const t=strongest(1,near(h.def.range*2))[0]; if(!t) return this.toast('No target'); shootS(h.x,h.y,t,'stone',{dmg:120,type:'physical',stun:1.5,crit:0.2},700); SFX.smoothStone(); break; }
+      case 'psalm': buffS(6,0); ring(240,0xd9a441); SFX.psalm(); break;
+      case 'five': { const ts=strongest(5); if(!ts.length) return this.toast('No target'); ts.forEach((t,j)=>this.time.delayedCall(j*120,()=>shootS(h.x,h.y,t,'stone',{dmg:250*(t.boss?3:1),type:'physical',stun:0.5},800))); SFX.fiveStones(); this.cameras.main.flash(200,217,164,65); break; }
       case 'rally': buffS(0,8); ring(400,0xd9a441); break;
       case 'palm': near(170).forEach(e=>e.stun=Math.max(e.stun||0,ctrlS(2))); ring(170,0x8a6a9a); break;
       case 'song': E.forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=6*mul; dmgS(e,60,'holy'); }); this.cameras.main.flash(250,200,180,230); break;
@@ -1568,7 +1586,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     }
     this.floatText(h.x,h.y-56,k.name+'!','#f2c14e');
     if(tier>0) this.floatText(h.x,h.y-74,HELD.names[tier]+'!','#ffe98a');
-    if(k.id!=='five') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); }
+    if(k.id!=='five'&&k.id!=='psalm'&&k.id!=='stone') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); } // Upgrade 13: stone/psalm/five carry signatures above — the generic skill chirp steps aside for them
     // Upgrade 8: the cast spends the charge and is tallied at its tier.
     this.heldSpent[tier]++; b.held=0; b._tierShown=0; b.buffered=false; b.cd=k.cd; b.cdMax=k.cd;
     if(this.tutorial) this.tutEvent('power'); } // Upgrade 11: a real cast — reached only past every 'No target' return, so it always counts
@@ -1775,7 +1793,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       else if(foe&&dl>range*0.9&&eo!=='hold'){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; }
       s.spr.setOrigin(0.5,0.9).setPosition(s.x,s.y+16).setDepth(7+s.y/1000);
       s.cd-=dt*(s.buffRateT>0?1.4:1);
-      if(foe&&s.cd<=0){ s.cd=s.rate; const dmg=s.dmg*(s.buffDmgT>0?1.3:1);
+      if(foe&&s.cd<=0){ s.cd=s.rate; const dmg=s.dmg*(s.buffDmgT>0?1.3:1); this.squadAtkSfx(s);
         if(s.def.role==='ranged'||s.def.role==='support') this.shoot(s.x,s.y-20,foe,'stone',{dmg,type:'physical',crit:0.08},620);
         else { this.damage(foe,dmg,'physical',{crit:0.08}); this.spark(foe.x,foe.y,0xe8e0c8,2); } }
       // Levite Healer (Upgrade 3): mends the most-wounded squad within 120px at 6 HP/s.
@@ -1786,8 +1804,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // enemies
     for(const e of this.enemies){ if(e.dead) continue;
       if(e.burnT>0){ e.burnT-=dt; e.hp-=e.burn*dt; if(e.hp<=0){ this.kill(e); continue; } }
-      if(e.def.heals){ e.healCd=(e.healCd||1.5)-dt; if(e.healCd<=0){ e.healCd=2.5;
-        for(const o of this.enemies){ if(o!==e&&!o.dead&&o.hp<o.max&&Phaser.Math.Distance.Between(e.x,e.y,o.x,o.y)<110){ o.hp=Math.min(o.max,o.hp+15); this.spark(o.x,o.y-10,0x8fd06a,1); } } } }
+      if(e.def.heals){ e.healCd=(e.healCd||1.5)-dt; if(e.healCd<=0){ e.healCd=2.5; let healed=false;
+        for(const o of this.enemies){ if(o!==e&&!o.dead&&o.hp<o.max&&Phaser.Math.Distance.Between(e.x,e.y,o.x,o.y)<110){ o.hp=Math.min(o.max,o.hp+15); healed=true; this.spark(o.x,o.y-10,0x8fd06a,1); } }
+        if(healed) SFX.priestChant(); } } // Upgrade 13: the Baal Priest's heal has a voice — an eerie, beating chant
       if(e.slowT>0) e.slowT-=dt; else e.slow=0;
       if(e.stun>0){ e.stun-=dt; }
       else if(e.confuse>0){ e.confuse-=dt; e.x+=e.speed*0.6*dt; }
@@ -1809,7 +1828,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
           if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0))*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
           else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate;
             if(def.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(def.s,e.dmg);
-            SFX.enemyAttack(); this.spark(def.x,def.y,0xc0392b,2); } }
+            SFX.enemyAttack(e); this.spark(def.x,def.y,0xc0392b,2); } }
         } else if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
           const sp=e.speed*(1-(e.slow||0))*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
         } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } }
@@ -1944,6 +1963,16 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
     keep(txt(this,90,196,'Keybinds',22,GOLD));
     keep(txt(this,90,222,'Click a key, then press the new one. Escape cancels. A key already in use trades places — a swap, so no action is ever left keyless.',14,'#cdbd95'));
     this.renderBinds();
+    // Upgrade 13: the SOUND setting — the one master level for every
+    // effect in the game (music keeps its own toggle, on the Menu).
+    // Quieter/Louder step by 25; Mute folds into the same setting (0),
+    // and unmuting restores the level the player had.
+    keep(txt(this,90,478,'Sound',20,GOLD));
+    keep(button(this,330,512,200,36,'Quieter',()=>{ SFX.setVolume((SFX.volume()||0)-25); this.refreshSnd(); },{size:15}));
+    keep(button(this,830,512,200,36,'Louder',()=>{ SFX.setVolume((SFX.volume()||0)+25); this.refreshSnd(); },{size:15}));
+    this.muteBtn=keep(button(this,1080,512,170,36,'Mute',()=>{ SFX.toggle(); this.refreshSnd(); },{size:15}));
+    this.sndTxt=keep(txt(this,595,512,'',16,'#f2c14e').setOrigin(0.5));
+    this.refreshSnd();
     this.bindStatus=keep(txt(this,W/2,540,'',16,'#f2c14e').setOrigin(0.5));
     keep(button(this,300,592,260,46,'Reset keybinds',()=>{ this.binds=Object.assign({},DEFAULT_BINDS); saveBinds(this.binds); this._cap=null; this.renderBinds(); this.bindStatus.setText('Keybinds reset to the standard set.'); },{size:16}));
     keep(button(this,640,592,260,46,'Reset button layout',()=>{ resetLayout(); this.bindStatus.setText('Button layout reset to the standard.'); },{size:16}));
@@ -1954,6 +1983,9 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
     // A click anywhere else gives up a capture in progress.
     this.input.on('pointerdown',()=>{ if(this._cap){ this._cap=null; this.renderBinds(); this.bindStatus.setText('Rebind cancelled.'); } });
     this.markMove(); }
+  refreshSnd(){ const v=SFX.volume?SFX.volume():100; // Upgrade 13
+    if(this.sndTxt) this.sndTxt.setText('Sound: '+(v==null?100:v)+'%');
+    if(this.muteBtn) this.muteBtn.label.setText(v>0?'Mute':'Unmute'); }
   markMove(){ if(!this.moveBtns) return;
     Object.entries(this.moveBtns).forEach(([id,b])=>{ b.label.setText((id==='tap'?'Tap to move':id==='stick'?'Joystick':'Follow (hold)')+(this.moveScheme===id?' ✓':'')); }); }
   renderBinds(){ (this.bindItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.bindItems=[];

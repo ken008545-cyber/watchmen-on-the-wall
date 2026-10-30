@@ -1648,3 +1648,149 @@ note and the new harness.
 - Follow-arrow readability at battle zoom, and whether FOLLOW should
   also steer while the finger DRAGS only (today a held still press
   arms it too, the slither way).
+
+## Upgrade 13 — The Sound Pass: weight and identity (2026-10-30)
+
+Kennin's ruling (voice, 2026-10-30): "we work on the sound like the
+sound effects, the sound the enemies make, the sound the heroes make,
+the players. The attack sounds, the power move sounds — you know, like
+we need a oomph the sound up." Code is in `js/sfx.js` (rewritten around
+its own legacy API — every pre-U13 voice survives by name and shape)
+and the call sites in `js/main.js`, plus this note and the new harness.
+`js/music.js` is OUT of scope and untouched: the generative pad kennin
+ruled perfect keeps its own key (`gxhub_wotw_music`), its own gain, and
+never passes through the new master. `js/gxhub.js` / `js/tokens.js`
+zero diff.
+
+### The master: one gain, the player's setting
+- Every SFX voice now routes through a single master GainNode built at
+  first unlock. Its level is the SOUND setting, `gxhub_wotw_sound`
+  (0–100, default 100), persisted like the other `gxhub_wotw_*` keys.
+- Controls (the U12 Settings scene) gains a Sound row: Quieter/Louder
+  step by 25, a live "Sound: N%" readout, and Mute — which is the same
+  setting at 0; unmuting restores the level the player had (tracked as
+  lastVol). The Menu's Sound button keeps its old behavior on top of
+  the same state: `SFX.toggle()` flips between 0 and the last level.
+- The browser rule stands: the context is only ever created/resumed
+  through `SFX.unlock()` (button presses, as before), and every voice
+  fails silent — never throws — when audio is locked, absent, or the
+  constructor itself throws (harness-proven both ways).
+
+### The mix (peak gains at master = 100, before the master)
+Power signatures 0.30–0.34 · boss boom 0.34 (slam ×1.2) · hero attacks
+0.15–0.42 by weapon (blunt heaviest) · camp crack+thud 0.30, threshold
+drums 0.30 · squad attacks 0.08–0.26 (golem fist the loud squad-side
+voice) · impacts 0.05–0.17 scaled by damage · field voices 0.04–0.26
+(golem spawn 0.22, falls 0.13–0.28) · the U10 power-ready whisper
+unchanged at 0.045 — still the quietest thing in the kit, by design.
+
+### Family 1 — attacks, layered (transient + body + low thump)
+- `atkMelee` swish (bandpass sweep 1500→450) + triangle body (190→75)
+  + sine thump (105→42); `atkBlunt` 92→30 boom + lowpass wash + a
+  square knock inside it; `atkSling` rising whistle (850→2300) + strap
+  snap (highpass) + body; `atkBow` string (260→150) + pluck tick +
+  arrow flight (bandpass sweep up); `atkSpear` a Q5 stab + short body.
+  The hero's mix runs roughly double his squads' throughout — harness
+  asserts hero melee peak > 1.8× squad peak.
+- Wiring: heroAutoFire melee → atkMelee(hero); ranged → atkSling, or
+  atkBow for holy heroes (their "ember" needed a brighter string).
+  Squads speak by weapon from their data (`squadAtkSfx`): archer/
+  bowman ids → bow; other ranged/support → sling; spear role → spear;
+  melee roles → melee + `exert`, a tiny grunt under the swing.
+- CHOICE: the Levite Healer (support) shoots with the sling voice —
+  there is no separate "holy dart" sound; if kennin's ear wants the
+  healer brighter, it is a one-line branch in squadAtkSfx.
+
+### Family 2 — power signatures
+- **Psalm** (`psalm`): a warm chord — C major sines (261.63/329.63/
+  392/523.25) with a slow 0.28s attack, a harp's body rather than its
+  pluck — under four triangle plucks climbing 523→1046.
+- **Five Stones** (`fiveStones`): CHOICE — five discrete rising
+  strikes, not one crescendo: five snap+tone pairs at the move's own
+  120ms cadence (the useSkill code already throws the stones 120ms
+  apart), each higher than the last (480→920Hz bodies), so the ear
+  counts the stones as the hand throws them.
+- **Smooth Stone** (`smoothStone`): a charge — sine rising 240→900
+  over 0.22s with a slow attack — then the release: strap snap +
+  whistle at hero weight.
+- useSkill's generic `skill()` chirp now steps aside for exactly these
+  three ids; every other skill keeps it, and every other ult keeps
+  `ult()` (Five Stones was the only ult with its own sound before; it
+  keeps exclusivity). Boss telegraphs: `bossWarn(dur)` — two detuned
+  saws rising (95→185, 142→278) with the attack stretched across the
+  telegraph's own duration (heavyWindup 1.1s / slamDelay 1.2s), so the
+  pitch IS the timer — and `bossBoom(scale)` at the landing: the old
+  stomp plus a 58→22Hz sub and a lowpass wash, slam scaled ×1.2.
+  Harness asserts the warning's first oscillator is scheduled before
+  the boom's, at under half its peak.
+
+### Family 3 — voices of the field
+- Golems: `golemSpawn` rumble at spawn (two low sines + lowpass noise),
+  `golemGroan` when struck (low saw + wash, 260ms throttle, from
+  damage() by sprite), `golemDie` crumble instead of the generic blip
+  (85→26 collapse + three descending noise bursts). Tutorial dummies
+  are Pebble Golems, so the lesson field rumbles and groans too — the
+  sounds are the unit's, not the mode's.
+- The Baal Priest's heal (he lands one on an ally) triggers
+  `priestChant`: three sines a minor second apart (196/208/98Hz)
+  gliding down together over 1s at whisper-adjacent levels, throttled
+  to the heal's own cadence — eerie because it beats against itself.
+- Falls differ per side: enemies keep `enemyDie`; squads fall with
+  `allyDie` (a descending triangle + soft thud in hurtSquad's death
+  branch); the hero's fall adds a low drum (`heroDown`, hurtHero's
+  real down branch only — the tutorial's 1HP mercy stays quiet).
+- Enemy blows: `enemyAttack(e)` now receives the attacker; a golem
+  attacker lands `atkBlunt(false)` — its fist — everything else keeps
+  the legacy grunt.
+- THE GATE: per-family sliding windows (100ms): atk 6, impact 6,
+  voice 4, pow 5, camp 3. When a family is full, a new voice enters
+  only if it is LOUDER than the quietest in the window, which it
+  evicts — otherwise it is dropped. The legacy per-sound throttles
+  (lim) still stand underneath. A 20-swing burst admits exactly 6.
+
+### Family 4 — impact & camp
+- `damage()` passes its amount to `enemyHit(amt)`, which is now the
+  impact family: a thock whose bandpass center (800→2400Hz) and peak
+  (0.05→0.17) grow with the blow, a sine body joining at 14+ damage —
+  the old square chirp rides on top at lower level so the ear keeps
+  the sound it learned. Projectile arrivals keep the legacy `hit()`
+  tick; the thock is the damage, the tick is the landing.
+- `campHit` gains a wooden crack (850Hz bandpass snap) over the thud.
+- Threshold drums in `hitCamp` (`campAlarm(1|2|3)`): first blood one
+  drum, crossing 50% two, crossing 25% three — each fired once per run
+  from run-state flags set beside campWarnedWave in create; repairs
+  and Fortify do not re-arm them (a mended camp that falls back
+  through a line does not drum twice — the flags are the run's memory,
+  and the camp bar already shows the number).
+- Victory/defeat stingers already existed (`win`/`lose`) and stand.
+
+### Verification
+tools/verify_upgrade13.js — 110 checks: statics (new surface, legacy
+surface, music untouched, every main.js wiring point); the recording-
+studio runtime (layers per weapon, hero>squad, damage scaling, gate
+caps + quietest-first eviction + window slide, chant throttle, voice
+cap, warn-before-boom order and weight, camp crack + drum sequences,
+whisper level, volume persistence/reload/clamp, silence-at-zero, and
+no-throw under missing/throwing AudioContext); main integration with
+the REAL SFX (hero thump through heroAutoFire, golem groan/crumble
+through damage(), camp drums 1/0/2/3 through hitCamp(), Psalm chord
+and five-strike pattern through useSkill(), and the Controls sound
+row driving the real persisted setting through its own buttons); and
+the competent-play sim copied from U12. All suites green together:
+U3 47, U4 32, U5 40, U6 34, U7 44, U8 93, U9 61, U10 77, U11 81,
+U12 66, U13 110 — 685 checks. Sim unchanged: champion 32.5s,
+camp 500/500. Local commit only, NOT pushed (the parent sequences
+pushes).
+
+**What remains for kennin's ears (Upgrade 13):**
+- The overall loudness balance between families — the mix above is a
+  first setting of the faders; which family feels too forward or too
+  buried is his call on real speakers.
+- Five Stones as five counted strikes vs one gathering crescendo —
+  the counted version shipped (it matches the throw cadence); the
+  crescendo is the alternative if the ult should feel like one wave.
+- Smooth Stone's charge time (0.22s rise) — whether the wind-up
+  should feel longer, more dangerous, before the release.
+- The priest's chant: how eerie is right — it is deliberately quiet;
+  if it reads as noise rather than menace, it wants lowering or a
+  slower glide, both one-line changes.
