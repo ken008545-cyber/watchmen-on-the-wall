@@ -27,6 +27,12 @@ const ORBS=[
 ];
 const ORB_CD=15; // seconds an orb sleeps after a purchase
 const ORB_RANGE=90; // the hero must stand this close to touch an orb
+// Upgrade 6: kennin's wave-flow ruling (2026-10-30, from his own playtest):
+// no click is ever required to advance. EVERY between-wave shop — the first
+// shop of a run included — runs a full minute of intermission on a visible
+// countdown, giving real time to upgrade and buy soldiers; at zero the next
+// wave starts on its own. "Next Wave Now" stays for finishing shopping early.
+const SHOP_COUNTDOWN=60; // seconds of intermission between waves
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -216,7 +222,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.campPos={x:150,y:600}; this.campSpr=this.add.image(this.campPos.x,this.campPos.y,'camp').setDepth(2);
     this.campBar=this.add.graphics().setDepth(12);
     this.manna=ERAS.startManna; this.speed=1; this.time.timeScale=1;
-    this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.victoryOpen=false; this.shopT=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
+    this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.victoryOpen=false; this.shopT=0; this.shopEndsAt=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
     this.fx=this.add.graphics().setDepth(20);
     this.buildHero(); this.buildOrbs(); this.buildHUD();
     this.cameras.main.setBounds(0,0,this.worldW,this.worldH);
@@ -487,10 +493,15 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.floatText(h.x,h.y-56,k.name+'!','#f2c14e');
     if(k.id!=='five') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); } b.cd=k.cd; }
   // --- between-wave shop ---
-  openShop(first){ this.shopOpen=true; this.shopFirst=!!first; this.shopT=20; this.shopPage=0;
+  // Upgrade 6: the intermission deadline is a wall-clock moment, set ONCE
+  // here. It lives on the scene, not on any shop widget, so buying, paging
+  // and the re-renders they cause never reset or pause it. shopT is the
+  // remaining-seconds mirror update() maintains from that deadline.
+  openShop(first){ this.shopOpen=true; this.shopFirst=!!first; this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; this.shopPage=0;
     // squads and hero mend between waves
     this.squads.forEach(s=>{ s.hp=s.max; }); this.hero.hp=this.heroDef.hp;
     this.renderShop(first); }
+  shopTimerLabel(){ const s=Math.max(0,Math.ceil(this.shopT)); return 'Next wave in '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
   shopAdd(o){ this.shopItems.push(o); return o; }
   clearShop(){ this.shopItems.forEach(o=>{ try{o.destroy();}catch(e){} }); this.shopItems=[]; }
   ownedSquad(defId){ return this.squads.find(s=>s.def.id===defId&&!s.dead); }
@@ -556,12 +567,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(pages>1){ const pv=button(this,420,668,60,48,'◀',()=>{ this.shopPage=(this.shopPage+pages-1)%pages; this.renderShop(false); },{size:18}); pv.setDepth(52); this.shopAdd(pv);
       this.shopAdd(txt(this,490,668,(this.shopPage+1)+'/'+pages,18,PARCH).setOrigin(0.5).setDepth(52));
       const nx=button(this,560,668,60,48,'▶',()=>{ this.shopPage=(this.shopPage+1)%pages; this.renderShop(false); },{size:18}); nx.setDepth(52); this.shopAdd(nx); }
-    const go=button(this,820,668,300,54,'Next wave ▶',()=>this.closeShop(),{size:22}); go.setDepth(52); this.shopAdd(go);
-    this.shopTimerTxt=this.shopAdd(txt(this,1090,668,this.shopFirst?'Auto-start off — take your time':'Auto-start in 20s',16,'#cdbd95').setOrigin(0.5).setDepth(52));
+    const go=button(this,820,668,300,54,'Next Wave Now ▶',()=>this.closeShop(),{size:22}); go.setDepth(52); this.shopAdd(go);
+    this.shopTimerTxt=this.shopAdd(txt(this,1090,668,this.shopTimerLabel(),18,GOLD).setOrigin(0.5).setDepth(52));
     this.fixUI();
   }
   updateShopHead(){ if(this.shopHead2) this.shopHead2.setText('Manna '+Math.floor(this.manna)+'  •  Squads '+this.squads.length+'/'+this.squadCap+'  •  Next: wave '+(this.wave+1)+' ('+((this.wave+1)%2===0?'night':'day')+')  •  Goal: wave '+this.goalWave+(this.endless?' (cleared — Endless)':'')); }
-  closeShop(){ this.shopOpen=false; this.shopFirst=false; this.clearShop(); this.startWave(); }
+  closeShop(){ this.shopOpen=false; this.shopFirst=false; this.shopEndsAt=0; this.clearShop(); this.startWave(); }
   waveClear(){ this.waveActive=false; this.wavesCleared=this.wave;
     let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*1.5); this.banquet=false; }
     const perfect=!this.campHurtThisWave; this.manna+=bonus; this.lastBonus=bonus;
@@ -582,9 +593,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const f=button(this,W/2+160,440,290,56,'Finish run',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.end(true); },{size:19}); f.setDepth(56); s.push(f); this.fixUI(); }
   // --- main loop ---
   update(time,delta){ if(this.over) return;
-    if(this.shopOpen){ if(this.shopFirst){ if(this.shopTimerTxt) this.shopTimerTxt.setText('Auto-start off — take your time'); }
-      else { this.shopT-=delta/1000; if(this.shopTimerTxt) this.shopTimerTxt.setText('Auto-start in '+Math.max(0,Math.ceil(this.shopT))+'s');
-        if(this.shopT<=0) this.closeShop(); } return; }
+    if(this.shopOpen){ // Upgrade 6: every shop counts the same honest minute
+      // down from the wall-clock deadline set in openShop. Phaser stops
+      // calling update() while the tab is hidden, so a returning player
+      // simply finds the minute elapsed and the wave beginning — the timer
+      // never grants hidden bonus time and never freezes mid-shop. At zero,
+      // closeShop() flips shopOpen off before startWave(), so the wave can
+      // only ever start once.
+      this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
+      if(this.shopTimerTxt) this.shopTimerTxt.setText(this.shopTimerLabel());
+      if(this.shopT<=0) this.closeShop();
+      return; }
     if(this.victoryOpen) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
     if(this.volleyCd>0){ this.volleyCd-=dt; if(this.volleyCd<=0) this.refreshHUD(); }
