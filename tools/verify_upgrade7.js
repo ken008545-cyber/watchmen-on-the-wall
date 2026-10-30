@@ -210,7 +210,8 @@ function buySquad(g, id, ups) { const def = UNITS.bible.player.find(u => u.id ==
   let steps = 0, maxPhase = 1;
   while (steps < 4800 && !e.dead && g.campHp > 0) {
     const tele = e.heavyWind > 0 || !!e.slam;
-    g.order = tele ? 'fallback' : 'charge';
+    const want = tele ? 'fallback' : 'charge';
+    if (g.__u9ord !== want) { g.__u9ord = want; g.selSquad = null; g.giveOrder(want); } // Upgrade 9: orders now go through the real command path (squads carry their own orders; the sim drives the army-wide one)
     g.hero.tx = Math.max(40, Math.min(g.worldW - 40, e.x - (tele ? 300 : 135)));
     g.hero.ty = tele ? g.hero.y : e.y;
     g.update(0, 50); steps++;

@@ -26,6 +26,17 @@ window.SFX = (function(){
     coinPickup(grok){ if(lim('coin',70)){ const b=grok?1.25:1; tone('triangle',880*b,880*b,0.09,0.11); setTimeout(()=>tone('triangle',1318*b,1318*b,0.14,0.11),70); } },
     // Upgrade 5: an orb purchase — a low hum that swells and settles, crowned with the coin sparkle.
     orbBuy(){ if(lim('orb',120)){ tone('sine',174,87,0.55,0.16); tone('sine',261,130,0.5,0.07); tone('triangle',784,784,0.1,0.1); setTimeout(()=>tone('triangle',1175,1175,0.16,0.1),80); } },
+    // Upgrade 9: the potion moment — a DRINK: two gulps, a fizz, and the
+    // sparkle of the power taking hold. Distinct from orbBuy's hum so the
+    // ear learns "bought" and "drank" as two different events.
+    orbDrink(){ if(lim('drink',120)){ tone('sine',300,170,0.09,0.13); setTimeout(()=>tone('sine',330,190,0.09,0.13),105); setTimeout(()=>tone('sine',370,230,0.1,0.11),210); nz(0.3,5200,0.7,0.045,'highpass'); setTimeout(()=>tone('triangle',1318,1318,0.15,0.09),250); } },
+    // Upgrade 10 (approved addition): the POWER-READY WHISPER — one soft,
+    // low chime (a gentle rising fifth, pure sine, a fraction of combat
+    // volume) when a great power finishes cooling. Throttled per power
+    // (the caller passes the power's id) so two powers completing on the
+    // same tick each get their one cue. Nothing else in the kit speaks
+    // this quietly.
+    ready(k){ if(lim('rdy'+(k||''),150)){ tone('sine',1318,1318,0.18,0.045); setTimeout(()=>tone('sine',1760,1760,0.22,0.035),70); } },
     build(){ tone('triangle',440,660,0.12,0.15); setTimeout(()=>tone('triangle',660,880,0.12,0.12),90); },
     leak(){ tone('sine',200,80,0.4,0.25); },
     stomp(){ tone('sine',90,30,0.6,0.5); nz(0.4,150,0.5,0.4,'lowpass'); },

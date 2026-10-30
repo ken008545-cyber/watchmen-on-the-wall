@@ -16,6 +16,17 @@
 // the boss stone at 250x3) — a pre-existing ult truth, not a mastery
 // question. No browser is available — button readability at phone size
 // needs a human pass at the playtest address.
+//
+// Upgrade 10 re-point (kennin's reversal, 2026-10-30): the manual
+// basic-attack scheme part of this suite was built to prove — LIGHT /
+// HEAVY presses, aim priority, the heavy wind-up/cleave/splash, the
+// attack press buffer, the sprint opener — was REMOVED at kennin's
+// ruling, and those batteries below were re-pointed to the new ruling
+// (auto-fire restored, toggleable; proof lives in verify_upgrade10.js).
+// Every Held-Power battery (accrual, tiers, multipliers, Perfect loss,
+// the skill input buffer, sweeps, the tally) is UNCHANGED, as are the
+// dodge/block/sprint/stamina batteries minus the opener. The sims now
+// fight by auto-fire, as the approved default plays.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -41,12 +52,12 @@ ok(main.includes("label+'!'") && main.includes("this.floatText(this.hero.x,this.
 ok(main.includes('held:this.heldSpent?this.heldSpent.slice()') && main.includes("'Held Power: '"), 'end-of-run payload and summary line carry the Held tally');
 ok(main.includes("c.on('pointerdown'"), 'the shared button helper presses with weight (pointerdown dip)');
 // --- combat-controls statics (kennin's two-hands design) ---
-ok(/const FIGHT=\{ lightDmg:0\.75, lightCd:0\.55, heavyDmg:2\.1, heavyCd:1\.9, heavyWindup:0\.28/.test(main), 'FIGHT table: light x0.75 dmg / x0.55 cd, heavy x2.1 dmg / x1.9 cd / 0.28s wind-up');
-ok(main.includes('blockMit:0.65, blockHeavyMit:0.45') && main.includes('sprintMul:1.45') && main.includes('openerMul:1.25'), 'FIGHT table: block 65% / heavy-block 45% mitigation, sprint x1.45, opener x1.25');
+ok(!/lightDmg|heavyDmg|lightCd|heavyCd|heavyCleave|heavySplash|openerMul/.test(main), 'Upgrade 10: the manual-strike numbers are GONE from the FIGHT table — auto-fire reads the hero data directly'); // (heavyWindup is not in this list on purpose: BOSS.heavyWindup is the champion's own telegraph and stays)
+ok(main.includes('blockMit:0.65, blockHeavyMit:0.45') && main.includes('sprintMul:1.45'), 'FIGHT table: block 65% / heavy-block 45% mitigation, sprint x1.45 (the surviving kit, unchanged)');
 ok(main.includes('dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6'), 'FIGHT table: dodge 150px in 0.22s, 0.30s i-frames, 1.6s cooldown');
-ok(main.includes('buildFightControls()') && main.includes("mk('heavy',1184,296") && main.includes("mk('light',1184,384") && main.includes("mk('block',1184,472"), 'fight cluster is built on the RIGHT side of the screen (x ~1184)');
-ok(main.includes('if(this.overFight(p)) return;'), 'onTap refuses taps on the fight cluster — the hands stay separate');
-ok(!/h\.cd-=dt; if\(h\.cd<=0\)\{ const t=this\.nearestEnemy\(h\.x,h\.y,hd\.range\)/.test(main), 'the hero auto-fire block is GONE — the range circle triggers nothing');
+ok(main.includes('buildFightControls()') && main.includes("mk('autofire',SX,70") && main.includes("mk('dodge',SX,176") && main.includes("mk('block',SX,240") && main.includes("mk('sprint',SX,304"), 'Upgrade 10: the right-thumb stack — AUTO-FIRE toggle over DODGE, BLOCK, SPRINT, top right of the screen');
+ok(main.includes('if(this.overFight(p)) return;'), 'onTap refuses taps on the fight stack — the hands stay separate');
+ok(main.includes('heroAutoFire(){') && main.includes('this.heroAutoFire();') && !main.includes('pressAttack') && !main.includes('lightStrike') && !main.includes('heavyStrike'), 'Upgrade 10: auto-fire is RESTORED through heroAutoFire(); the manual press path (pressAttack/lightStrike/heavyStrike) is removed entirely');
 ok(main.includes('if(h.iframes>0) return;'), 'hurtHero honors dodge i-frames before all damage');
 ok(main.includes("this.setBlock(true)") && main.includes("bb.on('pointerdown'"), 'BLOCK is a hold (pointerdown raises, release drops)');
 
@@ -230,55 +241,43 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
     b.held = HELD.perfectAt; g.drawSkillSweep(b); } catch (err) { clean = false; }
   ok(clean, 'the sweep draws without error on cooldown, at Ready, Tempered and Perfect'); }
 
-// ---------- THE FIGHT CLUSTER: manual combat (kennin's two-hands design) ----------
-{ // NO AUTO-FIRE: an enemy standing in the range circle is a warning, not a trigger
-  const g = bareBattle('david');
+// ---------- THE FIGHT STACK: auto-fire + the surviving kit (Upgrade 10 re-point) ----------
+{ // AUTO-FIRE: this battery asserted the exact opposite under Upgrade 8's
+  // manual ruling (zero strikes in the circle). Under kennin's reversal:
+  // ON strikes on its own; OFF is silent.
+  const g = bareBattle('david'); g.autoFire = true;
   const e = spawnFoe(g, g.hero.x + 120, g.hero.y); e.hp = 500; const before = e.hp;
   for (let i = 0; i < 60; i++) g.update(0, 50); // 3 seconds inside the range circle
-  ok(e.hp === before && g.shots.length === 0, 'no auto-fire: 3s with an enemy inside the range circle, zero strikes thrown'); }
-{ // LIGHT (ranged): the press throws the stone on the light recovery clock
-  const g = bareBattle('david');
-  const e = spawnFoe(g, g.hero.x + 120, g.hero.y); e.hp = 500; const before = e.hp;
-  const r = g.pressAttack('light');
-  ok(r === 'struck' && g.shots.length === 1 && approx(g.hero.atkCd, 0.7 * 0.55), 'LIGHT press fires one shot and starts the light recovery (rate x 0.55)');
-  ok(stepUntil(g, () => e.hp < before), 'the light stone lands');
-  ok(approx(before - e.hp, 18 * 0.75), 'LIGHT hit deals lightDmg x basic (18 x 0.75 = 13.5)');
-  const g2 = bareBattle('david');
-  ok(g2.pressAttack('light') === 'none' && g2.hero.atkCd === 0, 'a press with no target in range is free — no recovery spent on air'); }
-{ // AIM: the enemy at the marching hand's tap point is struck before the nearer one
-  const g = bareBattle('david');
-  spawnFoe(g, g.hero.x + 95, g.hero.y);
-  const aimed = spawnFoe(g, g.hero.x + 135, g.hero.y - 10);
-  g.hero.tx = aimed.x; g.hero.ty = aimed.y; // the marching hand tapped there
-  g.pressAttack('light');
-  ok(g.shots.length === 1 && g.shots[0].target === aimed, 'aim priority: the strike goes to the enemy at the tapped point, not the nearest'); }
-{ // Samson's hands: LIGHT is instant, HEAVY winds up for real and cleaves
-  const g = bareBattle('samson');
+  ok(e.hp < before, 'auto-fire ON: 3s with an enemy inside the range circle, the hero struck on his own (' + Math.round(before - e.hp) + ' damage, no press)');
+  const g2 = bareBattle('david'); g2.autoFire = false;
+  const e2 = spawnFoe(g2, g2.hero.x + 120, g2.hero.y); e2.hp = 500;
+  for (let i = 0; i < 60; i++) g2.update(0, 50);
+  ok(e2.hp === 500 && g2.shots.length === 0, 'auto-fire OFF: the same 3 seconds — zero strikes thrown'); }
+{ // AUTO-FIRE CLOCK + TARGET (replaces the LIGHT-press and aim batteries):
+  // the strike goes to the NEAREST enemy in range, on the hero's rate clock
+  const g = bareBattle('david'); g.autoFire = true;
+  const near = spawnFoe(g, g.hero.x + 95, g.hero.y); near.hp = 500;
+  const far = spawnFoe(g, g.hero.x + 135, g.hero.y - 10); far.hp = 500;
+  g.hero.tx = far.x; g.hero.ty = far.y; // the marching hand points at the far one — auto-fire takes no aim orders
+  g.update(0, 50);
+  ok(g.shots.length === 1 && g.shots[0].target === near && approx(g.hero.cd, g.heroDef.rate - 0.05, 0.06), 'auto-fire targets the NEAREST enemy in range and starts the rate clock (' + g.heroDef.rate + 's)');
+  ok(stepUntil(g, () => near.hp < 500), 'the stone lands');
+  ok(approx(500 - near.hp, 18), 'a basic hit deals FULL basic damage (18) — no light-strike discount'); }
+{ // MELEE auto-fire (replaces the Samson LIGHT/HEAVY battery): instant,
+  // full basic, and NO cleave — the heavy's cleave left with the heavy
+  const g = bareBattle('samson'); g.autoFire = true;
   const e = spawnFoe(g, g.hero.x + 50, g.hero.y); e.hp = 1000;
-  g.pressAttack('light');
-  ok(approx(1000 - e.hp, 30 * 0.75), 'melee LIGHT lands instantly at x0.75 (22.5)');
-  const g2 = bareBattle('samson');
-  const t = spawnFoe(g2, g2.hero.x + 50, g2.hero.y); t.hp = 1000;
-  const by = spawnFoe(g2, t.x + 30, t.y); by.hp = 1000;
-  ok(g2.pressAttack('heavy') === 'struck' && t.hp === 1000 && g2.hero.heavyWind > 0, 'HEAVY press starts the wind-up — nothing has landed yet');
-  for (let i = 0; i < 4; i++) g2.update(0, 50); // 0.20s < 0.28s wind-up
-  ok(t.hp === 1000, 'the heavy has still not landed at 0.20s — the wind-up is real time');
-  for (let i = 0; i < 3; i++) g2.update(0, 50); // past 0.28s
-  ok(approx(1000 - t.hp, 30 * 2.1) && approx(1000 - by.hp, 30 * 2.1 * 0.5), 'HEAVY lands at x2.1 (63) and CLEAVES the enemy beside the victim at half'); }
-{ // HEAVY (ranged): David's heavy stone splashes
+  const by = spawnFoe(g, e.x + 30, e.y); by.hp = 1000;
+  g.update(0, 50);
+  ok(approx(1000 - e.hp, 30) && by.hp === 1000, 'melee auto-fire lands instantly at full basic (30); the bystander is untouched — no cleave without a heavy'); }
+{ // DODGE BUFFER (replaces the attack-press buffer battery): a dodge
+  // pressed inside its window still fires as the cooldown ends — the
+  // skill input buffer battery above covers power moves the same way
   const g = bareBattle('david');
-  const t = spawnFoe(g, g.hero.x + 130, g.hero.y); t.hp = 1000;
-  const by = spawnFoe(g, t.x + 25, t.y); by.hp = 1000;
-  g.pressAttack('heavy');
-  ok(stepUntil(g, () => t.hp < 1000), 'the ranged heavy lands after its wind-up and flight');
-  ok(approx(1000 - t.hp, 18 * 2.1) && approx(1000 - by.hp, 18 * 2.1), 'ranged HEAVY deals x2.1 and splashes its neighbor in full'); }
-{ // ATTACK BUFFER: a press inside the window fires as recovery ends
-  const g = bareBattle('david');
-  spawnFoe(g, g.hero.x + 120, g.hero.y);
-  g.hero.atkCd = 0.1;
-  ok(g.pressAttack('light') === 'buffered' && g.hero.atkBuf === 'light', 'attack press inside the recovery window buffers');
-  for (let i = 0; i < 3; i++) g.update(0, 50);
-  ok(g.shots.length === 1, 'the buffered attack fired the moment the hands were free'); }
+  g.hero.dodgeCd = 0.1;
+  ok(g.pressDodge() === 'buffered' && g.hero.dodgeBuf === true, 'dodge press inside the cooldown window buffers');
+  for (let i = 0; i < 4; i++) g.update(0, 50);
+  ok(g.hero.dodgeT > 0 || g.hero.iframes > 0, 'the buffered dodge fired the moment the dash was ready'); }
 { // DODGE: dash toward the march target; i-frames eat even the champion's heavy — and save Perfect
   const g = bareBattle('david');
   g.hero.tx = g.hero.x + 400; g.hero.ty = g.hero.y;
@@ -303,7 +302,7 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
   const g2 = bareBattle('david'); g2.hero.stamina = 5; g2.setBlock(true);
   for (let i = 0; i < 20 && g2.hero.blocking; i++) g2.update(0, 50);
   ok(g2.hero.blocking === false && g2.hero.guardBreakT > 0 && g2.setBlock(true) === false, 'an emptied guard BREAKS and cannot be re-raised until it recovers'); }
-{ // SPRINT: faster feet, one shared pool, the opener — never behind a guard
+{ // SPRINT: faster feet, one shared pool — never behind a guard
   const g = bareBattle('david');
   g.hero.tx = g.hero.x + 400; g.hero.ty = g.hero.y;
   const x0 = g.hero.x; for (let i = 0; i < 20; i++) g.update(0, 50);
@@ -313,32 +312,31 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
   g2.toggleSprint();
   const x1 = g2.hero.x; for (let i = 0; i < 20; i++) g2.update(0, 50);
   ok(approx((g2.hero.x - x1) / walk, 1.45, 0.75), 'sprint moves the hero at x1.45 (' + Math.round(g2.hero.x - x1) + 'px vs ' + Math.round(walk) + 'px walked)');
-  ok(g2.hero.stamina < 95 && g2.hero.sprintT >= 0.2, 'sprinting drains the shared stamina pool and builds opener time');
-  const e = spawnFoe(g2, g2.hero.x + 120, g2.hero.y); e.hp = 500; const before = e.hp;
-  g2.hero.tx = g2.hero.x; g2.hero.ty = g2.hero.y;
-  g2.pressAttack('light');
-  ok(stepUntil(g2, () => e.hp < before), 'the opener strike lands');
-  ok(approx(before - e.hp, 18 * 0.75 * 1.25) && g2.hero.sprintT === 0, 'the strike out of a sprint is the OPENER (x1.25) and spends the built-up time');
+  ok(g2.hero.stamina < 95, 'sprinting drains the shared stamina pool');
+  // Upgrade 10: the sprint OPENER (a bonus on a strike pressed out of a
+  // sprint) retired with the manual strikes — it was a property of the
+  // press, and there is no press anymore. Sprint, its drain and its
+  // guard rules are unchanged.
   const g3 = bareBattle('david'); g3.setBlock(true); g3.toggleSprint();
   ok(g3.hero.sprint === false, 'no sprinting behind a raised guard');
   g3.setBlock(false); g3.toggleSprint();
   ok(g3.hero.sprint === true, 'guard down, sprint engages');
   g3.setBlock(true);
   ok(g3.hero.sprint === false && g3.hero.blocking === true, 'raising the guard cancels the sprint — one pool, one posture'); }
-{ // THE CLUSTER through the real HUD build: buttons, place, and the tap wall
+{ // THE STACK through the real HUD build: buttons, place, and the tap wall
   const g = bareBattle('david'); g.buildHUD();
   const B = g.fightBtns;
-  ok(B && B.light && B.heavy && B.dodge && B.block && B.sprint, 'the fight cluster exists: LIGHT, HEAVY, DODGE, BLOCK, SPRINT');
-  ok(B.light.sx > 1000 && B.heavy.sx > 1000 && B.dodge.sx > 1000 && B.block.sx > 1000 && B.sprint.sx > 1000, 'every fight button lives on the right side of the screen');
-  ok(g.overFight({ x: 1184, y: 384 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight knows the cluster from the field');
+  ok(B && B.autofire && B.dodge && B.block && B.sprint && !B.light && !B.heavy, 'Upgrade 10: the stack exists — AUTO-FIRE, DODGE, BLOCK, SPRINT (LIGHT and HEAVY are gone)');
+  ok(B.autofire.sx > 1000 && B.dodge.sx > 1000 && B.block.sx > 1000 && B.sprint.sx > 1000, 'every stack button lives on the right side of the screen');
+  ok(g.skillBtns[1].def.name === 'Psalm' && g.skillBtns[2].def.name === 'Five Stones', 'the power buttons in the stack are David\'s moves from the data: PSALM and FIVE STONES');
+  ok(g.overFight({ x: 1178, y: 176 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight knows the stack from the field');
   const tx0 = g.hero.tx, ty0 = g.hero.ty;
-  g.onTap({ x: 1184, y: 384, worldX: 1184, worldY: 384 });
-  ok(g.hero.tx === tx0 && g.hero.ty === ty0, 'a tap ON the fight cluster does not move the hero — the hands stay separate');
-  const e = spawnFoe(g, g.hero.x + 120, g.hero.y); e.hp = 500;
-  fireUp(B.light);
-  ok(g.shots.length === 1, "the LIGHT button's own press throws the stone");
+  g.onTap({ x: 1178, y: 176, worldX: 1178, worldY: 176 });
+  ok(g.hero.tx === tx0 && g.hero.ty === ty0, 'a tap ON the stack does not move the hero — the hands stay separate');
   fireUp(B.dodge);
-  ok(g.hero.dodgeT > 0 || g.hero.iframes > 0, "the DODGE button's own press dashes"); }
+  ok(g.hero.dodgeT > 0 || g.hero.iframes > 0, "the DODGE button's own press dashes");
+  fireUp(B.autofire);
+  ok(g.autoFire === false, "the AUTO-FIRE button's own press turns auto-fire off"); }
 
 // ---------- the end-of-run summary renders the tally ----------
 { const e8 = Object.create(EndProto);
@@ -355,7 +353,7 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
 // only. READY spends each the frame it is ready; PERFECT enters the fight
 // with both moves saved to Perfect — kennin's corner story — and after
 // that spends only at Perfect again.
-function champFight(style) { const g = bareBattle();
+function champFight(style) { const g = bareBattle(); g.autoFire = true; // Upgrade 10: the approved default does the hero's basic fighting
   buySquad(g, 'swordsman_gideon', ['drill1', 'drill2']);
   buySquad(g, 'benjamite_archer', ['drill1', 'drill2']);
   buySquad(g, 'mighty_man', ['drill1']);
@@ -366,29 +364,25 @@ function champFight(style) { const g = bareBattle();
   buySquad(g, 'shepherd_militia', ['veteran']);
   const e = spawnChamp(g, 10); g.waveActive = true;
   if (style === 'perfect') g.skillBtns.forEach(b => { b.held = HELD.perfectAt; });
-  let steps = 0, pressAt = 0, atkN = 0, strikes = 0;
+  let steps = 0;
   while (steps < 4800 && !e.dead && g.campHp > 0) {
     const tele = e.heavyWind > 0 || !!e.slam;
-    g.order = tele ? 'fallback' : 'charge';
-    // The fighting hand (Upgrade 8): the hero no longer auto-fires, so the
-    // script plays him like a player — a press at most every 0.3s (human
-    // cadence), LIGHT LIGHT HEAVY, and a DODGE away when a telegraph
-    // appears close and the dash is ready.
+    const want = tele ? 'fallback' : 'charge';
+    if (g.__u9ord !== want) { g.__u9ord = want; g.selSquad = null; g.giveOrder(want); } // Upgrade 9: orders now go through the real command path (squads carry their own orders; the sim drives the army-wide one)
+    // Positioning and the dodge are the player's hands; the hero's basic
+    // fighting is AUTO-FIRE (Upgrade 10), as the approved default plays.
     if (tele && g.hero.dodgeCd <= 0 && Math.hypot(g.hero.x - e.x, g.hero.y - e.y) < 220) {
       g.hero.tx = Math.max(40, g.hero.x - 260); g.hero.ty = g.hero.y; g.pressDodge(); }
     else { g.hero.tx = Math.max(40, Math.min(g.worldW - 40, e.x - (tele ? 300 : 135)));
       g.hero.ty = tele ? g.hero.y : e.y; }
-    const tNow = steps * 0.05;
-    if (tNow >= pressAt && g.hero.atkCd <= 0) { const kind = (atkN % 3 === 2) ? 'heavy' : 'light';
-      if (g.pressAttack(kind) === 'struck') { atkN++; strikes++; pressAt = tNow + 0.3; } }
     for (let i = 0; i < 2; i++) { const b = g.skillBtns[i]; if (b.cd > 0) continue;
       if (style === 'ready') g.useSkill(i);
       else if (g.heldTierOf(b) === 2) g.useSkill(i); }
     g.update(0, 50); steps++; }
-  return { g, e, sec: steps * 0.05, strikes }; }
+  return { g, e, sec: steps * 0.05 }; }
 { const r = champFight('ready');
   ok(r.e.dead, 'READY-ONLY competent play still clears the wave-10 champion (' + r.sec.toFixed(1) + 's of fighting)');
-  ok(r.strikes > 10, 'the clear was fought by hand: ' + r.strikes + ' scripted manual strikes (light/heavy presses at 0.3s human cadence)');
+  ok(r.sec <= 40, 'auto-fire keeps the clear comparable to the manual era (~30s): ' + r.sec.toFixed(1) + 's');
   ok(r.g.campHp > 0, '...with the camp standing (' + Math.round(r.g.campHp) + '/' + r.g.campMax + ') — Upgrade 7\'s reachability is unchanged for a no-mastery player');
   ok(r.g.heldSpent[1] === 0 && r.g.heldSpent[2] === 0 && r.g.heldSpent[0] > 0, 'the Ready style truly spent at Ready only (' + r.g.heldSpent[0] + ' casts)');
   const p = champFight('perfect');
