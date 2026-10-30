@@ -1,0 +1,996 @@
+{
+ "chapter": {
+  "name": "Chapter 1: The Valley of Elah",
+  "verse": "\"The battle is the LORD's.\" 1 Samuel 17:47",
+  "startManna": 220,
+  "lives": 20,
+  "grokoniansClear": 30,
+  "grokoniansBoss": 25,
+  "grokoniansPerfectWave": 2,
+  "path": [
+   [
+    -40,
+    150
+   ],
+   [
+    260,
+    150
+   ],
+   [
+    260,
+    520
+   ],
+   [
+    560,
+    520
+   ],
+   [
+    560,
+    230
+   ],
+   [
+    880,
+    230
+   ],
+   [
+    880,
+    560
+   ],
+   [
+    1130,
+    560
+   ],
+   [
+    1130,
+    360
+   ],
+   [
+    1320,
+    360
+   ]
+  ],
+  "ark": [
+   1235,
+   360
+  ]
+ },
+ "towers": {
+  "sling": {
+   "name": "Shepherd's Sling",
+   "dmgType": "physical",
+   "color": "#c9a46a",
+   "tiers": [
+    {
+     "cost": 70,
+     "dmg": 14,
+     "rate": 0.6,
+     "range": 150,
+     "crit": 0.15
+    },
+    {
+     "cost": 90,
+     "dmg": 24,
+     "rate": 0.5,
+     "range": 165,
+     "crit": 0.2
+    },
+    {
+     "cost": 150,
+     "dmg": 40,
+     "rate": 0.4,
+     "range": 185,
+     "crit": 0.3,
+     "special": "Giant-slayer: crits x4 vs giants"
+    }
+   ],
+   "branches": [
+    {
+     "name": "Mighty Men Volley",
+     "cost": 220,
+     "dmg": 30,
+     "rate": 0.4,
+     "range": 185,
+     "crit": 0.25,
+     "multishot": 3
+    },
+    {
+     "name": "Precision Forehead",
+     "cost": 240,
+     "dmg": 90,
+     "rate": 0.9,
+     "range": 240,
+     "crit": 0.5
+    }
+   ]
+  },
+  "altar": {
+   "name": "Altar of Fire",
+   "dmgType": "fire",
+   "color": "#d8572a",
+   "tiers": [
+    {
+     "cost": 100,
+     "dmg": 6,
+     "rate": 1.4,
+     "range": 110,
+     "splash": 60,
+     "burn": [
+      4,
+      3
+     ]
+    },
+    {
+     "cost": 120,
+     "dmg": 10,
+     "rate": 1.2,
+     "range": 120,
+     "splash": 70,
+     "burn": [
+      7,
+      3
+     ]
+    },
+    {
+     "cost": 180,
+     "dmg": 16,
+     "rate": 1.0,
+     "range": 130,
+     "splash": 85,
+     "burn": [
+      12,
+      4
+     ],
+     "special": "Refiner's Fire: x1.5 vs slowed"
+    }
+   ],
+   "branches": [
+    {
+     "name": "Fire from Heaven",
+     "cost": 260,
+     "dmg": 45,
+     "rate": 1.6,
+     "range": 150,
+     "splash": 110,
+     "burn": [
+      14,
+      4
+     ]
+    },
+    {
+     "name": "Eternal Flame",
+     "cost": 240,
+     "dmg": 12,
+     "rate": 0.6,
+     "range": 135,
+     "splash": 70,
+     "burn": [
+      22,
+      5
+     ]
+    }
+   ]
+  },
+  "trumpet": {
+   "name": "Trumpets of Jericho",
+   "dmgType": "sonic",
+   "color": "#e0c25a",
+   "tiers": [
+    {
+     "cost": 120,
+     "dmg": 10,
+     "rate": 2.2,
+     "range": 120,
+     "stun": 0.4,
+     "armorBreak": 3
+    },
+    {
+     "cost": 140,
+     "dmg": 16,
+     "rate": 2.0,
+     "range": 130,
+     "stun": 0.6,
+     "armorBreak": 4
+    },
+    {
+     "cost": 200,
+     "dmg": 26,
+     "rate": 1.8,
+     "range": 145,
+     "stun": 0.9,
+     "armorBreak": 5,
+     "special": "Walls fall: stun x2 vs armored"
+    }
+   ],
+   "branches": [
+    {
+     "name": "Seventh Circuit",
+     "cost": 260,
+     "dmg": 40,
+     "rate": 1.6,
+     "range": 170,
+     "stun": 1.2,
+     "armorBreak": 6
+    },
+    {
+     "name": "Shout of Victory",
+     "cost": 240,
+     "dmg": 60,
+     "rate": 1.4,
+     "range": 150,
+     "stun": 0.5,
+     "armorBreak": 8
+    }
+   ]
+  },
+  "cloud": {
+   "name": "Pillar of Cloud",
+   "dmgType": "holy",
+   "color": "#bfc8d6",
+   "tiers": [
+    {
+     "cost": 80,
+     "dmg": 3,
+     "rate": 0.5,
+     "range": 110,
+     "slow": 0.35
+    },
+    {
+     "cost": 100,
+     "dmg": 5,
+     "rate": 0.5,
+     "range": 125,
+     "slow": 0.45
+    },
+    {
+     "cost": 160,
+     "dmg": 8,
+     "rate": 0.5,
+     "range": 140,
+     "slow": 0.55,
+     "special": "Deep cloud: 60% slow"
+    }
+   ],
+   "branches": [
+    {
+     "name": "Pillar of Fire by Night",
+     "cost": 240,
+     "dmg": 14,
+     "rate": 0.5,
+     "range": 145,
+     "slow": 0.55,
+     "burn": [
+      6,
+      2
+     ]
+    },
+    {
+     "name": "Cloud of Witnesses",
+     "cost": 220,
+     "dmg": 6,
+     "rate": 0.5,
+     "range": 175,
+     "slow": 0.7
+    }
+   ]
+  }
+ },
+ "enemies": {
+  "locust": {
+   "name": "Locust Swarm",
+   "hp": 22,
+   "speed": 95,
+   "armor": "flesh",
+   "manna": 4,
+   "flying": true,
+   "size": 12
+  },
+  "frog": {
+   "name": "Frog",
+   "hp": 45,
+   "speed": 55,
+   "armor": "flesh",
+   "manna": 6,
+   "split": "froglet",
+   "size": 16
+  },
+  "froglet": {
+   "name": "Froglet",
+   "hp": 15,
+   "speed": 75,
+   "armor": "flesh",
+   "manna": 2,
+   "size": 9
+  },
+  "spearman": {
+   "name": "Philistine Spearman",
+   "hp": 110,
+   "speed": 42,
+   "armor": "bronze",
+   "manna": 12,
+   "size": 18
+  },
+  "goliath": {
+   "name": "Goliath of Gath",
+   "hp": 2600,
+   "speed": 20,
+   "armor": "bronze",
+   "manna": 150,
+   "giant": true,
+   "boss": true,
+   "size": 42
+  },
+  "priest": {
+   "name": "Baal Priest",
+   "hp": 90,
+   "speed": 40,
+   "armor": "flesh",
+   "manna": 14,
+   "heals": true,
+   "size": 17
+  },
+  "golem": {
+   "name": "Idol Golem",
+   "hp": 380,
+   "speed": 26,
+   "armor": "idol",
+   "manna": 25,
+   "size": 26
+  },
+  "wallguard": {
+   "name": "Wall Guard",
+   "hp": 150,
+   "speed": 38,
+   "armor": "bronze",
+   "manna": 14,
+   "size": 19,
+   "sprite": "spearman",
+   "tint": "0xb8a888"
+  },
+  "gatekeeper": {
+   "name": "The Gatekeeper Colossus",
+   "hp": 3200,
+   "speed": 18,
+   "armor": "idol",
+   "manna": 160,
+   "giant": true,
+   "boss": true,
+   "size": 44,
+   "sprite": "golem",
+   "tint": "0xc9a77a",
+   "h": 150
+  }
+ },
+ "armorTable": {
+  "bronze": {
+   "physical": 0.6,
+   "holy": 1,
+   "sonic": 1.2,
+   "fire": 0.9
+  },
+  "flesh": {
+   "physical": 1,
+   "holy": 1,
+   "sonic": 1,
+   "fire": 1.1
+  },
+  "idol": {
+   "physical": 1,
+   "holy": 0.5,
+   "sonic": 1.3,
+   "fire": 0.8
+  }
+ },
+ "boss": {
+  "phases": [
+   {
+    "at": 1.0,
+    "name": "The Giant Advances",
+    "desc": "Throws his spear at a tower every 8s (stuns it 4s)."
+   },
+   {
+    "at": 0.6,
+    "name": "The Armor Bearer",
+    "desc": "A shield-bearer goes before him; Goliath takes 50% less damage until it falls."
+   },
+   {
+    "at": 0.3,
+    "name": "Wrath of Gath",
+    "desc": "Enraged: faster, stomps stun nearby towers. A sling crit staggers him."
+   }
+  ]
+ },
+ "waves": [
+  [
+   [
+    "locust",
+    10,
+    0.6
+   ]
+  ],
+  [
+   [
+    "frog",
+    8,
+    1.0
+   ]
+  ],
+  [
+   [
+    "locust",
+    12,
+    0.4
+   ],
+   [
+    "frog",
+    5,
+    1.0
+   ]
+  ],
+  [
+   [
+    "spearman",
+    5,
+    1.6
+   ]
+  ],
+  [
+   [
+    "frog",
+    10,
+    0.8
+   ],
+   [
+    "priest",
+    3,
+    2.0
+   ]
+  ],
+  [
+   [
+    "spearman",
+    8,
+    1.2
+   ],
+   [
+    "locust",
+    10,
+    0.4
+   ]
+  ],
+  [
+   [
+    "golem",
+    3,
+    3.0
+   ],
+   [
+    "frog",
+    10,
+    0.6
+   ]
+  ],
+  [
+   [
+    "locust",
+    30,
+    0.25
+   ],
+   [
+    "priest",
+    4,
+    1.5
+   ]
+  ],
+  [
+   [
+    "spearman",
+    12,
+    0.9
+   ],
+   [
+    "golem",
+    3,
+    2.5
+   ]
+  ],
+  [
+   [
+    "goliath",
+    1,
+    0
+   ],
+   [
+    "spearman",
+    6,
+    2.0
+   ],
+   [
+    "priest",
+    2,
+    3
+   ]
+  ]
+ ],
+ "grokonians": {
+  "perWave": 2,
+  "perfectWaveBonus": 2,
+  "boss": 25,
+  "clear": 30,
+  "perfectClear": 20
+ },
+ "heroes": [
+  {
+   "id": "david",
+   "name": "David",
+   "role": "Ranged",
+   "color": "#8a6a3c",
+   "hp": 200,
+   "speed": 140,
+   "dmg": 18,
+   "rate": 0.7,
+   "range": 140,
+   "dmgType": "physical",
+   "unlock": {
+    "type": "free"
+   },
+   "skills": [
+    {
+     "id": "stone",
+     "name": "Smooth Stone",
+     "cd": 8
+    },
+    {
+     "id": "psalm",
+     "name": "Psalm",
+     "cd": 18
+    }
+   ],
+   "ult": {
+    "id": "five",
+    "name": "Five Stones",
+    "cd": 60
+   },
+   "theme": "bible"
+  },
+  {
+   "id": "deborah",
+   "name": "Deborah",
+   "role": "Support",
+   "color": "#6a4a7a",
+   "hp": 180,
+   "speed": 130,
+   "dmg": 10,
+   "rate": 0.8,
+   "range": 160,
+   "dmgType": "holy",
+   "unlock": {
+    "type": "grokonians",
+    "cost": 60
+   },
+   "skills": [
+    {
+     "id": "rally",
+     "name": "Rally",
+     "cd": 15
+    },
+    {
+     "id": "palm",
+     "name": "Judgment Palm",
+     "cd": 12
+    }
+   ],
+   "ult": {
+    "id": "song",
+    "name": "Song of Deborah",
+    "cd": 55
+   },
+   "theme": "bible"
+  },
+  {
+   "id": "gideon",
+   "name": "Gideon",
+   "role": "Trickster",
+   "color": "#4a6a5a",
+   "hp": 190,
+   "speed": 150,
+   "dmg": 14,
+   "rate": 0.6,
+   "range": 130,
+   "dmgType": "holy",
+   "unlock": {
+    "type": "milestone",
+    "key": "clearCh1",
+    "label": "Clear Valley of Elah, level 1",
+    "cost": 0
+   },
+   "skills": [
+    {
+     "id": "lamp",
+     "name": "Break Pitchers",
+     "cd": 14
+    },
+    {
+     "id": "three",
+     "name": "Three Hundred",
+     "cd": 20
+    }
+   ],
+   "ult": {
+    "id": "sword",
+    "name": "Sword of Gideon",
+    "cd": 55
+   },
+   "theme": "bible"
+  },
+  {
+   "id": "samson",
+   "name": "Samson",
+   "role": "Tank",
+   "color": "#7a3b22",
+   "hp": 420,
+   "speed": 115,
+   "dmg": 30,
+   "rate": 0.9,
+   "range": 55,
+   "dmgType": "physical",
+   "unlock": {
+    "type": "grokonians",
+    "cost": 120
+   },
+   "skills": [
+    {
+     "id": "jaw",
+     "name": "Jawbone Cleave",
+     "cd": 7
+    },
+    {
+     "id": "roar",
+     "name": "Lion's Roar",
+     "cd": 16
+    }
+   ],
+   "ult": {
+    "id": "pillars",
+    "name": "Pillar Pull",
+    "cd": 60
+   },
+   "theme": "bible"
+  },
+  {
+   "id": "moses",
+   "name": "Mo \"The Staff\" Moses",
+   "parody": "Moses",
+   "role": "Caster",
+   "theme": "bible",
+   "hp": 190,
+   "speed": 115,
+   "dmg": 12,
+   "rate": 0.9,
+   "range": 170,
+   "dmgType": "holy",
+   "unlock": {
+    "type": "bp",
+    "tier": 5,
+    "label": "Battle Pass tier 5"
+   },
+   "skills": [
+    {
+     "id": "geyser",
+     "name": "Staff Geyser",
+     "cd": 10
+    },
+    {
+     "id": "manna",
+     "name": "Manna Drop",
+     "cd": 25
+    }
+   ],
+   "ult": {
+    "id": "sea",
+    "name": "Part the Sea",
+    "cd": 60
+   }
+  },
+  {
+   "id": "elijah",
+   "name": "Elijah Firecaller",
+   "parody": "Elijah",
+   "role": "Caster",
+   "theme": "bible",
+   "hp": 180,
+   "speed": 120,
+   "dmg": 13,
+   "rate": 0.85,
+   "range": 170,
+   "dmgType": "fire",
+   "unlock": {
+    "type": "bp",
+    "tier": 10,
+    "label": "Battle Pass tier 10"
+   },
+   "skills": [
+    {
+     "id": "altarflame",
+     "name": "Altar Flame",
+     "cd": 9
+    },
+    {
+     "id": "ravens",
+     "name": "Ravens' Meal",
+     "cd": 20
+    }
+   ],
+   "ult": {
+    "id": "chariot",
+    "name": "Chariot of Fire",
+    "cd": 55
+   }
+  },
+  {
+   "id": "esther",
+   "name": "Queen Esther Brave",
+   "parody": "Esther",
+   "role": "Support",
+   "theme": "bible",
+   "hp": 170,
+   "speed": 125,
+   "dmg": 9,
+   "rate": 0.8,
+   "range": 160,
+   "dmgType": "holy",
+   "unlock": {
+    "type": "bp",
+    "tier": 15,
+    "label": "Battle Pass tier 15"
+   },
+   "skills": [
+    {
+     "id": "banquet",
+     "name": "Royal Banquet",
+     "cd": 30
+    },
+    {
+     "id": "plea",
+     "name": "Brave Plea",
+     "cd": 16
+    }
+   ],
+   "ult": {
+    "id": "time",
+    "name": "For Such a Time",
+    "cd": 55
+   }
+  },
+  {
+   "id": "noah",
+   "name": "Noah Boatman",
+   "parody": "Noah",
+   "role": "Summoner",
+   "theme": "bible",
+   "hp": 240,
+   "speed": 105,
+   "dmg": 14,
+   "rate": 1.0,
+   "range": 90,
+   "dmgType": "physical",
+   "unlock": {
+    "type": "grokonians",
+    "cost": 150
+   },
+   "skills": [
+    {
+     "id": "pair",
+     "name": "Animal Pair",
+     "cd": 12
+    },
+    {
+     "id": "rain",
+     "name": "Raincloud",
+     "cd": 14
+    }
+   ],
+   "ult": {
+    "id": "ark",
+    "name": "The Ark",
+    "cd": 70
+   }
+  },
+  {
+   "id": "franklite",
+   "name": "Ben Franklite",
+   "parody": "Benjamin Franklin",
+   "role": "Caster",
+   "theme": "liberty",
+   "hp": 170,
+   "speed": 120,
+   "dmg": 12,
+   "rate": 0.9,
+   "range": 180,
+   "dmgType": "sonic",
+   "unlock": {
+    "type": "bp",
+    "tier": 20,
+    "label": "Battle Pass tier 20"
+   },
+   "skills": [
+    {
+     "id": "kite",
+     "name": "Kite Lightning",
+     "cd": 8
+    },
+    {
+     "id": "bifocal",
+     "name": "Bifocal Focus",
+     "cd": 18
+    }
+   ],
+   "ult": {
+    "id": "almanac",
+    "name": "Almanac Storm",
+    "cd": 55
+   }
+  },
+  {
+   "id": "washingtoon",
+   "name": "George Washingtoon",
+   "parody": "George Washington",
+   "role": "Blocker",
+   "theme": "liberty",
+   "hp": 260,
+   "speed": 120,
+   "dmg": 16,
+   "rate": 0.9,
+   "range": 70,
+   "dmgType": "physical",
+   "unlock": {
+    "type": "grokonians",
+    "cost": 100
+   },
+   "skills": [
+    {
+     "id": "crossing",
+     "name": "Delaware Dash",
+     "cd": 12
+    },
+    {
+     "id": "cherry",
+     "name": "Cherry Chop",
+     "cd": 10
+    }
+   ],
+   "ult": {
+    "id": "forge",
+    "name": "Valley Forge Grit",
+    "cd": 60
+   }
+  },
+  {
+   "id": "lincolnlog",
+   "name": "Abe Lincolnlog",
+   "parody": "Abraham Lincoln",
+   "role": "Blocker",
+   "theme": "liberty",
+   "hp": 250,
+   "speed": 110,
+   "dmg": 15,
+   "rate": 1.0,
+   "range": 70,
+   "dmgType": "physical",
+   "unlock": {
+    "type": "bp",
+    "tier": 25,
+    "label": "Battle Pass tier 25"
+   },
+   "skills": [
+    {
+     "id": "log",
+     "name": "Log Wall",
+     "cd": 12
+    },
+    {
+     "id": "speech",
+     "name": "Rousing Speech",
+     "cd": 18
+    }
+   ],
+   "ult": {
+    "id": "union",
+    "name": "Union Shield",
+    "cd": 65
+   }
+  },
+  {
+   "id": "oakley",
+   "name": "Annie Oakley-Shot",
+   "parody": "Annie Oakley",
+   "role": "Striker",
+   "theme": "liberty",
+   "hp": 160,
+   "speed": 135,
+   "dmg": 18,
+   "rate": 0.6,
+   "range": 200,
+   "dmgType": "physical",
+   "unlock": {
+    "type": "bp",
+    "tier": 30,
+    "label": "Battle Pass tier 30"
+   },
+   "skills": [
+    {
+     "id": "trick",
+     "name": "Trick Shot",
+     "cd": 8
+    },
+    {
+     "id": "sharp",
+     "name": "Sharpshooter",
+     "cd": 12
+    }
+   ],
+   "ult": {
+    "id": "show",
+    "name": "Wild West Show",
+    "cd": 55
+   }
+  }
+ ],
+ "unlocks": {
+  "skins": [
+   {
+    "id": "bronze",
+    "name": "Bronze Towers",
+    "cost": 40,
+    "tint": "0xd9a441"
+   },
+   {
+    "id": "ash",
+    "name": "Ashen Towers",
+    "cost": 40,
+    "tint": "0x9a9a9a"
+   },
+   {
+    "id": "cedar",
+    "name": "Cedar Towers",
+    "tint": "0xb07a4a",
+    "bpOnly": true
+   },
+   {
+    "id": "gilded",
+    "name": "Gilded Towers",
+    "tint": "0xffe08a",
+    "bpOnly": true
+   },
+   {
+    "id": "moonlit",
+    "name": "Moonlit Towers",
+    "tint": "0x9ab0e0",
+    "bpOnly": true
+   },
+   {
+    "id": "ember",
+    "name": "Ember Towers",
+    "tint": "0xff9a6a",
+    "bpOnly": true
+   },
+   {
+    "id": "dawn",
+    "name": "Dawn Towers",
+    "tint": "0xffd0c0",
+    "bpOnly": true
+   },
+   {
+    "id": "sapphire",
+    "name": "Sapphire Towers",
+    "tint": "0x7aa0ff",
+    "bpOnly": true
+   }
+  ],
+  "perk": {
+   "id": "manna",
+   "name": "Extra starting Manna (+2% per rank, max +10%)",
+   "cost": 25,
+   "max": 5
+  }
+ }
+}

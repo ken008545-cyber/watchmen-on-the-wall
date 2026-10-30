@@ -1,0 +1,403 @@
+{
+ "xp": {
+  "wave": 20,
+  "perfectWave": 10,
+  "kill": 1,
+  "boss": 150,
+  "clear": 200,
+  "perfectClear": 100,
+  "achievement": 100
+ },
+ "playerLevel": {
+  "base": 150,
+  "step": 50,
+  "max": 60
+ },
+ "accountLevel": {
+  "note": "account level = 1 + floor((playerLevel-1)/2) + floor(achievements/3) + floor(totalMastery/5)"
+ },
+ "chapters": [
+  {
+   "id": "ch1",
+   "name": "Chapter 1: The Valley of Elah",
+   "reqAccount": 1,
+   "playable": true
+  },
+  {
+   "id": "ch2",
+   "name": "Chapter 2: The Walls of Jericho",
+   "reqAccount": 4,
+   "playable": false
+  },
+  {
+   "id": "ch3",
+   "name": "Chapter 3: Mount Carmel",
+   "reqAccount": 7,
+   "playable": false
+  },
+  {
+   "id": "lib1",
+   "name": "Liberty Chapter: Delaware Crossing",
+   "reqAccount": 10,
+   "playable": false
+  }
+ ],
+ "mastery": {
+  "xpPerLevel": 400,
+  "max": 10,
+  "perks": {
+   "dmgPerLevel": 0.02,
+   "hpPerLevel": 0.02,
+   "cdAt5": 0.1,
+   "titleAt10": "Master"
+  }
+ },
+ "season": {
+  "id": "s1",
+  "name": "Season 1: Watchmen Rise",
+  "start": "2026-10-26",
+  "lengthDays": 56,
+  "xpPerTier": 300,
+  "tracks": {
+   "free": true,
+   "paid": {
+    "enabled": false,
+    "note": "reserved for a future optional track; no paid code exists",
+    "rewards": []
+   }
+  },
+  "free": [
+   {
+    "tier": 1,
+    "type": "grok",
+    "value": 10
+   },
+   {
+    "tier": 2,
+    "type": "title",
+    "value": "t_watchman"
+   },
+   {
+    "tier": 3,
+    "type": "grok",
+    "value": 10
+   },
+   {
+    "tier": 4,
+    "type": "skin",
+    "value": "cedar"
+   },
+   {
+    "tier": 5,
+    "type": "hero",
+    "value": "moses"
+   },
+   {
+    "tier": 6,
+    "type": "grok",
+    "value": 15
+   },
+   {
+    "tier": 7,
+    "type": "title",
+    "value": "t_lookout"
+   },
+   {
+    "tier": 8,
+    "type": "grok",
+    "value": 15
+   },
+   {
+    "tier": 9,
+    "type": "skin",
+    "value": "gilded"
+   },
+   {
+    "tier": 10,
+    "type": "hero",
+    "value": "elijah"
+   },
+   {
+    "tier": 11,
+    "type": "grok",
+    "value": 15
+   },
+   {
+    "tier": 12,
+    "type": "title",
+    "value": "t_trumpeter"
+   },
+   {
+    "tier": 13,
+    "type": "grok",
+    "value": 20
+   },
+   {
+    "tier": 14,
+    "type": "skin",
+    "value": "moonlit"
+   },
+   {
+    "tier": 15,
+    "type": "hero",
+    "value": "esther"
+   },
+   {
+    "tier": 16,
+    "type": "grok",
+    "value": 20
+   },
+   {
+    "tier": 17,
+    "type": "title",
+    "value": "t_giant"
+   },
+   {
+    "tier": 18,
+    "type": "grok",
+    "value": 20
+   },
+   {
+    "tier": 19,
+    "type": "skin",
+    "value": "ember"
+   },
+   {
+    "tier": 20,
+    "type": "hero",
+    "value": "franklite"
+   },
+   {
+    "tier": 21,
+    "type": "grok",
+    "value": 25
+   },
+   {
+    "tier": 22,
+    "type": "title",
+    "value": "t_pilgrim"
+   },
+   {
+    "tier": 23,
+    "type": "grok",
+    "value": 25
+   },
+   {
+    "tier": 24,
+    "type": "skin",
+    "value": "dawn"
+   },
+   {
+    "tier": 25,
+    "type": "hero",
+    "value": "lincolnlog"
+   },
+   {
+    "tier": 26,
+    "type": "grok",
+    "value": 25
+   },
+   {
+    "tier": 27,
+    "type": "grok",
+    "value": 30
+   },
+   {
+    "tier": 28,
+    "type": "skin",
+    "value": "sapphire"
+   },
+   {
+    "tier": 29,
+    "type": "grok",
+    "value": 30
+   },
+   {
+    "tier": 30,
+    "type": "hero",
+    "value": "oakley"
+   }
+  ],
+  "tier30Title": "t_season1"
+ },
+ "challenges": {
+  "daily": {
+   "count": 3,
+   "xp": 150,
+   "pool": [
+    {
+     "id": "d_kill150",
+     "text": "Defeat 150 foes",
+     "stat": "kills",
+     "goal": 150
+    },
+    {
+     "id": "d_wave8",
+     "text": "Clear 8 waves",
+     "stat": "waves",
+     "goal": 8
+    },
+    {
+     "id": "d_perfect4",
+     "text": "Clear 4 waves without a leak",
+     "stat": "perfectWaves",
+     "goal": 4
+    },
+    {
+     "id": "d_build12",
+     "text": "Build 12 towers",
+     "stat": "towersBuilt",
+     "goal": 12
+    },
+    {
+     "id": "d_ult3",
+     "text": "Use 3 ultimates",
+     "stat": "ults",
+     "goal": 3
+    },
+    {
+     "id": "d_fly40",
+     "text": "Swat 40 flyers",
+     "stat": "flyKills",
+     "goal": 40
+    }
+   ]
+  },
+  "weekly": {
+   "count": 2,
+   "xp": 600,
+   "pool": [
+    {
+     "id": "w_boss3",
+     "text": "Topple Goliath 3 times",
+     "stat": "bossKills",
+     "goal": 3
+    },
+    {
+     "id": "w_clear5",
+     "text": "Win 5 battles",
+     "stat": "clears",
+     "goal": 5
+    },
+    {
+     "id": "w_branch6",
+     "text": "Raise 6 towers to tier 4",
+     "stat": "branches",
+     "goal": 6
+    },
+    {
+     "id": "w_kill1000",
+     "text": "Defeat 1000 foes",
+     "stat": "kills",
+     "goal": 1000
+    }
+   ]
+  }
+ },
+ "achievements": [
+  {
+   "id": "a_first",
+   "name": "First Watch",
+   "text": "Clear your first wave",
+   "stat": "waves",
+   "goal": 1,
+   "grok": 5
+  },
+  {
+   "id": "a_giant",
+   "name": "Giant Slayer",
+   "text": "Topple Goliath",
+   "stat": "bossKills",
+   "goal": 1,
+   "grok": 10
+  },
+  {
+   "id": "a_perfect",
+   "name": "Not One Lost",
+   "text": "Win a battle with no leaks",
+   "stat": "perfectClears",
+   "goal": 1,
+   "grok": 15
+  },
+  {
+   "id": "a_build50",
+   "name": "Wall Builder",
+   "text": "Build 50 towers",
+   "stat": "towersBuilt",
+   "goal": 50,
+   "grok": 10
+  },
+  {
+   "id": "a_branch",
+   "name": "Fully Armed",
+   "text": "Raise a tower to tier 4",
+   "stat": "branches",
+   "goal": 1,
+   "grok": 5
+  },
+  {
+   "id": "a_heroes3",
+   "name": "Mighty Men",
+   "text": "Own 3 heroes",
+   "stat": "heroesOwned",
+   "goal": 3,
+   "grok": 10
+  },
+  {
+   "id": "a_kill1000",
+   "name": "Host of Heaven's Side",
+   "text": "Defeat 1000 foes",
+   "stat": "kills",
+   "goal": 1000,
+   "grok": 15
+  },
+  {
+   "id": "a_ult50",
+   "name": "Mighty Acts",
+   "text": "Use 50 ultimates",
+   "stat": "ults",
+   "goal": 50,
+   "grok": 10
+  },
+  {
+   "id": "a_lvl10",
+   "name": "Seasoned Watchman",
+   "text": "Reach player level 10",
+   "stat": "level",
+   "goal": 10,
+   "grok": 15
+  },
+  {
+   "id": "a_daily5",
+   "name": "Daily Bread",
+   "text": "Finish 5 daily challenges",
+   "stat": "dailiesDone",
+   "goal": 5,
+   "grok": 10
+  },
+  {
+   "id": "a_bp10",
+   "name": "Pass Pilgrim",
+   "text": "Reach battle pass tier 10",
+   "stat": "bpTier",
+   "goal": 10,
+   "grok": 10
+  },
+  {
+   "id": "a_master5",
+   "name": "Apprentice No More",
+   "text": "Reach mastery 5 with any hero",
+   "stat": "bestMastery",
+   "goal": 5,
+   "grok": 15
+  }
+ ],
+ "titles": {
+  "t_watchman": "Watchman",
+  "t_giant": "Giant Slayer",
+  "t_pilgrim": "Pilgrim",
+  "t_trumpeter": "Trumpeter",
+  "t_lookout": "Lookout of the Wall",
+  "t_season1": "Season 1 Champion"
+ }
+}

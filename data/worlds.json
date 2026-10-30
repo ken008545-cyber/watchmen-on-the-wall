@@ -1,0 +1,42 @@
+{
+  "_doc": "Worlds + level generation rules. Levels are generated from (world, index, seed, difficulty). Add a world by adding an entry; set playable:false for a locked stub.",
+  "difficulties": {
+    "normal":    {"name":"Normal",    "hp":1.0, "speed":1.0,  "lives":20, "manna":1.0,  "xp":1.0, "count":1.0},
+    "hard":      {"name":"Hard",      "hp":1.4, "speed":1.05, "lives":15, "manna":0.9,  "xp":1.5, "count":1.2, "reqStars":1},
+    "nightmare": {"name":"Nightmare", "hp":1.9, "speed":1.12, "lives":10, "manna":0.8,  "xp":2.0, "count":1.4, "reqStars":2}
+  },
+  "modifiers": {
+    "fog":     {"name":"Fog",           "desc":"Towers see 25% less far",   "rangeMul":0.75},
+    "flyers":  {"name":"Double Flyers", "desc":"Twice as many flyers",       "flyerMul":2},
+    "armored": {"name":"Armored",       "desc":"Enemies have +35% HP",       "hpMul":1.35},
+    "fast":    {"name":"Fast",          "desc":"Enemies move 25% faster",    "speedMul":1.25},
+    "swarm":   {"name":"Swarm",         "desc":"+50% enemies, -30% HP each", "countMul":1.5, "hpMul":0.7}
+  },
+  "stars": {"3":"No lives lost", "2":"Lose under half your lives", "1":"Clear the level"},
+  "score": {"kill":10, "life":50, "wave":100, "star":500},
+  "endless": {"bossEvery":10, "hpGrowth":0.12, "countGrowth":0.08},
+  "worlds": [
+    {"id":"elah", "name":"Valley of Elah", "verse":"\"The battle is the LORD's.\" 1 Samuel 17:47", "reqAccount":1, "playable":true, "bg":"assets/bg_elah.jpg", "levels":12,
+     "startManna":220, "handPath":true,
+     "pool":{"locust":3,"frog":3,"spearman":3,"priest":2,"golem":1},
+     "boss":{"enemy":"goliath","name":"Goliath of Gath","fallen":"Goliath has fallen!","phases":[
+       {"at":1.0,"name":"The Giant Advances","desc":"Throws his spear at a tower every 8s (stuns it 4s)."},
+       {"at":0.6,"name":"The Armor Bearer","desc":"A shield-bearer goes before him; he takes 50% less damage until it falls."},
+       {"at":0.3,"name":"Wrath of Gath","desc":"Enraged: faster, stomps stun nearby towers. A sling crit staggers him."}]}},
+    {"id":"jericho", "name":"Walls of Jericho", "verse":"\"The wall fell down flat.\" Joshua 6:20", "reqAccount":3, "playable":true, "bg":"assets/bg_jericho.jpg", "levels":12,
+     "startManna":240,
+     "pool":{"wallguard":4,"spearman":2,"golem":2,"locust":2,"priest":1},
+     "boss":{"enemy":"gatekeeper","name":"The Gatekeeper Colossus","fallen":"The Gatekeeper crumbles! The walls fall!","phases":[
+       {"at":1.0,"name":"Walls Unbroken","desc":"Hurls stone blocks at a tower every 8s (stuns it 4s)."},
+       {"at":0.6,"name":"Shieldwall","desc":"A wall-guard marches before it; it takes 50% less damage until the guard falls."},
+       {"at":0.3,"name":"Crumbling Rage","desc":"Cracking apart: faster, quakes stun nearby towers. Crits stagger it."}]}},
+    {"id":"egypt", "name":"Egypt: The Plagues", "reqAccount":5, "playable":false, "bg":"assets/bg_egypt.jpg", "levels":12,
+     "pool":{"frog":4,"locust":4,"spearman":2}, "boss":{"name":"The Chariot Captain","stub":true}},
+    {"id":"babylon", "name":"Babylon", "reqAccount":8, "playable":false, "bg":"assets/bg_babylon.jpg", "levels":14,
+     "pool":{"golem":3,"priest":2,"spearman":3}, "boss":{"name":"The Golden Statue Titan","stub":true}},
+    {"id":"liberty", "name":"Liberty Frontier", "reqAccount":10, "playable":false, "bg":"assets/bg_liberty.jpg", "levels":14,
+     "pool":{}, "boss":{"name":"The Redcoat Juggernaut","stub":true}},
+    {"id":"toon", "name":"Toon Town", "reqAccount":12, "playable":false, "bg":"assets/bg_toon.jpg", "levels":15,
+     "pool":{}, "boss":{"name":"Professor Cartoonageddon","stub":true}}
+  ]
+}
