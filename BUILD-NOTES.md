@@ -1023,3 +1023,327 @@ standing as the rest of Upgrade 8).
 - Enemy contact attacks still land on the hero mid-dodge only via
   `hurtHero` (i-framed ✓); squadmates have no dodge/block — by design,
   they are the army, not the fighter.
+
+## Upgrade 9 — Command & Care: tap-to-order army, mid-wave camp panel, orbs like a potion (2026-10-30)
+
+Kennin's three rulings from the 2026-10-30 call, built as one upgrade —
+and the reversal of Upgrade 8's recorded scope call ("manual squads
+would be kennin's call"): he has now made that call.
+
+**Ruling 1 — the army does not follow unless told (tap-to-order).** The
+default-follow is dead. Every squad carries its own order (`s.ord`): it
+is born `'post'` at its spawn point beside the camp and holds there; the
+army's standing order at run start is Hold. `squadOrder(s)` resolves the
+effective order (the squad's own, else the army's) and `squadTarget()`
+resolves where it marches: its post, the army's charge/hold/fall-back,
+or its formation slot around the hero (Follow Me / Flank / Shield Wall).
+The marching hand now works by selection:
+
+- Tap a squad → selected (gold breathing ring drawn in the world by
+  `selFx`, name floated). Tap ground → the squad posts there and holds.
+  Tap another squad → selection switches. Tap the hero → selection
+  returns to the hero (the default at wave start). Repeated taps on a
+  crowded spot CYCLE through whoever stands there, so a squad stacked on
+  its brothers at the camp is never unselectable.
+- The command bar speaks to the selection (`giveOrder`): with a squad
+  selected, the order is that squad's alone (`s.ord=id`, echo floats
+  over the squad, toast names it); with the hero selected, the order is
+  army-wide as before and every squad returns to army control
+  (`s.ord=null`, echo over the hero — the exact float U8's harness
+  pins). Follow Me on one squad restores following for that squad only,
+  until countermanded: follow is an order, not the default.
+- The HUD order line names the audience ("Squad: Spearman of the Wall —
+  Posted / Charge…" vs "Order: …"), and button highlighting follows the
+  displayed order.
+- Shield Wall's mitigation and movement factors follow the squad's
+  EFFECTIVE order (a squad in its own Shield Wall gets the wall's
+  numbers even when the army is doing something else).
+- **Guard posts:** a posted squad is ground held, not a statue. An enemy
+  that comes within guard reach (its range + 50) is met and fought at
+  contact; when the intruder falls or leaves, the squad returns to its
+  post. This exists because the enemy stops at its own reach + 6 (44 px
+  for a golem) — outside a posted melee squad's arm (38 px) — so without
+  the guard step a posted blade could be struck without ever striking
+  back, and camp defense would be a fiction. Support squads (the Levite
+  Healer) hold their post and work from it instead.
+- Two-hands separation kept: fight-cluster taps are never selection or
+  move taps (`overFight` unchanged), and the new CAMP button carries the
+  same wall (below). A squad posted at the camp stays and defends it —
+  proven in the sim below.
+
+**Ruling 2 — camp care mid-wave (the camp panel).** Tapping the camp
+(hero selected; with a squad selected the same tap posts the squad
+there instead) or the persistent CAMP button (top-left, under the stat
+lines) opens a compact panel (600×384, centre-field) with the camp's
+five upgrades and Repair — the SAME `CAMP_UPGRADES` / `CAMP_REPAIR`
+table, the SAME `buyCampUpgrade` / `buyCampRepair`, the SAME run state
+(`campUp` / `campMax` / `campHp` / `respawnTime`). One source of truth,
+two doors; `afterCampBuy()` re-renders whichever surface sold the
+purchase. The wave does NOT pause behind the panel, purchases are
+instant, and while the panel is open `onTap` refuses field taps so
+nothing leaks through it. The between-wave shop's camp strip is
+untouched. `openShop` closes the panel first; `end()` closes it too.
+
+**Ruling 3 — orbs like a Minecraft potion.** A purchase is now a moment:
+- **Banner:** a panel at the top of the screen in the orb's color —
+  the orb's icon disc, its NAME, and a plain-language effect line (new
+  `fx` field on every orb def: "Hero damage +50% for 60s", "The camp
+  cannot be harmed for 30s", …), held ~1.7 s before fading, on top of
+  the existing purchase toast which still names the effect in text.
+- **Splash:** a 16-spark burst in the orb's color at the hero plus an
+  expanding colored ring.
+- **Sound:** a distinct drink — `SFX.orbDrink()` (two gulps, a fizz, a
+  sparkle) layered with the existing `SFX.orbBuy()` hum.
+- **Buff chips:** under the stat lines, each live timed power wears a
+  labeled chip (color disc + NAME + seconds: "STRENGTH 60s") drawn by
+  `drawBuffChips()` — the old timer-only line still rides above them,
+  byte-identical (U5's harness asserts it).
+- **One clear tap:** tapping an orb from ANY distance now marks the
+  purchase pending (`o.pending=6`); the hero walks to the orb as before
+  and `orbTick` completes the purchase the moment he arrives in range
+  while the orb is awake — one tap, one result, no second tap to land.
+  Scope call, recorded: the on-tap hit radius stays 42 px (U5's harness
+  pins that literal); the widening is delivered by the pending purchase
+  rather than a fatter, mis-tappable target. Walking within 90 px + tap
+  still buys instantly, exactly as before.
+
+**Scaling law:** no enemy stat, no wave-curve number, no orb price or
+duration changed. Driven through the real command path (`giveOrder`,
+army-wide), the competent-play sim reproduces Upgrade 8's standard
+EXACTLY: **wave-10 champion dead in 29.8 s, camp 500/500.** The posted
+variant — the same army directed squad-by-squad through the real tap
+path into a kill-zone astride the champion's road (tanks and spears
+forward, blades beside them, ranged and healer behind), then never
+ordered again, hero fighting in the field — also clears: **champion
+dead in 51.6 s, camp standing at 269/500, 1 of 8 squads left.** Slower
+and bloodier, as a passive posture should be against an active one —
+the Phase II escort splits the zone's fire and leaks blows onto the
+camp — but reachable and honest: posted defense is a real way to play,
+not the optimal one.
+
+**Harness:** `tools/verify_upgrade9.js`, 61 checks — statics for the
+new wiring, runtime batteries for no-follow, select/post/switch/cycle,
+scoped vs army-wide orders, Follow-Me-as-order, the guard post (step
+out, kill, return), the camp panel from both surfaces at identical
+prices with the wave running behind it, orb tap-to-buy + banner + chip
+state, the one-tap pending purchase, and both sims. Three documented
+re-points in prior suites, same pattern as U8's: `verify_upgrade5.js`'s
+squad-speed static now keys on the effective order (`eo===` — the
+multiplier's law is unchanged, its subject widened), and the
+`verify_upgrade7.js` / `verify_upgrade8.js` sims drive orders through
+`giveOrder` instead of writing `g.order` (assertions untouched; U8's
+sim times reproduced to the tenth of a second). No regressions:
+U3 47/47, U4 32/32, U5 40/40, U6 34/34, U7 44/44, U8 100/100,
+U9 61/61; `node --check` clean; `js/gxhub.js` and `js/tokens.js`
+zero diff. Local commit only, NOT pushed (parent sequences pushes,
+with Upgrade 8).
+
+**What remains for kennin's hands:**
+- Thumb feel of selection: tap targets are bodies within 44 px (with
+  cycling for stacks) — whether that radius and the ring read well at
+  phone size is his playtest call, as is the CAMP button's top-left
+  placement and the camp panel's size.
+- The banner's wording and hold time (~1.7 s) — written to be read at a
+  glance mid-fight; his eyes settle whether it says enough.
+- Posted play is deliberately the costlier posture (see the sim): if
+  kennin wants posted armies stronger (e.g. a guard-reach or
+  entrenchment bonus), that is a balance ruling for him, not a default
+  the scribe smuggles in.
+
+## Upgrade 10 — the approved button UI: auto-fire restored, big buttons (2026-10-30)
+
+Kennin playtested Upgrade 8's manual combat and reversed it in a voice
+call (~16:29 CDT): "I would much rather have it auto fire. Instead of
+have a light and heavy attack." He then directed the replacement
+himself — sketch v1, his refinements, sketch v2 — and approved v2
+element by element (~16:34 CDT): auto-fire toggle, the right-thumb
+button stack, the command row with CAMP in it. "All right, you're
+approved to work on it." This upgrade builds exactly that sketch.
+
+**What changed (js/main.js, plus this note, the new harness, and
+documented re-points in verify_upgrade8.js / verify_upgrade9.js):**
+
+- **Auto-fire restored, toggleable.** The hero's basic attacks are
+  automatic again — nearest enemy inside the range circle, on the
+  hero's own attack clock (`h.cd` against `hd.rate`), melee at hand
+  range or a sling stone beyond it, through `orbDmgMul()` like every
+  hero hit: the pre-Upgrade-8 behavior with its numbers unchanged
+  (new method `heroAutoFire()`, called from `update()`). A large
+  labeled **AUTO-FIRE toggle** tops the right stack and reads its
+  state (`AUTO-FIRE: ON` / `AUTO-FIRE: OFF`). Default ON; the choice
+  persists in localStorage (`gxhub_wotw_autofire`). OFF means the hero
+  performs NO basic attacks at all — power moves still fire by button.
+- **The manual scheme is removed entirely.** LIGHT and HEAVY buttons,
+  `pressAttack` / `lightStrike` / `heavyStrike` / `attackTarget`, the
+  shared recovery clock and attack buffer, the heavy wind-up, cleave
+  and splash, and their FIGHT-table numbers are all gone — not
+  disabled, deleted.
+- **The right-thumb stack** (one column, x center 1178, 196 px wide,
+  every button 56 px tall, real text labels, the game's stone-and-gold
+  `button()` styling): AUTO-FIRE toggle (y 70), the stamina readout and
+  bar under it, DODGE (176), BLOCK (240, still a hold), SPRINT (304),
+  then the hero's power moves (368/432/496). The stack's last bottom
+  edge is y 524 — clear of the command bar at HUD_Y 610. Every stack
+  rect is registered in `fightRects`, so `onTap` refuses the whole
+  stack (toggle included) as march orders.
+- **Power moves are their own named buttons, driven from the data.**
+  The skill buttons moved out of the bottom bar into the stack, built
+  in `buildFightControls()` from `[...hero.skills, hero.ult]` with the
+  data's own names as labels — for David: SMOOTH STONE, **PSALM**,
+  **FIVE STONES** (the data already carried those names; no data fix
+  was needed). Another hero shows his own names (the harness proves
+  Samson's). Cooldown sweep and label countdown ride each button
+  exactly as before.
+- **Held Power stays.** Kennin never revoked "patience is power," and
+  it composes with auto-fire without friction: charge still accrues on
+  ready power buttons only, tiers still multiply the cast only, a
+  boss-class heavy still knocks Perfect down to Tempered. Every U8
+  Held-Power harness battery passes unchanged.
+- **The command row rebuilt to the sketch.** One row along the bottom,
+  eight buttons at 110×56 (centers y HUD_Y+55, x from 176, pitch 117):
+  CHARGE, HOLD, FOLLOW, FLANK, FALL BACK, SHIELD WALL, VOLLEY, and
+  **CAMP** — Upgrade 9's mid-wave camp panel entry moved here from its
+  top-left perch; the same panel, state and prices stand behind it,
+  and `campBtnRect` moved with it. The order line keeps HUD_Y+8, clear
+  above the taller row; speed and Fullscreen keep the far right,
+  clear of the row (row ends x 1050, they start x 1166). Upgrade 9's
+  tap-to-order is untouched.
+- **The stamina kit survives intact** — DODGE (dash + i-frames),
+  BLOCK (hold, mitigation, guard break), SPRINT (toggle, drain), one
+  shared pool, same FIGHT numbers. The stamina bar moved with the
+  stack (drawn at 1080,122, 196 wide under the toggle).
+- One loading tip rewritten: the LIGHT/HEAVY tip now teaches the
+  toggle instead. The DODGE/BLOCK/SPRINT tip was already true.
+
+**Scope calls (the scribe's, stated plainly):**
+
+1. **Three power buttons, not two.** The sketch drew two because
+   kennin named two aloud — Psalm and Five Stones. Every hero carries
+   THREE power moves (two skills + ult; David's third is Smooth
+   Stone). The stack carries all three from the data; silently
+   deleting Smooth Stone would have cut a move kennin never asked to
+   remove. The approved pair is present and named exactly as ruled.
+2. **The sprint opener retired with the manual strikes.** Upgrade 8's
+   opener (×1.25 on a strike pressed out of a sprint) was a property
+   of the press; with no press there is nothing for it to ride.
+   Sprint itself — speed, drain, guard rules — is unchanged. This is
+   the one multiplier that did not survive, and it touched only the
+   player's own strike while it lived.
+3. **CAMP's old top-left spot is simply vacated** — nothing else moved
+   into it; the buff chips keep the top-left column.
+
+**The law:** the flattened enemy curve is untouched — no spawn-count,
+HP or damage scaling constant changed anywhere in this upgrade; the
+only surviving multipliers (Held tiers) touch the player's power moves
+only, exactly as in U8.
+
+**Verification (2026-10-30, this machine):** new harness
+`tools/verify_upgrade10.js`, **50/50**: the toggle (default ON,
+persistence key, label state, a fresh scene opening with the saved
+choice), OFF = zero hero basic damage over 3 s in range with power
+moves still firing by button, ON = full basic damage on the rate clock
+(ranged and melee), the manual path's absence, stack and row geometry
+(every button ≥ 56 px tall, stack clears the bar, CAMP in the row),
+David's PSALM + FIVE STONES from the data (and Samson's own names),
+the stamina kit, and U9's tap-to-order. **The scaling-law proof:**
+competent play (the standard U7/U8/U9 army and script, orders through
+`giveOrder`, telegraphs dodged, the two regular moves at Ready) with
+auto-fire ON clears the wave-10 champion in **32.5 s, camp 500/500** —
+comparable to the pre-U8/U9 standard (~30 s). Re-pointed suites, same
+documented pattern as U8/U9 used: `verify_upgrade8.js` (100 → 93
+checks — the seven net-removed checks are the manual batteries
+themselves: LIGHT press, aim priority, Samson LIGHT/HEAVY, ranged
+heavy splash, attack buffer, the opener assertion, and the inverted
+no-auto-fire battery; every Held-Power, dodge, block, sprint, buffer,
+sweep and tally battery preserved; its sims now read Ready 32.5 s /
+Perfect 35.7 s, camp 500/500 both) and `verify_upgrade9.js` (the CAMP
+static follows the button into the row; both sims replace their
+scripted presses with auto-fire — standard 32.5 s camp 500/500, posted
+variant 51.7 s camp 269/500 with 1/8 squads standing, the same shape
+U9 recorded). No regressions: U3 47/47, U4 32/32, U5 40/40, U6 34/34,
+U7 44/44, U8 93/93, U9 61/61, U10 50/50 — 401 checks. `node --check`
+clean on every JS file; HTTP spot-check served the new main.js
+byte-identical from the local server (AUTO-FIRE present, no LIGHT
+button); `js/gxhub.js` and `js/tokens.js` zero diff. Local commit
+only, NOT pushed (the parent sequences pushes).
+
+**What remains for kennin's hands:**
+
+- Thumb feel at phone size: the stack is wide (196 px) and the row is
+  tall (56 px) by his sketch; whether the stack's reach over the field
+  and the row's new height sit right in his hand is a playtest call,
+  as is the toggle's top-right placement.
+- The three-power-button call (scope call 1): if he wants the stack
+  to carry exactly the two moves he named, Smooth Stone's button is
+  the one to strike — his word, not the scribe's.
+
+### Approved additions (kennin, same call, 2026-10-30)
+
+Two further ideas from the same call, both approved on the spot and
+built the same day. A third idea from that call — a shared stamina
+well — was NOT approved and is not built.
+
+**Addition 1 — RALLY BANNER.** A ninth seat on the command row:
+**Rally**, at the same 110×56 as every other seat — the whole row
+shifted left (start x 130) to seat it rather than shrinking any
+button. Flow: tap Rally (a targeting mode like Volley's; the two
+cancel each other), then tap the ground to plant the banner there.
+Upgrade 9's scoping law decides who answers: the selected squad
+alone (its own order becomes `'rally'`, the point its own), or, with
+the hero selected, the whole army (army order `'rally'`, every squad
+returned to army control, one shared point). `'rally'` is a true
+citizen of the ord model: `squadTarget` resolves it (the squad's own
+point, else the army's) and arrival is a hold — a rallied squad also
+GUARDS its banner the way a posted squad guards its post (stepping to
+contact within its range + 50, returning when clear; support squads
+work from the banner). Shield Wall's factoring is untouched — it
+still keys on the effective order through `squadOrder`, so a squad
+leaving a rally for Shield Wall gets the wall's numbers, and a
+rallied squad gets none. Planting again moves the point. Any later
+order supersedes the rally — a command-bar order, a direct
+tap-to-place, or a new rally — because rally is an order, not a mode
+that outlives orders. The banner itself (pole, gold cloth, ground
+ring, drawn by `drawRallyBanners` from `rallyPoints()`) flies only
+while someone holds it: when the last holder is ordered elsewhere,
+it comes down. The HUD order line names Rally for both the squad and
+army cases, and shows "RALLY: tap a spot" while planting is armed. A
+loading tip teaches it.
+
+**Addition 2 — POWER-READY WHISPER.** When Psalm or Five Stones
+finishes cooling, the readiness signal is a whisper, not a shout:
+`powerReady()` sets a soft glow pulse on that power's button (a gold
+halo drawn by `drawSkillSweep`, decaying over ~0.6 s in `update()`)
+and plays one gentle SFX cue — new `SFX.ready(id)`, a soft rising
+fifth on pure sine at a fraction of combat volume, throttled per
+power so two powers completing on the same tick each get their one
+cue. No toast, no banner, no float text. It fires **exactly once per
+cooldown completion**: `update()` detects the crossing tick (cooldown
+was running, now ready) and fires only if the move stays ready — a
+buffered cast spends the crossing and re-cools instead, so no whisper
+sounds for a move that never sat ready; and a move sitting ready
+cannot re-fire until it is spent and cools again. Scope call, stated
+plainly: kennin named David's two powers; the rule is implemented by
+button position — the hero's **second skill and his ult** whisper for
+every hero, and the quick first skill (Smooth Stone) does not, on
+the reasoning that an 8-second cycle whispering forever is noise,
+not signal.
+
+**Verification for the additions:** `verify_upgrade10.js` grew
+50 → **77 checks** (row now seats nine; whisper and rally statics;
+a 13-check rally battery — plants, selected squad paths and holds,
+unselected squad unmoved, re-plant moves the hold point, tap-to-place
+supersedes and drops the banner, army-wide rally with squads actually
+marching, a later command supersedes; a 7-check whisper battery —
+one cue + pulse on the crossing, silence while cooling and while
+sitting ready, no whisper for the quick skill, re-fire after a real
+spend, no whisper through a buffered crossing). One documented
+re-point: `verify_upgrade9.js`'s CAMP static follows the row's shift
+(176+7·117 → 130+7·117) — same button, same panel. No regressions:
+U3 47/47, U4 32/32, U5 40/40, U6 34/34, U7 44/44, U8 93/93, U9 61/61,
+U10 77/77 — **428 checks**. The law stands: nothing here touches the
+enemy curve (rally moves only the player's own squads; the whisper
+is a signal). The champion sim is unchanged (32.5 s, camp 500/500 —
+neither addition is exercised by the script). `node --check` clean;
+HTTP spot-check served the new main.js and sfx.js byte-identical;
+`js/gxhub.js` and `js/tokens.js` zero diff. Local commit only, NOT
+pushed.
