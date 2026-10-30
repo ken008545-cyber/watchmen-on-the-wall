@@ -118,6 +118,31 @@ const FIGHT={ dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6,
 const AUTOFIRE_KEY='gxhub_wotw_autofire';
 function loadAutoFire(){ try{ const v=localStorage.getItem(AUTOFIRE_KEY); return v===null?true:v==='1'; }catch(e){ return true; } }
 function saveAutoFire(on){ try{ localStorage.setItem(AUTOFIRE_KEY,on?'1':'0'); }catch(e){} }
+// Upgrade 11 — TUTORIAL MODE (kennin, voice 2026-10-30: "I like tutorial
+// mode more... All right, I approve that. You can work on the tutorial
+// mode.") A guided layer over the REAL battle scene and the REAL controls
+// — not a mock: the same hero, buttons, squads, camp panel and orbs, with
+// practice dummies standing in for waves. There is no wave timer, the
+// camp cannot fall, the hero cannot die, and the run is self-contained:
+// no Manna, Grokonian, progression, battle-pass, score or saved-squad
+// state can move in here. The ONLY things that persist are the two flags
+// below, and they exist solely to stop the game SUGGESTING the tutorial —
+// the completion flag (set at FINISH) and the offered flag (set when the
+// first-run prompt is shown). Neither locks anything; the tutorial stays
+// replayable from the menu forever.
+const TUTORIAL_KEY='gxhub_wotw_tutorial_done';
+const TUTORIAL_OFFER_KEY='gxhub_wotw_tutorial_offered';
+function tutorialDone(){ try{ return localStorage.getItem(TUTORIAL_KEY)==='1'; }catch(e){ return false; } }
+function setTutorialDone(){ try{ localStorage.setItem(TUTORIAL_KEY,'1'); }catch(e){} }
+function tutorialOffered(){ try{ return localStorage.getItem(TUTORIAL_OFFER_KEY)==='1'; }catch(e){ return false; } }
+function setTutorialOffered(){ try{ localStorage.setItem(TUTORIAL_OFFER_KEY,'1'); }catch(e){} }
+function tutPromptNeeded(){ return !tutorialDone()&&!tutorialOffered(); }
+// Practice dummies (spawnTutDummy): the Pebble Golem's own figure and data
+// path, tutorial numbers — slow, harmless (dmg 0), and they stop at the
+// edge of the hero's circle (stop is inside David's 140 range, so
+// auto-fire can always reach them; the golem's own 150 range would park
+// them outside it).
+const TUT_DUMMY={ hp:120, sturdyHp:320, dmg:0, speed:26, spawnDist:300, stop:110 };
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -161,6 +186,7 @@ const LOAD_TIPS=[
   'Tip: The goal-wave champion telegraphs its heavy blows — when the red ring closes or a circle is marked, MOVE.',
   'Tip: Held Power: a power move left ready grows stronger — Tempered, then Perfect. Spend it at the forced moment. But a heavy blow knocks Perfect out of your hands.',
   'Tip: Your hero strikes on his own — auto-fire. The big AUTO-FIRE button (top right) turns it off if you want power moves only.',
+  'Tip: New to the wall? The Tutorial on the menu teaches the whole fight at the camp — no danger, no timer.',
   'Tip: Rally plants a banner: tap Rally, then tap the ground — the selected squad, or the whole army, moves to it and holds.',
   'Tip: DODGE makes you untouchable for a blink; BLOCK softens a blow but a boss heavy still lands through it. Sprint in, strike the opener, get out.',
   'Tip: Your squads hold their ground until you direct them — tap a squad, then tap where it should post up. Orders from the command bar go to the selected squad, or to the whole army when your hero is selected.',
@@ -207,9 +233,13 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     const m=button(this,725,510,140,50,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); },{size:16});
     const mu=button(this,875,510,140,50,'Music: '+(Music.enabled()?'on':'off'),()=>{ mu.label.setText('Music: '+(Music.toggle()?'on':'off')); },{size:16});
     button(this,1150,42,220,46,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:17});
+    // Upgrade 11: the tutorial's front door — always here, never locked,
+    // replayable any time. It runs the Bible era with David, the hero the
+    // lesson is written for (its power step names Psalm and Five Stones).
+    button(this,W/2,566,280,38,'Tutorial',()=>this.scene.start('Game',{hero:'david',level:{era:'bible'},tutorial:true}),{size:18});
     const L=Progress.level(), T=Progress.state.title;
-    txt(this,W/2,585,'Level '+L.lv+'  •  Account '+Progress.accountLevel()+'  •  Battle Pass tier '+Progress.bpTier()+'/30'+(T?'  •  "'+Progress.titleName(T)+'"':''),20).setOrigin(0.5);
-    txt(this,W/2,630,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,680,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':''),18).setOrigin(0.5);
+    txt(this,W/2,612,'Level '+L.lv+'  •  Account '+Progress.accountLevel()+'  •  Battle Pass tier '+Progress.bpTier()+'/30'+(T?'  •  "'+Progress.titleName(T)+'"':''),20).setOrigin(0.5);
+    txt(this,W/2,652,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,694,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':''),18).setOrigin(0.5);
   } }
 
 function heroUnlocked(h){ return Progress.heroUnlocked(h); }
@@ -226,11 +256,25 @@ class HeroSelect extends Phaser.Scene{ constructor(){super('HeroSelect');}
       txt(this,x,y-6,h.name,16,ok?PARCH:'#8a7a6a',{align:'center',wordWrap:{width:190}}).setOrigin(0.5);
       txt(this,x,y+20,h.role+' • HP '+h.hp+(ok?' • M'+M.lv:''),14).setOrigin(0.5);
       txt(this,x,y+56,h.skills.map(k=>k.name).join(', ')+'\nUlt: '+h.ult.name,13,'#cdbd95',{align:'center',wordWrap:{width:186}}).setOrigin(0.5);
-      if(ok) button(this,x,y+108,170,40,this.browse?'Mastery '+M.lv+(M.max?' (max)':''):'Lead',()=>{ if(!this.browse) this.scene.start('Game',{hero:h.id,level:this.level}); },{size:16,disabled:this.browse});
+      if(ok) button(this,x,y+108,170,40,this.browse?'Mastery '+M.lv+(M.max?' (max)':''):'Lead',()=>{ if(this.browse) return;
+        // Upgrade 11: a fresh profile's FIRST battle entry is offered the
+        // tutorial once — a prompt, never a lock. Either choice is honored
+        // at once, and the offered flag is set the moment the prompt shows,
+        // so it never nags again. Later battle entries go straight in.
+        if(tutPromptNeeded()) this.tutPrompt(h.id);
+        else this.scene.start('Game',{hero:h.id,level:this.level}); },{size:16,disabled:this.browse});
       else if(h.unlock.type==='grokonians') button(this,x,y+108,186,40,'Unlock '+h.unlock.cost+' G',()=>{ if(Tokens.spend('hero:'+h.id,h.unlock.cost)){Tokens.grant(h.id);Progress.checkAch();SFX.build();this.scene.restart({browse:this.browse,level:this.level});} },{disabled:Tokens.balance()<h.unlock.cost,size:15});
       else txt(this,x,y+108,'🔒 '+lockLabel(h),14,'#a08a6a',{align:'center',wordWrap:{width:186}}).setOrigin(0.5);
     });
     button(this,90,680,140,46,'Back',()=>this.browse?this.scene.start('Menu'):this.scene.start('EraSelect'));
+  }
+  // Upgrade 11: the one-time first-battle offer (see the Lead button).
+  tutPrompt(heroId){ if(this._tutPromptOpen) return; this._tutPromptOpen=true; setTutorialOffered();
+    const g=this.add.graphics(); g.fillStyle(0x140c07,0.97); g.fillRoundedRect(W/2-330,240,660,190,12); g.lineStyle(3,0xd9a441,1); g.strokeRoundedRect(W/2-330,240,660,190,12);
+    txt(this,W/2,272,'New here?',26,GOLD).setOrigin(0.5);
+    txt(this,W/2,322,'The tutorial teaches the fight at the camp — moving, auto-fire,\nyour powers, your squads, the camp and the orbs. No danger, no timer.',16,PARCH,{align:'center'}).setOrigin(0.5);
+    button(this,W/2-140,390,240,48,'Tutorial',()=>this.scene.start('Game',{hero:heroId,level:this.level,tutorial:true}),{size:18});
+    button(this,W/2+140,390,240,48,'Start the battle',()=>this.scene.start('Game',{hero:heroId,level:this.level}),{size:18});
   } }
 
 class Unlocks extends Phaser.Scene{ constructor(){super('Unlocks');}
@@ -314,7 +358,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // campItems are the mid-wave camp panel's state.
     this.order='hold'; this.volleyMode=false; this.volleyCd=0; this.rallyMode=false; this.rallyPoint=null;
     this.selSquad=null; this.campPanelOpen=false; this.campItems=[];
-    this.autoFire=loadAutoFire(); } // Upgrade 10: the player's saved choice (default ON)
+    this.autoFire=loadAutoFire(); // Upgrade 10: the player's saved choice (default ON)
+    // Upgrade 11: tutorial mode — a guided, self-contained run over this
+    // same scene (see startTutorial). tutCred records the real actions the
+    // player has actually done, whenever they did them, so an action taken
+    // early is credited silently when its step arrives.
+    this.tutorial=!!(d&&d.tutorial); this.tutStep=-1; this.tutPhase=0; this.tutCred={}; this.tutFinished=false; this.tutDummy=null; this.tutDefs=null; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -339,8 +388,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.cameras.main.startFollow(this.hero.spr,true,0.08,0.08);
     this.fixUI();
     this.input.on('pointerdown',p=>this.onTap(p));
-    this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:''),4200);
-    this.openShop(true);
+    // Upgrade 11: a tutorial run opens on its first lesson instead of the
+    // shop — no wave ever starts here (waveActive never turns on), so no
+    // shop, no victory screen and no end() can ever fire in the tutorial.
+    if(this.tutorial){ this.startTutorial(); }
+    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:''),4200); this.openShop(true); }
   }
   // HUD, command bar, toasts, shop and overlays are screen furniture: anything
   // at depth >= 30 is pinned to the camera so the world can scroll beneath it.
@@ -381,6 +433,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // selected squad — or the whole army, hero selected — moves to it
     // and holds (plantRally).
     this.rallyBtn=button(this,130+8*117,HUD_Y+55,110,56,'Rally',()=>this.pressRally(),{size:16}); this.rallyBtn.setDepth(31);
+    this.rallyBtnRect={x:130+8*117,y:HUD_Y+55,w:110,h:56}; // Upgrade 11: where the tutorial's ring finds Rally
     // Upgrade 10: the hero's power buttons are built in
     // buildFightControls() now — they ride the right-thumb stack under
     // the AUTO-FIRE toggle, as the approved sketch draws them.
@@ -454,7 +507,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // marches as he always has.
     if(this.selSquad&&!this.selSquad.dead){ const s=this.selSquad;
       s.ord='post'; s.post={x:Math.max(20,Math.min(this.worldW-20,wx)),y:Math.max(40,Math.min(this.worldH-20,wy))};
-      this.floatText(s.post.x,s.post.y-16,'Hold here','#f2c14e'); this.refreshHUD(); return; }
+      this.floatText(s.post.x,s.post.y-16,'Hold here','#f2c14e'); this.refreshHUD();
+      if(this.tutorial) this.tutEvent('posted'); // Upgrade 11: the army step watches the real post
+      return; }
     this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); }
   doVolley(x,y){ this.volleyMode=false; this._volleyBuf=false; this.volleyCd=12; let n=0;
     this.squads.filter(s=>s.def.role==='ranged'&&!s.dead).forEach((s,i)=>{ n++; this.time.delayedCall(i*90,()=>{ this.shoot(s.x,s.y-20,{x,y,dead:false},'stone',{dmg:s.dmg*3,type:'physical',splash:90,splashAt:{x,y}},800); }); });
@@ -525,7 +580,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(heavy&&this.skillBtns){ let lost=false;
       this.skillBtns.forEach(b=>{ if(b.cd<=0&&this.heldTierOf(b)===2){ b.held=HELD.temperAt; b._tierShown=1; lost=true; } });
       if(lost) this.floatText(h.x,h.y-84,'Perfect lost!','#ff8a6a'); }
-    if(h.hp<=0){ h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } }
+    if(h.hp<=0){ // Upgrade 11: the tutorial's hero cannot fall — a blow
+      // that would empty his health leaves him standing at 1 HP and the
+      // lesson goes on. (Nothing in the tutorial deals real damage anyway
+      // — the dummies deal 0 — so this is a promise kept, not a path taken.)
+      if(this.tutorial){ h.hp=1; this.floatText(h.x,h.y-84,'You cannot fall here','#8fd06a'); }
+      else { h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } } }
   // --- Upgrade 8: Held Power + button weight ---
   heldTierOf(b){ const s=b.held||0; return s>=HELD.perfectAt?2:(s>=HELD.temperAt?1:0); }
   // A press on a skill button: fires at once when ready; a press inside the
@@ -566,7 +626,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     else { this.order='rally'; this.rallyPoint={x:px,y:py}; this.squads.forEach(s=>{ s.ord=null; });
       this.toast('Army: Rally!'); this.floatText(px,py-24,'Rally!','#f2c14e');
       if(this.hero) this.floatText(this.hero.x,this.hero.y-64,'Rally!','#f2c14e'); }
-    this.refreshHUD(); }
+    this.refreshHUD();
+    if(this.tutorial) this.tutEvent('rallied'); } // Upgrade 11: a planted banner is the rally step's proof
   // The banners that currently fly: the army's point, while at least one
   // army-order squad holds it, plus each squad's own point while that
   // squad holds its rally. When the last holder is given another order
@@ -580,6 +641,133 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.rallyPoints().forEach(p=>{ g.lineStyle(3,0x8a6a3a,1); g.lineBetween(p.x,p.y,p.x,p.y-52+bob);
       g.fillStyle(0xd9a441,0.95); g.fillRect(p.x,p.y-52+bob,20,12);
       g.fillStyle(0x000000,0.35); g.fillCircle(p.x,p.y,7); g.lineStyle(2,0xf2c14e,0.8); g.strokeCircle(p.x,p.y,7); }); }
+  // --- Upgrade 11: the tutorial — a guided layer over this real scene ---
+  // kennin's shape: sit by the camp and learn the real systems one step at
+  // a time, with no pressure. Each step shows ONE plain instruction line,
+  // rings the exact control or ground to use, and advances only when the
+  // player actually does the thing — the hooks are the game's own events
+  // (the march in update(), heroAutoFire, toggleAutoFire, the fight
+  // buttons, the cast end of useSkill, a tap-to-post, plantRally,
+  // openCampPanel, a successful tryBuyOrb). tutCred remembers an action
+  // done early and credits it when its step arrives (tutStepDone is
+  // checked on step entry), so nothing honest is made to repeat. SKIP
+  // STEP and EXIT TUTORIAL stand the whole time; exiting mid-way keeps no
+  // penalties and no partial rewards — end() and flush() never run here,
+  // waveActive never turns on, and the only write that outlives the run
+  // is the completion flag, set at tutFinish.
+  startTutorial(){ this.waveHpM=1; this.waveDmM=1; // dummies spawn outside startWave; both curves stay neutral here
+    this.tutStep=0; this.tutPhase=0; this.tutFinished=false;
+    this.tutDefs=[
+      { id:'move', line:'This is your camp, and this is David. Tap the ground — he walks where you tap.' },
+      { id:'autofire', line:'A practice dummy is coming. Stand your ground — when it steps into your circle, David fires on his own.',
+        lineOff:'Your auto-fire is off — David is holding his shots. Flip AUTO-FIRE on, at the top right, and watch him work.',
+        line2:'That is auto-fire. The AUTO-FIRE button at the top right is yours: flip it off — and back on, if you like.' },
+      { id:'kit', line:'Three buttons guard you: DODGE slips a blow, BLOCK softens one, SPRINT runs. Press each of them once.' },
+      { id:'power', line:'His power moves have their own buttons — Psalm and Five Stones. A stronger dummy is coming: cast one at it. When a power is ready again, its button glows and whispers.' },
+      { id:'army', line:'This squad is yours — a gift for the lesson. Tap the squad to choose it, then tap the ground to post it there.',
+        line2:'Now tap RALLY, then tap the ground. Your squad goes to the banner and holds it.' },
+      { id:'camp', line:'The camp is cared for while the fight goes on. Tap CAMP — or the camp itself — and look inside: Fortify makes it stronger, Repair mends it.' },
+      { id:'orbs', line:'The glowing orbs sell powers for Grokonians. Walk David to the shining orb and tap it — this first buy is on the house, this once.' },
+    ];
+    // The instruction furniture: a quiet panel across the top centre —
+    // clear of the stats at the left and the fight stack at the right;
+    // depth 44 sits under the camp panel (50/51), whose Close button
+    // stays the way out of the camp step, and the orb banner (45/46)
+    // still gets its one moment over it when a buy lands.
+    const items=[];
+    const g=this.add.graphics().setDepth(44);
+    g.fillStyle(0x140c07,0.92); g.fillRoundedRect(215,78,850,68,10); g.lineStyle(2,0xd9a441,0.9); g.strokeRoundedRect(215,78,850,68,10); items.push(g);
+    this.tutLine=txt(this,W/2,88,'',15,PARCH,{align:'center',wordWrap:{width:620}}).setOrigin(0.5,0).setDepth(45); items.push(this.tutLine);
+    this.tutSub=txt(this,W/2,124,'',13,'#f2c14e').setOrigin(0.5,0).setDepth(45); items.push(this.tutSub);
+    this.tutExitBtn=button(this,264,112,92,38,'Exit',()=>this.exitTutorial(),{size:14}); this.tutExitBtn.setDepth(45); items.push(this.tutExitBtn);
+    this.tutSkipBtn=button(this,1016,112,92,38,'Skip step',()=>this.tutSkip(),{size:13}); this.tutSkipBtn.setDepth(45); items.push(this.tutSkipBtn);
+    items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); });
+    this.tutFxW=this.add.graphics().setDepth(19); // the world ring: ground, squads, orbs
+    this.tutFxS=this.add.graphics().setDepth(46).setScrollFactor(0); // the screen ring: buttons
+    this.tutEnterStep(); }
+  // A real action happened. Record it whatever step we are on — credit
+  // given early is honored when its step arrives.
+  tutEvent(name){ if(!this.tutorial) return;
+    if(!this.tutCred) this.tutCred={};
+    if(name) this.tutCred[name]=true;
+    if(this.tutFinished) return;
+    const st=this.tutDefs&&this.tutDefs[this.tutStep]; if(!st) return;
+    if(st.id==='army'&&this.tutPhase===0&&name==='posted'){ this.tutPhase=1; this.tutRender(); return; } // the post turns the army step to its rally half
+    if(this.tutStepDone(st)) this.tutAdvance(); else this.tutRender(); }
+  tutStepDone(st){ const c=this.tutCred||{};
+    switch(st.id){
+      case 'move': return !!c.moved;
+      case 'autofire': return !!(c.autofired&&c.autotoggled); // both halves, in either order
+      case 'kit': return !!(c.dodge&&c.block&&c.sprint);
+      case 'power': return !!c.power;
+      case 'army': return this.tutPhase===1&&!!c.rallied;
+      case 'camp': return !!c.camp;
+      case 'orbs': return !!c.orb;
+    } return false; }
+  tutAdvance(){ if(this.tutFinished) return; this.tutStep++; this.tutPhase=0;
+    if(this.tutStep>=(this.tutDefs||[]).length){ this.tutFinish(); return; }
+    this.tutEnterStep(); }
+  tutEnterStep(){ const st=this.tutDefs&&this.tutDefs[this.tutStep]; if(!st) return;
+    if(st.id==='autofire'&&!this.tutDummy) this.tutDummy=this.spawnTutDummy(false);
+    if(st.id==='power') this.spawnTutDummy(true); // the sturdier dummy; the step-(b) one may stand beside it
+    if(st.id==='army'&&!this.squads.length){ // the tutorial-granted squad: free, run-local, never saved
+      const def=(this.roster.player||[]).find(u=>u.id==='shepherd_militia'); if(def) this.addSquad(def); }
+    this.tutRender();
+    if(this.tutStepDone(st)) this.tutAdvance(); } // silent credit: done early counts as done now
+  tutSkip(){ if(!this.tutorial||this.tutFinished) return; this.tutAdvance(); }
+  tutFinish(){ this.tutFinished=true; setTutorialDone(); // the ONLY persistent write in the whole mode
+    if(this.tutSkipBtn) this.tutSkipBtn.setVisible(false);
+    if(this.tutFxW) this.tutFxW.clear(); if(this.tutFxS) this.tutFxS.clear();
+    const items=[];
+    const g=this.add.graphics().setDepth(52); g.fillStyle(0x140c07,0.96); g.fillRoundedRect(W/2-420,236,840,232,12); g.lineStyle(3,0xd9a441,1); g.strokeRoundedRect(W/2-420,236,840,232,12); items.push(g);
+    items.push(txt(this,W/2,262,'The lesson is complete',26,GOLD).setOrigin(0.5).setDepth(53));
+    items.push(txt(this,W/2,296,'You march where you tap. David fires on his own — auto-fire, your choice.\nDodge, block and sprint guard you. Psalm and Five Stones answer your tap,\nand whisper when they are ready. Your squads post and rally where you put\nthem. The camp is cared for from CAMP. The orbs sell their powers.\nThe wall is yours.',16,PARCH,{align:'center'}).setOrigin(0.5,0).setDepth(53));
+    const fb=button(this,W/2,428,200,46,'Finish',()=>this.exitTutorial(),{size:18}); fb.setDepth(53); items.push(fb);
+    items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); });
+    this.tutRender(); }
+  exitTutorial(){ this.scene.start('Menu'); } // nothing persists, nothing is owed — see the firewall note above
+  tutRender(){ if(!this.tutLine) return;
+    if(this.tutFinished){ this.tutLine.setText('The lesson is complete — the wall is yours.'); this.tutSub.setText(''); return; }
+    const st=this.tutDefs&&this.tutDefs[this.tutStep]; if(!st){ this.tutLine.setText(''); this.tutSub.setText(''); return; }
+    let line=st.line;
+    if(st.id==='autofire') line=this.tutCred.autofired?st.line2:(this.autoFire?st.line:st.lineOff);
+    if(st.id==='army'&&this.tutPhase===1) line=st.line2;
+    this.tutLine.setText(line);
+    let sub='Step '+(this.tutStep+1)+' of '+this.tutDefs.length;
+    if(st.id==='kit'){ const left=[['dodge','Dodge'],['block','Block'],['sprint','Sprint']].filter(p=>!this.tutCred[p[0]]).map(p=>p[1]);
+      if(left.length) sub+='  ·  Still to try: '+left.join(', '); }
+    this.tutSub.setText(sub); }
+  // Where the ring goes this frame: the exact control or ground the
+  // current step (and phase) is waiting on.
+  tutTarget(){ const st=this.tutDefs&&this.tutDefs[this.tutStep]; if(!st||this.tutFinished) return null;
+    switch(st.id){
+      case 'move': return {hl:'world',x:this.campPos.x+280,y:this.campPos.y};
+      case 'autofire': if(!this.tutCred.autofired) return this.tutDummy&&!this.tutDummy.dead?{hl:'world',x:this.tutDummy.x,y:this.tutDummy.y}:{hl:'world',x:this.hero.x+170,y:this.hero.y};
+        return this.autoBtn?{hl:'screen',x:this.autoBtn.sx,y:this.autoBtn.sy}:null;
+      case 'kit': { const left=['dodge','block','sprint'].find(k=>!this.tutCred[k]); const b=left&&this.fightBtns&&this.fightBtns[left]; return b?{hl:'screen',x:b.sx,y:b.sy}:null; }
+      case 'power': { const b=this.skillBtns&&this.skillBtns[1]; return b?{hl:'screen',x:b.sx,y:b.sy}:null; }
+      case 'army': if(this.tutPhase===1) return this.rallyBtnRect?{hl:'screen',x:this.rallyBtnRect.x,y:this.rallyBtnRect.y}:null;
+        if(!this.selSquad&&this.squads&&this.squads[0]) return {hl:'world',x:this.squads[0].x,y:this.squads[0].y};
+        return {hl:'world',x:this.campPos.x+430,y:this.campPos.y-140};
+      case 'camp': return this.campBtnRect?{hl:'screen',x:this.campBtnRect.x,y:this.campBtnRect.y}:null;
+      case 'orbs': { let best=null,bd=1e12; (this.orbs||[]).forEach(o=>{ const d=Math.hypot(o.x-this.hero.x,o.y-this.hero.y); if(d<bd){ bd=d; best=o; } }); return best?{hl:'world',x:best.x,y:best.y}:null; }
+    }
+    return null; }
+  tutTick(){ if(!this.tutFxW||!this.tutFxS) return; const wg=this.tutFxW, sg=this.tutFxS; wg.clear(); sg.clear();
+    const t=this.tutTarget(); if(!t) return;
+    const r=26+5*Math.sin((this._pulse||0)*5);
+    if(t.hl==='world'){ wg.fillStyle(0xf2c14e,0.10); wg.fillCircle(t.x,t.y,r+10); wg.lineStyle(3,0xf2c14e,0.95); wg.strokeCircle(t.x,t.y,r+10); }
+    else { sg.fillStyle(0xf2c14e,0.08); sg.fillCircle(t.x,t.y,r+12); sg.lineStyle(3,0xf2c14e,0.95); sg.strokeCircle(t.x,t.y,r+12); } }
+  // A practice dummy: the Pebble Golem's own figure and data path, with
+  // tutorial numbers — it walks to the hero and waits (see the enemy
+  // loop's tutDummy branch). It goes through the real spawn() so every
+  // real system sees a real enemy; the wave system never does, because
+  // waveActive is false and spawn() is called by hand, not by a queue.
+  spawnTutDummy(sturdy){ const def=(UNITS.bible.enemy||[]).find(e=>e.id==='pebble_golem'); if(!def) return null;
+    const e=this.spawn({def,at:0,boss:false});
+    e.hp=e.max=sturdy?TUT_DUMMY.sturdyHp:TUT_DUMMY.hp; e.dmg=TUT_DUMMY.dmg; e.speed=TUT_DUMMY.speed; e.tutDummy=true;
+    e.x=this.hero.x+TUT_DUMMY.spawnDist; e.y=this.hero.y; if(e.spr&&e.spr.setPosition) e.spr.setPosition(e.x,e.y);
+    return e; }
   // The button carries its own state on its face: a dark cooldown sweep
   // that drains as the move returns, then a charge bar along the bottom
   // that fills toward the next Held tier — gold at Tempered, bright and
@@ -635,7 +823,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // The AUTO-FIRE toggle: the choice is the player's and it persists.
   toggleAutoFire(){ this.autoFire=!this.autoFire; saveAutoFire(this.autoFire);
     if(this.autoBtn) this.autoBtn.label.setText(this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF');
-    this.toast(this.autoFire?'Auto-fire ON — '+this.heroDef.name+' strikes on his own':'Auto-fire OFF — power moves only, by button'); }
+    this.toast(this.autoFire?'Auto-fire ON — '+this.heroDef.name+' strikes on his own':'Auto-fire OFF — power moves only, by button');
+    if(this.tutorial) this.tutEvent('autotoggled'); } // Upgrade 11: the auto-fire step listens for this flip, either way
   overFight(p){ if(!this.fightRects) return false;
     return this.fightRects.some(r=>Math.abs(p.x-r.x)<=r.w/2+6&&Math.abs(p.y-r.y)<=r.h/2+6); }
   // Upgrade 10: AUTO-FIRE — the hero's basic attack, restored. When the
@@ -651,7 +840,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     h.cd=hd.rate;
     if(h.blocking) this.setBlock(false);
     if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); }
-    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); SFX.sling(); } }
+    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); SFX.sling(); }
+    if(this.tutorial) this.tutEvent('autofired'); } // Upgrade 11: proof the hero fired on his own
   pressDodge(){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
     if(h.dodgeCd>0){ if(h.dodgeCd<=INPUT_BUFFER) h.dodgeBuf=true; return 'buffered'; }
     // Dash where the hero is heading (his march target), else where he faces.
@@ -659,11 +849,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(dl>6){ dx/=dl; dy/=dl; } else { dx=h.faceX; dy=h.faceY; }
     h.dodgeDx=dx; h.dodgeDy=dy; h.dodgeT=FIGHT.dodgeTime; h.iframes=FIGHT.dodgeIframes; h.dodgeCd=FIGHT.dodgeCd;
     if(h.blocking) this.setBlock(false);
-    SFX.sling(); return 'dodged'; }
+    if(this.tutorial) this.tutEvent('dodge'); SFX.sling(); return 'dodged'; } // Upgrade 11: a real dodge, counted
   setBlock(on){ const h=this.hero; if(!h) return false;
     if(on){ if(h.down>0||h.guardBreakT>0||h.stamina<=1) return false;
       if(h.sprint){ h.sprint=false; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); }
-      h.blocking=true; }
+      h.blocking=true; if(this.tutorial) this.tutEvent('block'); } // Upgrade 11: the guard was really raised
     else h.blocking=false;
     if(this.fightBtns&&this.fightBtns.block) this.fightBtns.block.redraw(h.blocking);
     return h.blocking; }
@@ -671,6 +861,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(h.blocking){ this.toast('Cannot sprint behind a raised guard'); return; }
     if(!h.sprint&&h.stamina<=5){ this.toast('Too winded to sprint'); return; }
     h.sprint=!h.sprint;
+    if(this.tutorial&&h.sprint) this.tutEvent('sprint'); // Upgrade 11: sprint switched on counts
     if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(h.sprint);
     this.floatText(h.x,h.y-64,h.sprint?'Sprint!':'Sprint off','#f2c14e'); }
   // Per-frame fight bookkeeping: dodge cooldown and i-frames, the dodge
@@ -711,7 +902,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(h.down<=0&&this.campHp>0){ h.hp=h.def.hp; h.down=0; h.spr.setAlpha(1); h.x=h.tx=this.campPos.x+60; h.y=h.ty=this.campPos.y; this.toast(h.def.name+' returns!'); } }
   // Upgrade 3: camp damage. Union Shield (shieldT) turns every blow aside.
   // The goal-wave champion hits the camp three times as hard.
-  hitCamp(amt,e){ if(this.over) return; if(this.shieldT>0) return;
+  hitCamp(amt,e){ if(this.over) return;
+    if(this.tutorial) return; // Upgrade 11: the tutorial's camp cannot fall — no blow lands on it at all
+    if(this.shieldT>0) return;
     if(e&&e.boss) amt*=3;
     this.campHp-=amt; this.campHurtThisWave=true; this.campHurtTotal=true;
     if(this.campSpr){ this.campSpr.setTintFill(0xff8a6a); this.time.delayedCall(90,()=>{ if(this.campSpr&&this.campSpr.active) this.campSpr.clearTint(); }); }
@@ -743,7 +936,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // (onTap), and purchases land instantly, exactly as in the shop.
   toggleCampPanel(){ if(this.over||this.shopOpen||this.victoryOpen) return;
     if(this.campPanelOpen) this.closeCampPanel(); else this.openCampPanel(); }
-  openCampPanel(){ if(this.campPanelOpen||this.shopOpen||this.over) return; this.campPanelOpen=true; this.renderCampPanel(); }
+  openCampPanel(){ if(this.campPanelOpen||this.shopOpen||this.over) return; this.campPanelOpen=true; this.renderCampPanel();
+    if(this.tutorial) this.tutEvent('camp'); } // Upgrade 11: opening the panel is the camp step's proof
   closeCampPanel(){ this.campPanelOpen=false; this.clearCampPanel(); }
   campAdd(o){ if(!this.campItems) this.campItems=[]; this.campItems.push(o); return o; }
   clearCampPanel(){ (this.campItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.campItems=[]; }
@@ -813,9 +1007,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       // range (while the orb is awake). One clear tap, one clear result.
       o.pending=6;
       return 'far'; }
-    if(!Tokens.spend('orb:'+o.def.id,o.def.cost)){ this.toast('Not enough Grokonians (have '+Tokens.balance()+')'); return 'funds'; }
+    // Upgrade 11: in the tutorial a buy is a GRANT, never a purchase —
+    // Tokens is not called at all, so no real Grokonian can move here
+    // (the U11 harness proves the spend count stays zero through a buy).
+    if(!this.tutorial&&!Tokens.spend('orb:'+o.def.id,o.def.cost)){ this.toast('Not enough Grokonians (have '+Tokens.balance()+')'); return 'funds'; }
     o.cd=ORB_CD; o._cdShown=null; o.pending=0;
-    this.applyOrb(o); SFX.orbBuy(); if(SFX.orbDrink) SFX.orbDrink(); this.orbBanner(o); this.spark(o.x,o.y-8,o.def.color,10); this.refreshHUD();
+    this.applyOrb(o); if(this.tutorial) this.tutEvent('orb'); SFX.orbBuy(); if(SFX.orbDrink) SFX.orbDrink(); this.orbBanner(o); this.spark(o.x,o.y-8,o.def.color,10); this.refreshHUD();
     return 'bought'; }
   // Upgrade 9: the potion moment — a purchase you cannot miss. A colored
   // burst and a closing ring at the hero in the orb's own color, and a
@@ -1111,7 +1308,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(tier>0) this.floatText(h.x,h.y-74,HELD.names[tier]+'!','#ffe98a');
     if(k.id!=='five') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); }
     // Upgrade 8: the cast spends the charge and is tallied at its tier.
-    this.heldSpent[tier]++; b.held=0; b._tierShown=0; b.buffered=false; b.cd=k.cd; b.cdMax=k.cd; }
+    this.heldSpent[tier]++; b.held=0; b._tierShown=0; b.buffered=false; b.cd=k.cd; b.cdMax=k.cd;
+    if(this.tutorial) this.tutEvent('power'); } // Upgrade 11: a real cast — reached only past every 'No target' return, so it always counts
   // --- between-wave shop ---
   // Upgrade 6: the intermission deadline is a wall-clock moment, set ONCE
   // here. It lives on the scene, not on any shop widget, so buying, paging
@@ -1227,6 +1425,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.victoryOpen) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
     this._pulse=(this._pulse||0)+dt; // Upgrade 8: drives the Perfect glow pulse in drawSkillSweep
+    if(this.tutorial) this.tutTick(); // Upgrade 11: the highlight ring breathes here
     if(this.volleyCd>0){ this.volleyCd-=dt;
       if(this.volleyCd<=0){ this.volleyCd=0; this.refreshHUD();
         // Upgrade 8: a Volley press buffered in its last breath fires now.
@@ -1251,7 +1450,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     else { const dx=h.tx-h.x, dy=h.ty-h.y, dl=Math.hypot(dx,dy);
       if(dl>3){ h.faceX=dx/dl; h.faceY=dy/dl;
         const spd=hd.speed*this.orbSpdMul()*(h.sprint?FIGHT.sprintMul:1)*(h.blocking?0.45:1);
-        const st=Math.min(dl,spd*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0); }
+        const st=Math.min(dl,spd*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0);
+        if(this.tutorial) this.tutEvent('moved'); } // Upgrade 11: the march itself is the move step's proof
       h.hp=Math.min(hd.hp,h.hp+hd.hp*0.01*dt); }
     // Upgrade 10: AUTO-FIRE — the hero's basic attack clock runs here,
     // and heroAutoFire() strikes when the toggle is ON (kennin's reversal
@@ -1314,6 +1514,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(e.stun>0){ e.stun-=dt; }
       else if(e.confuse>0){ e.confuse-=dt; e.x+=e.speed*0.6*dt; }
       else if(e.boss&&e.heavyWind>0){ /* Upgrade 7: winding up a heavy blow — the champion stands committed while the ring closes; step out or take it. */ }
+      else if(e.tutDummy){ // Upgrade 11: a practice dummy walks to the hero
+        // and waits at the edge of his range circle. It never strikes (its
+        // dmg is 0), never marches on the camp, and belongs to no wave.
+        if(h.down<=0){ const dx=h.x-e.x, dy=h.y-e.y, dl=Math.hypot(dx,dy)||1;
+          if(dl>TUT_DUMMY.stop){ e.x+=dx/dl*e.speed*dt; e.y+=dy/dl*e.speed*dt; e.spr.setFlipX(dx<0); } } }
       else { // Upgrade 3: the camp is the prize. A defender within 90px blocks
         // the road and the enemy stops to fight it; otherwise it marches on
         // the camp and, on arrival, stays and attacks it. It never vanishes,
