@@ -3,6 +3,12 @@ const W=1280,H=720,HUD_Y=610;
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
+// Real unit art cut from Formara's era sheets (tools/cut_units.py). A unit def
+// with an "img" field uses its cut PNG; anything without one falls back to the
+// old atlas sprite, unchanged.
+const UNIT_IMGS=['u_shepherd_militia','u_shepherd_slinger','u_idol_golem','u_pebble_golem','u_cohortman','u_javelineer','u_brass_empire','u_brass_dart_thrower','u_man_at_arms','u_longbowman','u_gloom_barons','u_gloom_crossbow','u_musket_line','u_rifleman','u_crown_of_fog','u_fog_musketeer','u_line_infantry','u_sharpshooter','u_rust_raiders','u_rust_raider_blaster','u_trooper','u_marksman','u_clockwork_legion','u_clockwork_popper','u_peacekeeper','u_paintball_marksman','u_glitch_horde','u_glitch_painter'];
+function uspr(s,x,y,def,h){ if(def.img&&s.textures.exists(def.img)){ const im=s.add.image(x,y,def.img); im.setScale((h||54)/im.height); im.baseScale=im.scaleX; return im; } return spr(s,x,y,def.sprite||'david',h); }
+function applyTint(im,def){ if(def.tint&&!def.img) im.setTint(parseInt(def.tint)); }
 const FONT={fontFamily:'Georgia, "Times New Roman", serif'};
 const PARCH='#e8d9b0', GOLD='#d9a441';
 let DATA=null; const DATA_P=()=>Progress.data;
@@ -17,7 +23,7 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   c.label=t; c.redraw=draw; return c; }
 
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
-  preload(){ this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); this.load.json('eras','data/eras.json'); this.load.json('units','data/units.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.image('logo','assets/logo.png'); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); }
+  preload(){ this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); this.load.json('eras','data/eras.json'); this.load.json('units','data/units.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.image('logo','assets/logo.png'); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); UNIT_IMGS.forEach(k=>this.load.image(k,'assets/units/'+k+'.png')); }
   create(){ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); ERAS=this.cache.json.get('eras'); UNITS=this.cache.json.get('units'); makeArt(this); makeArt2(this); this.scene.start('Menu'); } }
 
 function backdrop(s,dim,key){ s.add.image(W/2,H/2,key||'bg').setDisplaySize(W,H); s.add.rectangle(W/2,H/2,W,H,0x0d0906,dim); }
@@ -170,10 +176,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // --- squads ---
   addSquad(def,x,y){ const s={def,x:x||170,y:y||360,hp:def.hp,max:def.hp,dmg:def.dmg,range:def.range,rate:def.rate,speed:def.speed,
       armor:def.role==='shield'?0.2:0,cd:0,buffRateT:0,buffDmgT:0,dead:false,upgrades:{}};
-    s.spr=spr(this,s.x,s.y,def.sprite||'david',54); if(def.tint) s.spr.setTint(parseInt(def.tint));
+    s.spr=uspr(this,s.x,s.y,def,def.img?58:54); applyTint(s.spr,def);
     s.bar=this.add.graphics().setDepth(12); this.squads.push(s); return s; }
   hurtSquad(s,amt){ if(s.dead) return; let m=1-(s.armor||0); if(this.order==='shieldwall') m*=0.55; s.hp-=amt*m;
-    s.spr.setTint(0xff6a5a); this.time.delayedCall(60,()=>{ if(!s.dead&&s.spr.active){ s.spr.clearTint(); if(s.def.tint) s.spr.setTint(parseInt(s.def.tint)); } });
+    s.spr.setTint(0xff6a5a); this.time.delayedCall(60,()=>{ if(!s.dead&&s.spr.active){ s.spr.clearTint(); applyTint(s.spr,s.def); } });
     if(s.hp<=0){ s.dead=true; s.spr.destroy(); s.bar.destroy(); this.toast(s.def.name+' has fallen'); } }
   formationOffset(i){ const col=Math.floor(i/3), row=i%3;
     if(this.order==='flank') return {dx:-16-col*30,dy:(row-1)*74};
@@ -206,8 +212,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   spawn(q){ const d=q.def, hpM=this.waveHpM*(q.boss?5:1), dmM=this.waveDmM*(q.boss?1.6:1);
     const e={def:d,hp:d.hp*hpM,max:d.hp*hpM,dmg:d.dmg*dmM,range:d.range,rate:d.rate,speed:d.speed*(this.wave%2===0?1.08:1),
       x:1300+Math.random()*30,y:80+Math.random()*480,cd:0,dead:false,boss:q.boss,armorType:'flesh',ph:Math.random()*6};
-    e.spr=spr(this,e.x,e.y,d.sprite||'golem',q.boss?110:(SZ[d.sprite]||54)); if(d.tint) e.spr.setTint(parseInt(d.tint));
-    e.spr.setDepth(7); e.bar=this.add.graphics().setDepth(12); this.enemies.push(e); return e; }
+    e.spr=uspr(this,e.x,e.y,d,q.boss?120:(d.img?66:(SZ[d.sprite]||54))); applyTint(e.spr,d);
+    e.spr.setDepth(7); e.bar=this.add.graphics().setDepth(12); if(d.heals) e.healCd=1.5; if(q.boss) this.setupBoss(e); this.enemies.push(e); return e; }
+  // --- goal-wave champion: boss name + health bar (the old TD treatment) ---
+  setupBoss(e){ this.boss=e; this.bossBar=this.add.graphics().setDepth(32);
+    this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+' — GOAL-WAVE CHAMPION',20,GOLD).setOrigin(0.5).setDepth(32);
+    this.cameras.main.shake(400,0.008); SFX.stomp(); this.toast(e.def.name+' has come out to fight!',2600); }
+  bossTick(){ if(!this.bossBar) return; const e=this.boss; if(!e||e.dead){ this.clearBoss(); return; }
+    const f=Math.max(0,e.hp/e.max), bb=this.bossBar; bb.clear();
+    bb.fillStyle(0x000000,0.7); bb.fillRect(W/2-250,HUD_Y-16,500,12); bb.fillStyle(0xa33b20,1); bb.fillRect(W/2-250,HUD_Y-16,500*f,12);
+    bb.lineStyle(2,0xd9a441); bb.strokeRect(W/2-250,HUD_Y-16,500,12); }
+  clearBoss(){ if(this.bossBar){ this.bossBar.destroy(); this.bossBar=null; } if(this.bossName){ this.bossName.destroy(); this.bossName=null; } this.boss=null; }
   // --- combat core ---
   damage(e,amt,type,opt){ if(e.dead) return; opt=opt||{};
     let m=(DATA.armorTable[e.armorType]||{})[type]||1; if(opt.crit&&Math.random()<opt.crit){ m*=e.boss?2.5:2; this.floatText(e.x,e.y-20,'CRIT','#f2c14e'); }
@@ -215,10 +230,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(opt.slow){ e.slow=Math.max(e.slow||0,opt.slow); e.slowT=Math.max(e.slowT||0,1.2); }
     if(opt.stun){ e.stun=Math.max(e.stun||0,opt.stun*(e.boss?0.3:1)); }
     if(opt.burn){ e.burn=Math.max(e.burn||0,opt.burn[0]); e.burnT=Math.max(e.burnT||0,opt.burn[1]); }
-    if(e.spr.active){ e.spr.setTintFill(0xffffff); this.time.delayedCall(60,()=>{ if(!e.dead&&e.spr.active){ e.spr.clearTint(); if(e.def.tint) e.spr.setTint(parseInt(e.def.tint)); } }); }
+    if(e.spr.active){ e.spr.setTintFill(0xffffff); this.time.delayedCall(60,()=>{ if(!e.dead&&e.spr.active){ e.spr.clearTint(); applyTint(e.spr,e.def); } }); }
     if(e.hp<=0) this.kill(e); }
   kill(e){ e.dead=true; this.kills++; this.manna+=e.def.bounty||5; this.tr('kills'); if(e.def.sprite==='locust') this.tr('flyKills');
-    if(e.boss) this.tr('bossKills'); this.gx(DATA_P().xp.kill); SFX.die(); this.spark(e.x,e.y,0xcdbd95,8);
+    if(e.boss){ this.tr('bossKills'); this.clearBoss(); this.toast(e.def.name+' has fallen!',2400); } this.gx(DATA_P().xp.kill); SFX.die(); this.spark(e.x,e.y,0xcdbd95,8);
     this.tweens.add({targets:e.spr,alpha:0,scale:0.3,duration:250,onComplete:()=>e.spr.destroy()}); e.bar.destroy(); this.refreshHUD(); }
   shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); this.shots.push({s,target,opt,speed:speed||560,lx:target.x,ly:target.y}); }
   spark(x,y,col,n){ for(let i=0;i<(n||4);i++){ const p=this.add.image(x,y,'spark').setTint(col).setDepth(16).setScale(0.8); this.tweens.add({targets:p,x:x+Phaser.Math.Between(-24,24),y:y+Phaser.Math.Between(-24,24),alpha:0,scale:0.2,duration:350,onComplete:()=>p.destroy()}); } }
@@ -285,7 +300,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.shopHead2=this.shopAdd(txt(this,W/2,84,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
     pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=112+row*252,cx=x+190;
       const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(x,y,380,238,10); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(x,y,380,238,10); this.shopAdd(g);
-      const im=spr(this,x+42,y+44,def.sprite||'david',58).setDepth(52); if(def.tint) im.setTint(parseInt(def.tint)); this.shopAdd(im);
+      const im=uspr(this,x+42,y+44,def,58).setDepth(52); applyTint(im,def); this.shopAdd(im);
       const owned=this.ownedSquad(def.id);
       this.shopAdd(txt(this,x+78,y+14,def.name,19,GOLD,{wordWrap:{width:290}}).setDepth(52));
       const st=owned?{hp:owned.max,dmg:owned.dmg}:{hp:def.hp,dmg:def.dmg};
@@ -374,6 +389,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // enemies
     for(const e of this.enemies){ if(e.dead) continue;
       if(e.burnT>0){ e.burnT-=dt; e.hp-=e.burn*dt; if(e.hp<=0){ this.kill(e); continue; } }
+      if(e.def.heals){ e.healCd=(e.healCd||1.5)-dt; if(e.healCd<=0){ e.healCd=2.5;
+        for(const o of this.enemies){ if(o!==e&&!o.dead&&o.hp<o.max&&Phaser.Math.Distance.Between(e.x,e.y,o.x,o.y)<110){ o.hp=Math.min(o.max,o.hp+15); this.spark(o.x,o.y-10,0x8fd06a,1); } } } }
       if(e.slowT>0) e.slowT-=dt; else e.slow=0;
       if(e.stun>0){ e.stun-=dt; }
       else if(e.confuse>0){ e.confuse-=dt; e.x+=e.speed*0.6*dt; }
@@ -387,13 +404,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         else if(tgt.kind!=='camp'){ e.cd-=dt; if(e.cd<=0){ e.cd=e.rate;
           if(tgt.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(tgt.s,e.dmg);
           this.spark(tgt.x,tgt.y,0xc0392b,2); } }
-        if(e.x<=this.campPos.x+16&&Math.abs(e.y-this.campPos.y)<70){ e.dead=true; e.spr.destroy(); e.bar.destroy();
+        if(e.x<=this.campPos.x+16&&Math.abs(e.y-this.campPos.y)<70){ e.dead=true; e.spr.destroy(); e.bar.destroy(); if(e.boss) this.clearBoss();
           const loss=this.shieldT>0?0:(e.boss?5:1); this.lives-=loss; this.leakedThisWave+=loss; this.leakedTotal+=loss; SFX.leak(); this.cameras.main.shake(120,0.005); this.refreshHUD();
           if(this.lives<=0) return this.end(false); continue; } }
       const p={x:e.x,y:e.y}; e.spr.setOrigin(0.5,0.9).setPosition(p.x,p.y+(e.def.size||18)).setDepth((e.boss?9:7)+p.y/1000);
       e.bar.clear(); if(e.hp<e.max){ e.bar.fillStyle(0x000000,0.7); e.bar.fillRect(e.x-16,e.y-36,32,4); e.bar.fillStyle(0xa33b20,1); e.bar.fillRect(e.x-16,e.y-36,32*Math.max(0,e.hp)/e.max,4); }
     }
     this.enemies=this.enemies.filter(e=>!e.dead);
+    this.bossTick();
     // shots
     for(const s of this.shots){ const tg=s.target; if(tg&&!tg.dead&&tg.x!==undefined){ s.lx=tg.x; s.ly=tg.y; }
       const a=Phaser.Math.Angle.Between(s.s.x,s.s.y,s.lx,s.ly), step=s.speed*dt;

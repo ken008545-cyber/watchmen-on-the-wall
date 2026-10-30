@@ -13,6 +13,7 @@
     "speed": 95,
     "cost": 155,
     "sprite": "david",
+    "img": "u_shepherd_militia",
     "tint": "0xd8c9a3",
     "upgrades": [
      {
@@ -49,6 +50,7 @@
     "speed": 85,
     "cost": 190,
     "sprite": "gideon",
+    "img": "u_shepherd_slinger",
     "tint": "0xe6ddc0",
     "upgrades": [
      {
@@ -278,7 +280,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_idol_golem"
    },
    {
     "id": "pebble_golem",
@@ -291,6 +294,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_pebble_golem",
     "tint": "0xb8a888"
    },
    {
@@ -315,7 +319,8 @@
     "rate": 1.1,
     "speed": 85,
     "bounty": 12,
-    "sprite": "priest"
+    "sprite": "priest",
+    "heals": true
    },
    {
     "id": "locust_swarm",
@@ -356,6 +361,7 @@
     "speed": 95,
     "cost": 184,
     "sprite": "david",
+    "img": "u_cohortman",
     "tint": "0xd9b36a",
     "upgrades": [
      {
@@ -392,6 +398,7 @@
     "speed": 85,
     "cost": 224,
     "sprite": "gideon",
+    "img": "u_javelineer",
     "tint": "0xd9b36a",
     "upgrades": [
      {
@@ -493,7 +500,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_brass_empire"
    },
    {
     "id": "enemy_ranged",
@@ -506,6 +514,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_brass_dart_thrower",
     "tint": "0xb8a888"
    },
    {
@@ -549,6 +558,7 @@
     "speed": 95,
     "cost": 208,
     "sprite": "david",
+    "img": "u_man_at_arms",
     "tint": "0x9a8ad0",
     "upgrades": [
      {
@@ -585,6 +595,7 @@
     "speed": 85,
     "cost": 254,
     "sprite": "gideon",
+    "img": "u_longbowman",
     "tint": "0x9a8ad0",
     "upgrades": [
      {
@@ -686,7 +697,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_gloom_barons"
    },
    {
     "id": "enemy_ranged",
@@ -699,6 +711,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_gloom_crossbow",
     "tint": "0xb8a888"
    },
    {
@@ -742,6 +755,7 @@
     "speed": 95,
     "cost": 232,
     "sprite": "david",
+    "img": "u_musket_line",
     "tint": "0xa8c0e0",
     "upgrades": [
      {
@@ -778,6 +792,7 @@
     "speed": 85,
     "cost": 283,
     "sprite": "gideon",
+    "img": "u_rifleman",
     "tint": "0xa8c0e0",
     "upgrades": [
      {
@@ -879,7 +894,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_crown_of_fog"
    },
    {
     "id": "enemy_ranged",
@@ -892,6 +908,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_fog_musketeer",
     "tint": "0xb8a888"
    },
    {
@@ -935,6 +952,7 @@
     "speed": 95,
     "cost": 256,
     "sprite": "david",
+    "img": "u_line_infantry",
     "tint": "0xd08a5a",
     "upgrades": [
      {
@@ -971,6 +989,7 @@
     "speed": 85,
     "cost": 312,
     "sprite": "gideon",
+    "img": "u_sharpshooter",
     "tint": "0xd08a5a",
     "upgrades": [
      {
@@ -1072,7 +1091,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_rust_raiders"
    },
    {
     "id": "enemy_ranged",
@@ -1085,6 +1105,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_rust_raider_blaster",
     "tint": "0xb8a888"
    },
    {
@@ -1128,6 +1149,7 @@
     "speed": 95,
     "cost": 288,
     "sprite": "david",
+    "img": "u_trooper",
     "tint": "0xc9c9c9",
     "upgrades": [
      {
@@ -1164,6 +1186,7 @@
     "speed": 85,
     "cost": 351,
     "sprite": "gideon",
+    "img": "u_marksman",
     "tint": "0xc9c9c9",
     "upgrades": [
      {
@@ -1265,7 +1288,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_clockwork_legion"
    },
    {
     "id": "enemy_ranged",
@@ -1278,6 +1302,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_clockwork_popper",
     "tint": "0xb8a888"
    },
    {
@@ -1321,6 +1346,7 @@
     "speed": 95,
     "cost": 320,
     "sprite": "david",
+    "img": "u_peacekeeper",
     "tint": "0x7ae0d8",
     "upgrades": [
      {
@@ -1357,6 +1383,7 @@
     "speed": 85,
     "cost": 390,
     "sprite": "gideon",
+    "img": "u_paintball_marksman",
     "tint": "0x7ae0d8",
     "upgrades": [
      {
@@ -1458,7 +1485,8 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 25,
-    "sprite": "golem"
+    "sprite": "golem",
+    "img": "u_glitch_horde"
    },
    {
     "id": "enemy_ranged",
@@ -1471,6 +1499,7 @@
     "speed": 85,
     "bounty": 12,
     "sprite": "golem",
+    "img": "u_glitch_painter",
     "tint": "0xb8a888"
    },
    {

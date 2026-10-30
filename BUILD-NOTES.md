@@ -98,3 +98,66 @@ against `~/workspace/watchmen-conquest/SPEC.md`. Tower defense is retired.
    beyond Volley (shield Bulwark stance, spear Brace as timed abilities).
 5. Publish to https://hub.gxhub.workers.dev/ (deploy route still unknown —
    SPEC phase 8) and push `muse/test` only when kennin says so.
+
+## Upgrade 1 — real unit art, boss bar, priest healing (2026-10-30)
+Local commit on `muse/test` only; nothing pushed. The local tree already
+carried the GX Hub hello fix (f75e12b), and js/gxhub.js / js/tokens.js were
+not touched by this upgrade.
+
+### Real sprites cut from Formara's sheets (tools/cut_units.py)
+- Method: flood-fill background removal against the sheets' uniform
+  dark-brown ground, with a second chromatic-distance test so low-contrast
+  figures (Gloom purple, Fog green-grey) separate where plain RGB distance
+  fails; components grouped per figure, trimmed to bounding box, alpha
+  softened 1px. Every PNG verified in PIL (RGBA, sane figure box).
+- 28 figures cut to assets/units/: from 4066 (swordsmen) — Shepherd
+  Militia, Cohortman, Man-at-Arms, Musket Line, Line Infantry, Trooper,
+  Peacekeeper, Idol Golem, Brass Empire, Gloom Barons, Crown of Fog,
+  Rust Raiders, Clockwork Legion, Glitch Horde; from 4062 (ranged t1) —
+  Shepherd Slinger, Javelineer, Longbowman, Rifleman, Sharpshooter,
+  Marksman, Paintball Marksman, Pebble Golem, Brass Dart Thrower,
+  Gloom Crossbow, Fog Musketeer, Rust Raider Blaster, Clockwork Popper,
+  Glitch Painter. All inspected on a contact sheet; complete figures.
+  (The Gloom Crossbow and Fog Musketeer are dark/blended in the source
+  itself — the cuts are faithful, not defective.)
+- Wiring is data-driven: an "img" field per unit in data/units.json.
+  Boot preloads all 28 PNGs; uspr() in js/main.js uses the cut image when
+  a def has one and falls back to the atlas otherwise. Placeholder-era
+  tints are NOT applied over real art (applyTint skips img units).
+- Bible battle + shop now show real art for Shepherd Militia, Shepherd
+  Slinger, Idol Golem (incl. the wave-10 champion) and Pebble Golem.
+  The other eras' infantry/ranged (player) and enemy infantry/ranged
+  units also carry img fields, ready for when those eras unlock.
+
+### Still placeholder (no delivered figure exists)
+- Shieldman of Judah, Spearman of the Wall, Swordsman of Gideon,
+  Benjamite Archer, and Bible page-2 units; every era's shield, spear
+  and elite units; Philistine Spearman, Baal Priest, Locust, Frog
+  enemies. They keep their v1 atlas sprites until Formara sheets for
+  those roles arrive.
+
+### Boss treatment for the goal-wave champion
+- setupBoss/bossTick/clearBoss in the Game scene, ported from the old
+  TD: on the champion's spawn — name plate "IDOL GOLEM — GOAL-WAVE
+  CHAMPION" above the field, a 500px gold-framed health bar under it,
+  camera shake + stomp, and a "has fallen" toast on the kill. The bar
+  clears if the champion falls or reaches the camp. Boss phases (the
+  old TD's spear-throw / armor-bearer / enrage) are NOT ported — still
+  owed.
+
+### Baal Priest healing
+- data: "heals": true on baal_priest. In battle the priest mends every
+  wounded ally within 110px for 15 HP every 2.5s (small green spark),
+  capped at each ally's max.
+
+### Verification
+- node --check passes on all JS; every JSON parses; 28 img fields in
+  units.json, each file present under assets/units/.
+- Served with python http.server: HTTP 200 for index, js/main.js,
+  data/units.json, the atlas, and all 28 new unit PNGs.
+- Node harness (stubbed Phaser): all 7 game JS files load together, the
+  game config builds with all 9 scenes, UNIT_IMGS=28, uspr/applyTint
+  behave (tint set for atlas units, skipped for img units).
+- Still no live-browser playtest from this environment (same Chromium
+  policy limit as the original build); the served playtest address
+  shows this build for a human pass.
