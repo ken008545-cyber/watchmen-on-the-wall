@@ -1,0 +1,1504 @@
+{
+ "_doc": "Conquest rosters. Player units: cost/upgrades drive the between-wave shop. Enemy units: bounty = Manna on kill. Bible page-1 numbers match SPEC.md exactly.",
+ "bible": {
+  "player": [
+   {
+    "id": "shepherd_militia",
+    "name": "Shepherd Militia",
+    "role": "infantry",
+    "hp": 110,
+    "dmg": 9,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 155,
+    "sprite": "david",
+    "tint": "0xd8c9a3",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 270,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 70,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 5,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "shepherd_slinger",
+    "name": "Shepherd Slinger",
+    "role": "ranged",
+    "hp": 80,
+    "dmg": 11,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 190,
+    "sprite": "gideon",
+    "tint": "0xe6ddc0",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shieldman_judah",
+    "name": "Shieldman of Judah",
+    "role": "shield",
+    "hp": 300,
+    "dmg": 7,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 224,
+    "sprite": "samson",
+    "tint": "0xcfd6de",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 585,
+      "hpAdd": 220,
+      "dmgAdd": 3,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spearman_wall",
+    "name": "Spearman of the Wall",
+    "role": "spear",
+    "hp": 190,
+    "dmg": 13,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 180,
+    "sprite": "spearman",
+    "tint": "0xf0e6cc"
+   },
+   {
+    "id": "swordsman_gideon",
+    "name": "Swordsman of Gideon",
+    "role": "infantry",
+    "hp": 190,
+    "dmg": 17,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 293,
+    "sprite": "gideon",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 255,
+      "hpAdd": 40,
+      "dmgAdd": 6
+     }
+    ]
+   },
+   {
+    "id": "benjamite_archer",
+    "name": "Benjamite Archer",
+    "role": "ranged",
+    "hp": 90,
+    "dmg": 15,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 241,
+    "sprite": "deborah",
+    "tint": "0xf5eeda",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 210,
+      "hpAdd": 20,
+      "dmgAdd": 5
+     }
+    ]
+   },
+   {
+    "id": "mighty_man",
+    "name": "Mighty Man of David",
+    "role": "infantry",
+    "hp": 260,
+    "dmg": 22,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 380,
+    "sprite": "samson",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 300,
+      "hpAdd": 55,
+      "dmgAdd": 7
+     }
+    ]
+   },
+   {
+    "id": "watchman_bowman",
+    "name": "Watchman Bowman",
+    "role": "ranged",
+    "hp": 110,
+    "dmg": 18,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 310,
+    "sprite": "elijah",
+    "tint": "0xdfe8f2",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 260,
+      "hpAdd": 25,
+      "dmgAdd": 6
+     }
+    ]
+   },
+   {
+    "id": "gate_shieldbearer",
+    "name": "Gate Shieldbearer",
+    "role": "shield",
+    "hp": 380,
+    "dmg": 9,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 340,
+    "sprite": "bearer",
+    "upgrades": [
+     {
+      "id": "bulwark2",
+      "name": "Bulwark",
+      "cost": 520,
+      "hpAdd": 200,
+      "dmgAdd": 3,
+      "armorAdd": 0.3
+     }
+    ]
+   },
+   {
+    "id": "levite_spearman",
+    "name": "Levite Spearman",
+    "role": "spear",
+    "hp": 230,
+    "dmg": 16,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 265,
+    "sprite": "priest",
+    "tint": "0xf0e6cc",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 230,
+      "hpAdd": 35,
+      "dmgAdd": 5
+     }
+    ]
+   },
+   {
+    "id": "sling_veteran",
+    "name": "Veteran Slinger",
+    "role": "ranged",
+    "hp": 95,
+    "dmg": 20,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 350,
+    "sprite": "noah",
+    "tint": "0xe6ddc0",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "temple_guard",
+    "name": "Temple Guard",
+    "role": "shield",
+    "hp": 320,
+    "dmg": 12,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 365,
+    "sprite": "moses",
+    "tint": "0xcfd6de",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 290,
+      "hpAdd": 60,
+      "dmgAdd": 4
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "idol_golem",
+    "name": "Idol Golem",
+    "role": "infantry",
+    "hp": 380,
+    "dmg": 14,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "pebble_golem",
+    "name": "Pebble Golem",
+    "role": "ranged",
+    "hp": 120,
+    "dmg": 9,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "philistine_spearman",
+    "name": "Philistine Spearman",
+    "role": "spear",
+    "hp": 110,
+    "dmg": 11,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman"
+   },
+   {
+    "id": "baal_priest",
+    "name": "Baal Priest",
+    "role": "ranged",
+    "hp": 90,
+    "dmg": 8,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "priest"
+   },
+   {
+    "id": "locust_swarm",
+    "name": "Locust Swarm",
+    "role": "infantry",
+    "hp": 22,
+    "dmg": 4,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 3,
+    "sprite": "locust"
+   },
+   {
+    "id": "plague_frog",
+    "name": "Frog",
+    "role": "infantry",
+    "hp": 45,
+    "dmg": 6,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 4,
+    "sprite": "frog"
+   }
+  ]
+ },
+ "roman": {
+  "player": [
+   {
+    "id": "infantry",
+    "name": "Cohortman",
+    "role": "infantry",
+    "hp": 138,
+    "dmg": 12,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 184,
+    "sprite": "david",
+    "tint": "0xd9b36a",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 322,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 86,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 6,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ranged",
+    "name": "Javelineer",
+    "role": "ranged",
+    "hp": 98,
+    "dmg": 14,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 224,
+    "sprite": "gideon",
+    "tint": "0xd9b36a",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shield",
+    "name": "Legion Shieldman",
+    "role": "shield",
+    "hp": 356,
+    "dmg": 9,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 264,
+    "sprite": "samson",
+    "tint": "0xd9b36a",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 644,
+      "hpAdd": 241,
+      "dmgAdd": 3,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spear",
+    "name": "Pilum Spearman",
+    "role": "spear",
+    "hp": 224,
+    "dmg": 16,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 213,
+    "sprite": "spearman",
+    "tint": "0xd9b36a"
+   },
+   {
+    "id": "elite_infantry",
+    "name": "Praetorian",
+    "role": "infantry",
+    "hp": 230,
+    "dmg": 21,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 345,
+    "sprite": "gideon",
+    "tint": "0xd9b36a",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 299,
+      "hpAdd": 46,
+      "dmgAdd": 7
+     }
+    ]
+   },
+   {
+    "id": "elite_ranged",
+    "name": "Auxiliary Archer",
+    "role": "ranged",
+    "hp": 109,
+    "dmg": 18,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 282,
+    "sprite": "deborah",
+    "tint": "0xd9b36a",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 247,
+      "hpAdd": 23,
+      "dmgAdd": 6
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "enemy_infantry",
+    "name": "Brass Empire",
+    "role": "infantry",
+    "hp": 414,
+    "dmg": 17,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "enemy_ranged",
+    "name": "Brass Dart Thrower",
+    "role": "ranged",
+    "hp": 138,
+    "dmg": 12,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "enemy_shield",
+    "name": "Brass Shieldguard",
+    "role": "shield",
+    "hp": 345,
+    "dmg": 10,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "bounty": 16,
+    "sprite": "bearer",
+    "tint": "0xd9b36a"
+   },
+   {
+    "id": "enemy_spear",
+    "name": "Brass Lancer",
+    "role": "spear",
+    "hp": 132,
+    "dmg": 14,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman",
+    "tint": "0xd9b36a"
+   }
+  ]
+ },
+ "medieval": {
+  "player": [
+   {
+    "id": "infantry",
+    "name": "Man-at-Arms",
+    "role": "infantry",
+    "hp": 156,
+    "dmg": 13,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 208,
+    "sprite": "david",
+    "tint": "0x9a8ad0",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 364,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 98,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 6,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ranged",
+    "name": "Longbowman",
+    "role": "ranged",
+    "hp": 110,
+    "dmg": 16,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 254,
+    "sprite": "gideon",
+    "tint": "0x9a8ad0",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shield",
+    "name": "Tower Shieldman",
+    "role": "shield",
+    "hp": 403,
+    "dmg": 10,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 299,
+    "sprite": "samson",
+    "tint": "0x9a8ad0",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 728,
+      "hpAdd": 273,
+      "dmgAdd": 4,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spear",
+    "name": "Halberdier",
+    "role": "spear",
+    "hp": 254,
+    "dmg": 18,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 240,
+    "sprite": "spearman",
+    "tint": "0x9a8ad0"
+   },
+   {
+    "id": "elite_infantry",
+    "name": "Knight of the Wall",
+    "role": "infantry",
+    "hp": 260,
+    "dmg": 23,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 390,
+    "sprite": "gideon",
+    "tint": "0x9a8ad0",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 338,
+      "hpAdd": 52,
+      "dmgAdd": 8
+     }
+    ]
+   },
+   {
+    "id": "elite_ranged",
+    "name": "Yeoman Archer",
+    "role": "ranged",
+    "hp": 124,
+    "dmg": 21,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 318,
+    "sprite": "deborah",
+    "tint": "0x9a8ad0",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 280,
+      "hpAdd": 26,
+      "dmgAdd": 6
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "enemy_infantry",
+    "name": "Gloom Barons",
+    "role": "infantry",
+    "hp": 468,
+    "dmg": 20,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "enemy_ranged",
+    "name": "Gloom Crossbow",
+    "role": "ranged",
+    "hp": 156,
+    "dmg": 13,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "enemy_shield",
+    "name": "Gloom Bulwark",
+    "role": "shield",
+    "hp": 390,
+    "dmg": 12,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "bounty": 16,
+    "sprite": "bearer",
+    "tint": "0x9a8ad0"
+   },
+   {
+    "id": "enemy_spear",
+    "name": "Gloom Pike",
+    "role": "spear",
+    "hp": 150,
+    "dmg": 16,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman",
+    "tint": "0x9a8ad0"
+   }
+  ]
+ },
+ "colonial": {
+  "player": [
+   {
+    "id": "infantry",
+    "name": "Sabre Line",
+    "role": "infantry",
+    "hp": 174,
+    "dmg": 14,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 232,
+    "sprite": "david",
+    "tint": "0xa8c0e0",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 406,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 109,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 7,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ranged",
+    "name": "Rifleman",
+    "role": "ranged",
+    "hp": 123,
+    "dmg": 17,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 283,
+    "sprite": "gideon",
+    "tint": "0xa8c0e0",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shield",
+    "name": "Pavisier",
+    "role": "shield",
+    "hp": 450,
+    "dmg": 12,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 334,
+    "sprite": "samson",
+    "tint": "0xa8c0e0",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 812,
+      "hpAdd": 304,
+      "dmgAdd": 4,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spear",
+    "name": "Bayonet Line",
+    "role": "spear",
+    "hp": 283,
+    "dmg": 20,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 268,
+    "sprite": "spearman",
+    "tint": "0xa8c0e0"
+   },
+   {
+    "id": "elite_infantry",
+    "name": "Frontier Ranger",
+    "role": "infantry",
+    "hp": 290,
+    "dmg": 26,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 435,
+    "sprite": "gideon",
+    "tint": "0xa8c0e0",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 377,
+      "hpAdd": 58,
+      "dmgAdd": 9
+     }
+    ]
+   },
+   {
+    "id": "elite_ranged",
+    "name": "Sharpshooter",
+    "role": "ranged",
+    "hp": 138,
+    "dmg": 23,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 355,
+    "sprite": "deborah",
+    "tint": "0xa8c0e0",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 312,
+      "hpAdd": 29,
+      "dmgAdd": 7
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "enemy_infantry",
+    "name": "Crown of Fog",
+    "role": "infantry",
+    "hp": 522,
+    "dmg": 22,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "enemy_ranged",
+    "name": "Fog Musketeer",
+    "role": "ranged",
+    "hp": 174,
+    "dmg": 14,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "enemy_shield",
+    "name": "Fog Guard",
+    "role": "shield",
+    "hp": 435,
+    "dmg": 13,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "bounty": 16,
+    "sprite": "bearer",
+    "tint": "0xa8c0e0"
+   },
+   {
+    "id": "enemy_spear",
+    "name": "Fog Pikeman",
+    "role": "spear",
+    "hp": 167,
+    "dmg": 17,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman",
+    "tint": "0xa8c0e0"
+   }
+  ]
+ },
+ "civilwar": {
+  "player": [
+   {
+    "id": "infantry",
+    "name": "Line Infantry",
+    "role": "infantry",
+    "hp": 192,
+    "dmg": 16,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 256,
+    "sprite": "david",
+    "tint": "0xd08a5a",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 448,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 120,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 8,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ranged",
+    "name": "Sharpshooter",
+    "role": "ranged",
+    "hp": 136,
+    "dmg": 19,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 312,
+    "sprite": "gideon",
+    "tint": "0xd08a5a",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shield",
+    "name": "Iron Shieldman",
+    "role": "shield",
+    "hp": 496,
+    "dmg": 13,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 368,
+    "sprite": "samson",
+    "tint": "0xd08a5a",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 896,
+      "hpAdd": 336,
+      "dmgAdd": 5,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spear",
+    "name": "Zouave Spearman",
+    "role": "spear",
+    "hp": 312,
+    "dmg": 22,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 296,
+    "sprite": "spearman",
+    "tint": "0xd08a5a"
+   },
+   {
+    "id": "elite_infantry",
+    "name": "Union Veteran",
+    "role": "infantry",
+    "hp": 320,
+    "dmg": 29,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 480,
+    "sprite": "gideon",
+    "tint": "0xd08a5a",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 416,
+      "hpAdd": 64,
+      "dmgAdd": 10
+     }
+    ]
+   },
+   {
+    "id": "elite_ranged",
+    "name": "Skirmisher",
+    "role": "ranged",
+    "hp": 152,
+    "dmg": 26,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 392,
+    "sprite": "deborah",
+    "tint": "0xd08a5a",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 344,
+      "hpAdd": 32,
+      "dmgAdd": 8
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "enemy_infantry",
+    "name": "Rust Raiders",
+    "role": "infantry",
+    "hp": 576,
+    "dmg": 24,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "enemy_ranged",
+    "name": "Rust Raider Blaster",
+    "role": "ranged",
+    "hp": 192,
+    "dmg": 16,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "enemy_shield",
+    "name": "Rust Bulwark",
+    "role": "shield",
+    "hp": 480,
+    "dmg": 14,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "bounty": 16,
+    "sprite": "bearer",
+    "tint": "0xd08a5a"
+   },
+   {
+    "id": "enemy_spear",
+    "name": "Rust Lancer",
+    "role": "spear",
+    "hp": 184,
+    "dmg": 19,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman",
+    "tint": "0xd08a5a"
+   }
+  ]
+ },
+ "wwiwwii": {
+  "player": [
+   {
+    "id": "infantry",
+    "name": "Trooper",
+    "role": "infantry",
+    "hp": 216,
+    "dmg": 18,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 288,
+    "sprite": "david",
+    "tint": "0xc9c9c9",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 504,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 135,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 9,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ranged",
+    "name": "Marksman",
+    "role": "ranged",
+    "hp": 153,
+    "dmg": 22,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 351,
+    "sprite": "gideon",
+    "tint": "0xc9c9c9",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shield",
+    "name": "Trench Shieldman",
+    "role": "shield",
+    "hp": 558,
+    "dmg": 14,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 414,
+    "sprite": "samson",
+    "tint": "0xc9c9c9",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 1008,
+      "hpAdd": 378,
+      "dmgAdd": 5,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spear",
+    "name": "Trench Spearman",
+    "role": "spear",
+    "hp": 351,
+    "dmg": 25,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 333,
+    "sprite": "spearman",
+    "tint": "0xc9c9c9"
+   },
+   {
+    "id": "elite_infantry",
+    "name": "Commando",
+    "role": "infantry",
+    "hp": 360,
+    "dmg": 32,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 540,
+    "sprite": "gideon",
+    "tint": "0xc9c9c9",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 468,
+      "hpAdd": 72,
+      "dmgAdd": 11
+     }
+    ]
+   },
+   {
+    "id": "elite_ranged",
+    "name": "Sniper",
+    "role": "ranged",
+    "hp": 171,
+    "dmg": 29,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 441,
+    "sprite": "deborah",
+    "tint": "0xc9c9c9",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 387,
+      "hpAdd": 36,
+      "dmgAdd": 9
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "enemy_infantry",
+    "name": "Clockwork Legion",
+    "role": "infantry",
+    "hp": 648,
+    "dmg": 27,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "enemy_ranged",
+    "name": "Clockwork Popper",
+    "role": "ranged",
+    "hp": 216,
+    "dmg": 18,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "enemy_shield",
+    "name": "Clockwork Bulwark",
+    "role": "shield",
+    "hp": 540,
+    "dmg": 16,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "bounty": 16,
+    "sprite": "bearer",
+    "tint": "0xc9c9c9"
+   },
+   {
+    "id": "enemy_spear",
+    "name": "Clockwork Lancer",
+    "role": "spear",
+    "hp": 207,
+    "dmg": 22,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman",
+    "tint": "0xc9c9c9"
+   }
+  ]
+ },
+ "modern": {
+  "player": [
+   {
+    "id": "infantry",
+    "name": "Peacekeeper",
+    "role": "infantry",
+    "hp": 240,
+    "dmg": 20,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 320,
+    "sprite": "david",
+    "tint": "0x7ae0d8",
+    "upgrades": [
+     {
+      "id": "branch",
+      "name": "Pick one",
+      "cost": 560,
+      "options": [
+       {
+        "id": "stout",
+        "name": "Stout",
+        "hpAdd": 150,
+        "dmgAdd": 0,
+        "speedAdd": -8
+       },
+       {
+        "id": "rush",
+        "name": "Rush",
+        "hpAdd": 0,
+        "dmgAdd": 10,
+        "speedAdd": 22
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "id": "ranged",
+    "name": "Paintball Marksman",
+    "role": "ranged",
+    "hp": 170,
+    "dmg": 24,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 390,
+    "sprite": "gideon",
+    "tint": "0x7ae0d8",
+    "upgrades": [
+     {
+      "id": "maxtier",
+      "name": "Max tier",
+      "cost": 0
+     }
+    ]
+   },
+   {
+    "id": "shield",
+    "name": "Riot Shieldman",
+    "role": "shield",
+    "hp": 620,
+    "dmg": 16,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 460,
+    "sprite": "samson",
+    "tint": "0x7ae0d8",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 1120,
+      "hpAdd": 420,
+      "dmgAdd": 6,
+      "armorAdd": 0.35
+     }
+    ]
+   },
+   {
+    "id": "spear",
+    "name": "Javelin Trooper",
+    "role": "spear",
+    "hp": 390,
+    "dmg": 28,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 370,
+    "sprite": "spearman",
+    "tint": "0x7ae0d8"
+   },
+   {
+    "id": "elite_infantry",
+    "name": "Elite Peacekeeper",
+    "role": "infantry",
+    "hp": 400,
+    "dmg": 36,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "cost": 600,
+    "sprite": "gideon",
+    "tint": "0x7ae0d8",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 520,
+      "hpAdd": 80,
+      "dmgAdd": 12
+     }
+    ]
+   },
+   {
+    "id": "elite_ranged",
+    "name": "Paintball Sniper",
+    "role": "ranged",
+    "hp": 190,
+    "dmg": 32,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "cost": 490,
+    "sprite": "deborah",
+    "tint": "0x7ae0d8",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 430,
+      "hpAdd": 40,
+      "dmgAdd": 10
+     }
+    ]
+   }
+  ],
+  "enemy": [
+   {
+    "id": "enemy_infantry",
+    "name": "Glitch Horde",
+    "role": "infantry",
+    "hp": 720,
+    "dmg": 30,
+    "range": 38,
+    "rate": 0.9,
+    "speed": 95,
+    "bounty": 25,
+    "sprite": "golem"
+   },
+   {
+    "id": "enemy_ranged",
+    "name": "Glitch Painter",
+    "role": "ranged",
+    "hp": 240,
+    "dmg": 20,
+    "range": 150,
+    "rate": 1.1,
+    "speed": 85,
+    "bounty": 12,
+    "sprite": "golem",
+    "tint": "0xb8a888"
+   },
+   {
+    "id": "enemy_shield",
+    "name": "Glitch Bulwark",
+    "role": "shield",
+    "hp": 600,
+    "dmg": 18,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "bounty": 16,
+    "sprite": "bearer",
+    "tint": "0x7ae0d8"
+   },
+   {
+    "id": "enemy_spear",
+    "name": "Glitch Lancer",
+    "role": "spear",
+    "hp": 230,
+    "dmg": 24,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "bounty": 10,
+    "sprite": "spearman",
+    "tint": "0x7ae0d8"
+   }
+  ]
+ }
+}
