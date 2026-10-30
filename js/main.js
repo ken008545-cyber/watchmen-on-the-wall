@@ -2,6 +2,17 @@
 const W=1280,H=720,HUD_Y=610;
 // Upgrade 3: the camp's health is the run's life. CAMP_MAX hit points; if it falls, the run falls.
 const CAMP_MAX=500;
+// Upgrade 4: the camp has its own upgrade track, bought per-run in the shop.
+// Fortify tiers raise (and heal by) hpAdd; "req" chains them like unit upgrades.
+const CAMP_UPGRADES=[
+  {id:'fortify1', name:'Fortify I', cost:200, hpAdd:150, req:null},
+  {id:'fortify2', name:'Fortify II', cost:320, hpAdd:200, req:'fortify1'},
+  {id:'fortify3', name:'Fortify III', cost:450, hpAdd:250, req:'fortify2'},
+  {id:'swift', name:'Swift Return', cost:300, req:null},
+  {id:'watchfire', name:'Watch Fire', cost:500, req:null},
+];
+const CAMP_REPAIR={cost:90, heal:100};
+const CAMP_FIRE={range:240, dmg:10, rate:1.2};
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -161,6 +172,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.runXp=0; this.kills=0; this.pend={}; this.pendXp=0; this.shieldT=0; this.banquet=false; this.earned=0;
     // Upgrade 3: the camp is the defeat meter now — camp HP replaces lives.
     this.campHp=CAMP_MAX; this.campHurtThisWave=false; this.campHurtTotal=false; this.campWarnedWave=0;
+    // Upgrade 4: campMax is the single source for the camp's current maximum
+    // (CAMP_MAX is only the un-upgraded base). campUp holds this run's bought
+    // camp upgrades; respawnTime is what hurtHero() actually waits.
+    this.campMax=CAMP_MAX; this.campUp={}; this.respawnTime=8; this.campFireCd=0;
     this.wave=0; this.wavesCleared=0; this.endless=false; this.cleared=false; this.over=false;
     this.coins=[]; this.coinT=3; this.coinSeq=0; this.coinCount=0;
     this.order='follow'; this.volleyMode=false; this.volleyCd=0; }
@@ -207,7 +222,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave%2===0&&this.wave>0?'Night':'Day'; }
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
-    this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+CAMP_MAX+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
+    this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
     this.orderTxt.setText('Order: '+({charge:'Charge',hold:'Hold',follow:'Follow Me',flank:'Flank',fallback:'Fall Back',shieldwall:'Shield Wall'})[this.order]+(this.volleyMode?'   •   VOLLEY: tap a spot':''));
     if(this._lastOrder!==this.order){ this._lastOrder=this.order; Object.entries(this.cmdBtns).forEach(([id,b])=>{ if(b.redraw) b.redraw(id===this.order); }); }
     Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; }); }
@@ -226,7 +241,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.hero.spr=spr(this,hx,hy,h.id).setDepth(8); this.hero.hpBar=this.add.graphics().setDepth(12);
     this.hero.ring=this.add.circle(hx,hy,h.range,0xffffff,0.04).setStrokeStyle(1,0xd9a441,0.4).setDepth(3); }
   hurtHero(n){ const h=this.hero; if(h.down>0) return; h.hp-=n; h.spr.setTint(0xff6a5a); this.time.delayedCall(80,()=>{ if(h.spr.active) h.spr.clearTint(); });
-    if(h.hp<=0){ h.down=8; h.hp=0; h.spr.setAlpha(0.35); this.toast(h.def.name+' is down! Returns in 8s — while the camp stands',3000); } }
+    if(h.hp<=0){ h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } }
   // Upgrade 3: the hero returns only while the camp stands. If the camp has
   // fallen the run is already over, so a downed hero simply stays down.
   tickHeroDown(dt){ const h=this.hero; if(h.down<=0) return; h.down-=dt;
@@ -241,8 +256,29 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.campWarnedWave!==this.wave){ this.campWarnedWave=this.wave; SFX.campWarning(); this.toast('The camp is under attack!',2600); }
     if(this.campHp<=0){ this.campHp=0; this.refreshHUD(); this.end(false); return; }
     this.refreshHUD(); }
-  drawCampBar(){ if(!this.campBar) return; const f=Math.max(0,this.campHp/CAMP_MAX), x=this.campPos.x-46, y=this.campPos.y-58, b=this.campBar;
+  drawCampBar(){ if(!this.campBar) return; const f=Math.max(0,this.campHp/this.campMax), x=this.campPos.x-46, y=this.campPos.y-58, b=this.campBar;
     b.clear(); b.fillStyle(0x000000,0.7); b.fillRect(x,y,92,8); b.fillStyle(f>0.3?0x5aa33b:0xa33b20,1); b.fillRect(x,y,92*f,8); b.lineStyle(1,0xd9a441,0.9); b.strokeRect(x,y,92,8); }
+  // --- camp upgrades (Upgrade 4): the camp grows with the run, bought in the shop ---
+  campUpLocked(u){ return !!(u.req&&!this.campUp[u.req]); }
+  buyCampUpgrade(u){ if(this.campUp[u.id]||this.campUpLocked(u)||this.manna<u.cost) return false;
+    this.manna-=u.cost; this.campUp[u.id]=true;
+    if(u.hpAdd){ this.campMax+=u.hpAdd; this.campHp=Math.min(this.campMax,this.campHp+u.hpAdd); }
+    if(u.id==='swift') this.respawnTime=4;
+    if(u.id==='watchfire') this.campFireCd=0;
+    SFX.build(); this.renderShop(false); this.refreshHUD(); return true; }
+  buyCampRepair(){ if(this.campHp>=this.campMax||this.manna<CAMP_REPAIR.cost) return false;
+    this.manna-=CAMP_REPAIR.cost; this.campHp=Math.min(this.campMax,this.campHp+CAMP_REPAIR.heal);
+    SFX.build(); this.renderShop(false); this.refreshHUD(); return true; }
+  // Watch Fire: a camp that has bought its fire fights back — an ember at the
+  // nearest enemy in range every CAMP_FIRE.rate seconds, with a gold spark at
+  // the camp so the shot has a visible source.
+  campFireTick(dt){ if(!this.campUp||!this.campUp.watchfire||!this.waveActive) return;
+    this.campFireCd-=dt; if(this.campFireCd>0) return;
+    const t=this.nearestEnemy(this.campPos.x,this.campPos.y,CAMP_FIRE.range);
+    if(!t){ this.campFireCd=0.25; return; }
+    this.campFireCd=CAMP_FIRE.rate;
+    this.shoot(this.campPos.x,this.campPos.y-40,t,'ember',{dmg:CAMP_FIRE.dmg,type:'fire',crit:0},700);
+    this.spark(this.campPos.x,this.campPos.y-46,0xd9a441,2); }
   // --- field coins (Upgrade 3): the bigger map pays those who explore it ---
   spawnCoin(){ this.coinSeq=(this.coinSeq||0)+1; const grok=this.coinSeq%6===0;
     const x=Phaser.Math.Between(this.campPos.x+220,this.worldW-160), y=Phaser.Math.Between(90,this.worldH-90);
@@ -352,7 +388,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'time': this.squads.forEach(s=>{ s.cd=0; s.buffRateT=10; s.buffDmgT=10; }); this.cameras.main.flash(250,230,200,240); break;
       case 'pair': for(let j=0;j<6;j++) this.time.delayedCall(j*120,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,45,'physical'); this.spark(t.x,t.y,0xcdbd95,3); } }); break;
       case 'rain': near(220).forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=5; }); ring(220,0xdfe6ee); break;
-      case 'ark': this.campHp=Math.min(CAMP_MAX,this.campHp+50); E.forEach(e=>this.damage(e,100,'holy')); this.floatText(this.campPos.x,this.campPos.y-70,'Camp +50','#8fd06a'); this.toast('The Ark: the camp is mended (+50)'); this.refreshHUD(); break;
+      case 'ark': this.campHp=Math.min(this.campMax,this.campHp+50); E.forEach(e=>this.damage(e,100,'holy')); this.floatText(this.campPos.x,this.campPos.y-70,'Camp +50','#8fd06a'); this.toast('The Ark: the camp is mended (+50)'); this.refreshHUD(); break;
       case 'kite': { let src=h, hit=[]; for(let j=0;j<4;j++){ const c=E.filter(e=>!hit.includes(e)&&Phaser.Math.Distance.Between(e.x,e.y,src.x,src.y)<220).sort((a,b2)=>Phaser.Math.Distance.Between(a.x,a.y,src.x,src.y)-Phaser.Math.Distance.Between(b2.x,b2.y,src.x,src.y))[0]; if(!c) break; this.fx.lineStyle(3,0xf2e07a,1).lineBetween(src.x,src.y,c.x,c.y); this.damage(c,90,'sonic',{stun:0.5}); hit.push(c); src=c; } this.time.delayedCall(150,()=>this.fx.clear()); if(!hit.length) return this.toast('No target'); break; }
       case 'bifocal': buffSquads(0,8); ring(260,0xf2e07a); break;
       case 'almanac': for(let j=0;j<10;j++) this.time.delayedCall(j*110,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,120,'sonic',{stun:0.4}); this.spark(t.x,t.y,0xf2e07a,5); } }); this.cameras.main.flash(200,240,230,150); break;
@@ -381,15 +417,32 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // Upgrade 3: an upgrade with a "req" is locked until that upgrade is owned.
   // Branch picks store their chosen name under 'branch', which counts as owned.
   upgradeLocked(owned,u){ return !!(u.req&&!(owned.upgrades&&owned.upgrades[u.req])); }
+  // Upgrade 4: the camp strip — a slim full-width bar under the shop header,
+  // page 1 only, so it never consumes a unit slot. Left: the camp and its
+  // current strength. Then the five one-time upgrades and repeatable Repair.
+  renderCampStrip(){ const sy=92;
+    const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(48,sy,W-96,42,8); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(48,sy,W-96,42,8); this.shopAdd(g);
+    this.shopAdd(txt(this,64,sy+7,'THE CAMP',15,GOLD).setDepth(52));
+    this.shopAdd(txt(this,64,sy+24,'Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+' HP',12,PARCH).setDepth(52));
+    CAMP_UPGRADES.forEach((u,i)=>{ const cx=410+i*146, cy=sy+21;
+      if(this.campUp[u.id]){ this.shopAdd(txt(this,cx,cy,u.name+' ✓',13,'#8fd06a').setOrigin(0.5).setDepth(52)); return; }
+      const locked=this.campUpLocked(u);
+      const b=button(this,cx,cy,142,34,(locked?'🔒 ':'')+u.name+' '+u.cost,()=>this.buyCampUpgrade(u),{size:13,disabled:locked||this.manna<u.cost}); b.setDepth(52); this.shopAdd(b); });
+    const full=this.campHp>=this.campMax;
+    const rb=button(this,1140,sy+21,142,34,'Repair +'+CAMP_REPAIR.heal+' · '+CAMP_REPAIR.cost,()=>this.buyCampRepair(),{size:13,disabled:full||this.manna<CAMP_REPAIR.cost}); rb.setDepth(52); this.shopAdd(rb); }
   renderShop(first){ this.clearShop();
     const units=this.roster.player, pages=Math.ceil(units.length/6), pageUnits=units.slice(this.shopPage*6,this.shopPage*6+6);
     // Panel starts at y=38, below the HUD stat line, so the header is never clipped behind the shop.
     const bg=this.add.graphics().setDepth(50); bg.fillStyle(0x140c07,0.92); bg.fillRect(24,38,W-48,H-62); bg.lineStyle(3,0xd9a441); bg.strokeRect(24,38,W-48,H-62); this.shopAdd(bg);
     const head=first?'Prepare your squads':('Wave '+this.wavesCleared+' survived!  +'+(this.lastBonus||0)+' manna');
-    this.shopAdd(txt(this,W/2,52,head,26,GOLD).setOrigin(0.5).setDepth(51));
-    this.shopHead2=this.shopAdd(txt(this,W/2,84,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
-    if(this.shopFirst) this.shopAdd(txt(this,W/2,622,'If the camp falls, the run falls — and the fallen hero only returns while it stands.',14,'#cdbd95').setOrigin(0.5).setDepth(51));
-    pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=112+row*252,cx=x+190;
+    this.shopAdd(txt(this,W/2,50,head,26,GOLD).setOrigin(0.5).setDepth(51));
+    this.shopHead2=this.shopAdd(txt(this,W/2,76,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
+    // Upgrade 4: the camp strip lives on page 1 only, and pushes that page's
+    // unit grid down by 24px; pages 2+ keep the original geometry untouched.
+    const gridY=this.shopPage===0?136:112;
+    if(this.shopPage===0) this.renderCampStrip();
+    if(this.shopFirst) this.shopAdd(txt(this,W/2,635,'If the camp falls, the run falls — and the fallen hero only returns while it stands.',13,'#cdbd95').setOrigin(0.5).setDepth(51));
+    pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=gridY+row*252,cx=x+190;
       const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(x,y,380,238,10); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(x,y,380,238,10); this.shopAdd(g);
       const im=uspr(this,x+42,y+44,def,58).setDepth(52); applyTint(im,def); this.shopAdd(im);
       const owned=this.ownedSquad(def.id);
@@ -439,7 +492,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     else { this.toast('Wave '+this.wave+' cleared  +'+bonus+' Manna'+(perfect?'  (perfect)':'')); this.flush(); this.openShop(false); }
     this.refreshHUD(); }
   showVictory(){ this.victoryOpen=true; const s=[];
-    const campFrac=Math.max(0,this.campHp/CAMP_MAX);
+    const campFrac=Math.max(0,this.campHp/this.campMax);
     const stars=campFrac>=0.85?3:(campFrac>=0.45?2:1);
     const bg=this.add.graphics().setDepth(55); bg.fillStyle(0x140c07,0.94); bg.fillRect(340,180,600,330); bg.lineStyle(3,0xd9a441); bg.strokeRect(340,180,600,330); s.push(bg);
     s.push(txt(this,W/2,225,this.era.name+': Held!',38,GOLD).setOrigin(0.5).setDepth(56));
@@ -473,6 +526,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
     this.drawCampBar();
+    this.campFireTick(dt);
     // squads
     this.squads=this.squads.filter(s=>!s.dead);
     this.squads.forEach((s,idx)=>{ if(s.buffRateT>0) s.buffRateT-=dt; if(s.buffDmgT>0) s.buffDmgT-=dt;
@@ -547,7 +601,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(this.eraId==='bible'){ const first=!Tokens.milestone('clearCh1'); Tokens.setMilestone('clearCh1'); this.newUnlock=first; }
       SFX.win(); } else SFX.lose();
     // Upgrade 3: stars and score now read from the camp the player kept standing.
-    const campFrac=Math.max(0,this.campHp/CAMP_MAX);
+    // Upgrade 4: the fraction divides by the CURRENT max, so Fortify tiers
+    // neither gift nor steal stars — keeping 85% of a bigger camp is the same feat.
+    const campFrac=Math.max(0,this.campHp/this.campMax);
     const stars=win?(campFrac>=0.85?3:(campFrac>=0.45?2:1)):0;
     if(win) cqRecordStars(this.eraId,stars);
     this.flush(); const ev=Progress.takeEvents();
