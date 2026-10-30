@@ -24,6 +24,8 @@ window.SFX = (function(){
     campHit(){ if(lim('camp',260)){ tone('sine',92,44,0.3,0.3); nz(0.25,170,0.7,0.22,'lowpass'); } },
     campWarning(){ if(lim('campw',900)){ tone('sine',120,58,0.25,0.3); setTimeout(()=>tone('sine',120,58,0.3,0.3),190); } },
     coinPickup(grok){ if(lim('coin',70)){ const b=grok?1.25:1; tone('triangle',880*b,880*b,0.09,0.11); setTimeout(()=>tone('triangle',1318*b,1318*b,0.14,0.11),70); } },
+    // Upgrade 5: an orb purchase — a low hum that swells and settles, crowned with the coin sparkle.
+    orbBuy(){ if(lim('orb',120)){ tone('sine',174,87,0.55,0.16); tone('sine',261,130,0.5,0.07); tone('triangle',784,784,0.1,0.1); setTimeout(()=>tone('triangle',1175,1175,0.16,0.1),80); } },
     build(){ tone('triangle',440,660,0.12,0.15); setTimeout(()=>tone('triangle',660,880,0.12,0.12),90); },
     leak(){ tone('sine',200,80,0.4,0.25); },
     stomp(){ tone('sine',90,30,0.6,0.5); nz(0.4,150,0.5,0.4,'lowpass'); },

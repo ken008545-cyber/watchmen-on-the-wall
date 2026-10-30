@@ -495,3 +495,129 @@ untouched.
   and the bottom buttons; Watch Fire's feel (is 10 dmg / 1.2s worth 500?);
   and overall camp-economy balance (Fortify chain + Repair income vs wave
   rewards is a first pass, expect to tune).
+
+## Upgrade 5 — Grokonian orbs: mid-wave wall-buys (2026-10-30)
+
+kennin's design, in his words: "there should be these magic orbs that you
+can buy with the Grokonians while you're alive in the wave... like guns you
+buy on Black Ops Zombies on the walls, but they're different powers." Built
+exactly on that model: five glowing stations stand fixed in the world, the
+hero walks up, taps the orb, and Grokonians leave the wallet mid-wave via
+Tokens.spend('orb:<id>', cost) — the same spend path as hero unlocks.
+js/tokens.js and js/gxhub.js are untouched (verified by diff).
+
+### The orbs (constant ORBS in js/main.js; textures in js/art.js; sound in js/sfx.js)
+| Orb | Colour | Cost | Effect |
+|---|---|---|---|
+| Orb of Strength | crimson | 15 G | hero damage x1.5 for 60s |
+| Orb of Swiftness | cyan | 12 G | hero + squad movement speed x1.3 for 60s |
+| Orb of Mending | green | 20 G | instant: hero to full HP, every living squad +50% of its max HP, camp +75 HP (capped at campMax) |
+| Orb of Iron | silver | 18 G | the camp takes no damage for 30s |
+| Orb of Thunder | gold | 25 G | instant: every living enemy takes 150 damage through damage(); the goal-wave boss takes half (75) |
+
+Art: one generated texture per orb (orb_<id> in makeArt) — a wobbly stone
+base, pale outer glow, halo, coloured core, white-hot heart — placed as a
+world image with a breathing glow circle behind it and a slow pulse tween.
+Label floats above in the orb's own colour: "Strength · 15 G". While the
+orb sleeps after a purchase the image dims to 0.45 alpha, the glow hides,
+and the label counts down ("Strength · 12s"); on waking the price label
+returns. New SFX.orbBuy: a low sine hum swelling down, crowned with the
+coin sparkle. One new loading tip names the orbs.
+
+### Placement (fractions of the world, so locked eras inherit the same posts)
+- Strength (0.323, 0.25), Swiftness (0.323, 0.75), Mending (0.1875, 0.5),
+  Iron (0.547, 0.5), Thunder (0.781, 0.5).
+- In the Bible world (1920x1200) those land at (620,300), (620,900),
+  (360,600), (1050,600) and (1500,600): a north and a south post in the
+  mid-field, Mending a short walk east of the camp, Iron at centre-field,
+  Thunder deep toward the enemy edge — the strongest power asks the
+  longest walk into danger.
+
+### Buying (tryBuyOrb, routed from onTap before movement)
+- onTap hit-tests the tap against orb positions (42px) using world
+  coordinates and routes to tryBuyOrb instead of issuing a move order.
+  Volley targeting still takes precedence, and the shop being open blocks
+  orb taps entirely (purchases happen only while the shop is closed and
+  the run is live — between-wave wandering included).
+- Gates, in order: orb cooling down -> toast with the seconds left; hero
+  down -> refused (no one stands to touch it); hero farther than 90px
+  (ORB_RANGE) -> "Move closer to the orb" toast AND the hero's move target
+  is set to a spot beside the orb, so one more tap buys; Tokens.spend
+  false -> "Not enough Grokonians (have X)". Only a passed spend applies
+  the effect, starts the 15s cooldown (ORB_CD), plays the sound and
+  sparks. A refused tap changes nothing — no spend, no buff, no cooldown.
+- First approach: the first time the hero comes within 140px of an orb in
+  a run, one hint toast names it ("Orb of Strength — 15 Grokonians. Tap
+  the orb to buy its power."). Once per orb per run, never again.
+
+### Wiring — the real paths, no parallel systems
+- Strength: orbDmgMul() (1.5 while buffStrT runs) multiplies hd.dmg at the
+  hero's two attack sites in update() — the melee damage() call and the
+  ranged shoot() payload.
+- Swiftness: orbSpdMul() (1.3 while buffSpdT runs) multiplies hd.speed in
+  hero movement and the squads' computed spd (after the Shield Wall 0.6).
+- Iron: reuses the Union Shield mechanic — hitCamp already turns every
+  blow aside while shieldT runs — by raising shieldT to at least 30s. A
+  separate buffIronT mirrors the purchase purely so the HUD can show
+  IRON's own countdown even alongside a Union cast.
+- Mending and Thunder are one-shot effects inside applyOrb at purchase
+  time, using the ordinary caps (heroDef.hp, squad max, campMax) and the
+  ordinary damage() path (so armor, crit rules and kill bookkeeping all
+  apply; Thunder's damage type is 'holy').
+- Timers: orbTick(dt) runs in update() beside the volley cooldown; timed
+  buffs are refreshed by assignment on re-buy, so magnitude can never
+  stack (a second Strength is still x1.5, with a fresh 60s).
+- HUD: a second stat line (buffTxt, y=36, pinned like the rest of the
+  HUD) shows live timers compactly — "STR 42s · SPD 18s · IRON 30s" —
+  rebuilt by refreshHUD, which update() already calls every frame.
+
+### Design decisions kennin did not specify (made plainly, all reversible)
+1. Station posts are world fractions, not per-era coordinates, so the six
+   locked eras inherit the same layout when their art lands; the Bible
+   numbers above are what those fractions produce.
+2. The tap hit-test radius is 42px and the buy range is 90px centre to
+   centre, both measured on the hero's position (not his sprite edge).
+3. A downed hero cannot buy. Mending bought the moment before a fall will
+   still be waiting in his restored HP when he returns.
+4. Iron rides shieldT rather than a second invulnerability flag, so Union
+   Shield and the orb extend one another by max(), never additively.
+5. Thunder strikes through damage() with 'holy' — golems (armorType idol,
+   holy x0.5) feel it less than flesh does; the boss rule (half) is applied
+   before armor, as specified.
+6. Buff timers pause while the shop is open, like every other timer in
+   the battle loop; orb cooldowns pause with them.
+7. The approach hint ring (140px) is wider than the buy range (90px) on
+   purpose: the hint arrives while there is still walking to do.
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all JS files; all 5 data JSONs parse (no data
+  files changed — Upgrade 5 is code-only in js/main.js, js/art.js,
+  js/sfx.js, plus this note and the new harness).
+- tools/verify_upgrade5.js (stubbed Phaser, REAL main.js, Tokens stub
+  with a true balance): **41/41 checks pass** — orb table costs/durations,
+  station coordinates in the Bible world, price labels; a successful buy
+  deducts 15 G through Tokens and logs 'orb:strength'; insufficient funds
+  refuses with balance, buffs and cooldown untouched and the toast naming
+  the balance; the 90px gate refuses at 200px, spends nothing and sends
+  the hero to the orb's side; Strength enters the real damage path
+  (50 -> 75 per hit); orbSpdMul reads 1.3 under Swiftness; Mending caps
+  hero (30->200), squad (+50% of max, full and dead squads untouched) and
+  camp (480->500, capped) exactly; Thunder deals 150 to two soldiers, 75
+  to the boss, nothing to the dead; Iron raises shieldT to 30 and the real
+  hitCamp then deals 0; the 15s cooldown refuses a second buy with no
+  double spend; timers tick, the orb wakes with its price label back,
+  re-buy refreshes 60s without stacking magnitude, and the buff expires
+  on schedule; the approach hint fires exactly once. The HUD buff line is
+  exercised through the real refreshHUD against text stubs ("STR 60s").
+- tools/verify_upgrade3.js (47/47) and tools/verify_upgrade4.js (32/32)
+  still pass — no regressions.
+- Local server: 200 for /, index.html, js/main.js, js/sfx.js, js/art.js,
+  js/tokens.js, data/eras.json, a unit PNG and battle.mp3.
+- NOT verified (no live browser in this environment — needs kennin's or a
+  playtest's hands): whether the orb textures and glow read clearly on
+  the busy Elah field at battle zoom; whether the floating labels collide
+  with enemy health bars or the boss plate when fights pass over a
+  station; whether 90px feels like "standing at the orb" or slightly
+  short; whether the label countdown is legible at phone size; and the
+  prices' feel against real Grokonian income (a clear pays ~30 + waves —
+  Thunder at 25 G is priced as a run-saver, Strength as a habit).

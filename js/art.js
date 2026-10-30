@@ -28,6 +28,12 @@ window.makeArt = function(scene){
   tex('coin',26,26,(g)=>{ g.fillStyle(0xd9a441,1); g.fillCircle(13,13,11); g.lineStyle(2,0x8a6420,1); g.strokeCircle(13,13,11); g.lineStyle(1.5,0xa87a28,1); g.strokeCircle(13,13,7); g.fillStyle(0xf2c14e,1); g.fillTriangle(13,8.5,14.6,11.8,18,11.8,15.2,13.8,16.4,17.5,13,15.4,9.6,17.5,10.8,13.8,8,11.8,11.4,11.8); });
   // Grokonian coin: same coin, struck brighter — pale gold with a white-hot ring.
   tex('coing',26,26,(g)=>{ g.fillStyle(0xf2c14e,1); g.fillCircle(13,13,11); g.lineStyle(2,0xd9a441,1); g.strokeCircle(13,13,11); g.lineStyle(1.5,0xfff3c0,1); g.strokeCircle(13,13,7); g.fillStyle(0xfff8dd,1); g.fillTriangle(13,8.5,14.6,11.8,18,11.8,15.2,13.8,16.4,17.5,13,15.4,9.6,17.5,10.8,13.8,8,11.8,11.4,11.8); });
+  // --- Grokonian orbs (Upgrade 5): a glowing sphere on a squat stone base.
+  // Drawn per power: pale outer glow, a mid halo, the coloured core, and a
+  // white-hot heart. The pulse itself is a tween on the placed image.
+  function orbTex(key,core){ tex(key,64,76,(g)=>{ g.fillStyle(0x5a5148,1); g.fillPoints([new Phaser.Geom.Point(14,74),new Phaser.Geom.Point(50,74),new Phaser.Geom.Point(42,56),new Phaser.Geom.Point(22,56)],true); g.lineStyle(3,INK,1); g.strokePoints([new Phaser.Geom.Point(14,74),new Phaser.Geom.Point(50,74),new Phaser.Geom.Point(42,56),new Phaser.Geom.Point(22,56)],true,true); g.fillStyle(0x6e6455,1); g.fillEllipse(32,56,26,8); g.lineStyle(2,INK,1); g.strokeEllipse(32,56,26,8);
+    g.fillStyle(core,0.16); g.fillCircle(32,30,27); g.fillStyle(core,0.45); g.fillCircle(32,30,19); g.fillStyle(core,1); g.fillCircle(32,30,13); g.lineStyle(2,INK,0.65); g.strokeCircle(32,30,13); g.fillStyle(0xffffff,0.9); g.fillCircle(27,24,4.5); }); }
+  orbTex('orb_strength',0xd83a2a); orbTex('orb_swiftness',0x3ac8d8); orbTex('orb_mending',0x63c74d); orbTex('orb_iron',0xc8ccd4); orbTex('orb_thunder',0xf2c14e);
   tex('spear',40,8,(g)=>{ g.fillStyle(0x5a4020,1); g.fillRect(0,3,32,2); g.fillStyle(0x9c7a3c,1); g.fillTriangle(30,0,40,4,30,8);});
   // Ark of the covenant shown as a simple tent camp (no depiction of holy objects in combat)
   tex('camp',90,70,(g)=>{ g.fillStyle(0x8a6a3c,1); g.fillTriangle(5,65,45,8,85,65); g.lineStyle(3,INK); g.strokeTriangle(5,65,45,8,85,65); g.fillStyle(0x3a2412,1); g.fillTriangle(35,65,45,35,55,65); g.lineBetween(45,8,45,0);});
