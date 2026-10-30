@@ -624,3 +624,29 @@ coin sparkle. One new loading tip names the orbs.
 
 ## Music ruling (kennin, 2026-10-30, voice)
 Kennin heard the generative pad on the loading screen, called it better than his own track — "that eerie music... that's perfect" — and ruled: his "demon diss" battle track is REMOVED and the pad is the game's music, in the menu and in battle alike (battle already falls back to the same pad when no file is cached; Boot now loads no music files at all). His original .m4a remains preserved untouched in ~/workspace/watchmen-conquest/music-inbox/. The file slots in js/music.js stay supported should he ever reverse the ruling. verify_upgrade3.js updated to assert the ruling (no loads, no shipped mp3) instead of the old wiring.
+
+
+## Upgrade 6 — wave flow: a 60-second intermission, never a required click (2026-10-30)
+Kennin's ruling from his own playtest (voice, 2026-10-30 ~14:58 CDT): "I don't like when the wave is over, I have to click to make it next wave. So instead there should be like the wave time and then when you complete the wave, there should be at least a minute of wait time before the next wave comes so you could do upgrades and buy more soldiers and things like that."
+
+This supersedes two earlier behaviors recorded above: the slice's 20s auto-start, and Upgrade 2's "first shop has no auto-start" — both are gone.
+
+### What changed (js/main.js only, plus this note and the new harness)
+1. **Every shop gets the same minute.** `SHOP_COUNTDOWN=60`. `openShop()` — all callers: the pre-wave-1 shop (`create()` -> `openShop(true)`), each `waveClear()` shop, and the post-victory Endless shop — arms `shopEndsAt = Date.now() + 60s` and `shopT = 60`. The `shopFirst` branch no longer touches the timer at all (the flag now only gates the first shop's camp footnote text).
+2. **Visible countdown.** The shop footer timer reads `Next wave in M:SS` (`shopTimerLabel()`, ceiling so 0:00 means the wave is here), rendered larger (18px) and in gold at the same footer spot, updated every frame while the shop is open.
+3. **Auto-start at zero, exactly once.** `update()`'s shop branch derives the remaining time from the deadline each frame and calls `closeShop()` at zero; `closeShop()` sets `shopOpen=false` before `startWave()`, so no later frame can re-enter the branch or double-start a wave.
+4. **The click is now optional.** The footer button is relabeled "Next Wave Now ▶" and still calls `closeShop()` for a player who finishes shopping early.
+5. **No stale text.** The strings "Auto-start in 20s" / "Auto-start off — take your time" and the old "Next wave ▶" label no longer exist anywhere in the game code.
+
+### Timer implementation and judgment calls
+- The countdown is a **wall-clock deadline** (`shopEndsAt`, ms), not accumulated frame deltas. It lives on the scene, set once in `openShop()`. Buying, upgrading and camp purchases all re-render the shop via `renderShop()`, and shop paging does too — none of them touches the deadline, and the re-rendered label reads the current `shopT` mirror, so the displayed time never jumps back up after a purchase.
+- **Hidden tab:** Phaser stops calling `update()` while the tab is hidden, so nothing can start unseen; on return, the wall clock has honestly elapsed and the wave begins on the first frame back. The timer never grants hidden bonus shopping time and never freezes mid-shop either.
+- **Game speed (x2) does not shorten the intermission** — the shop branch already ran on unscaled time before this upgrade; the minute is a real minute.
+- **Goal-wave victory choice is untouched.** Clearing the goal wave opens Continue Endless / Finish with no timer behind it — it waits for the player indefinitely. Choosing Continue Endless re-enters the shop flow, so waves 11+ get the same 60s intermission. Quit run and defeat flows are unchanged.
+- **First-shop footnote kept.** The "If the camp falls..." line on the first shop is flavor/instruction, not timer text, and stays.
+
+### Verification (2026-10-30, this machine)
+- `node --check` passes on js/main.js and tools/verify_upgrade6.js.
+- tools/verify_upgrade6.js (stubbed Phaser, REAL main.js, `Date.now` patched inside the vm to a controllable clock): **34/34 checks pass** — label formatting (1:00 / ceil / 0:00 / 2:05); the first shop arms exactly 60,000ms, shows 1:00 -> 0:30 -> 0:01 and starts wave 1 by itself with startWave called exactly once and no click handler fired, and cannot double-start; a later shop behaves identically and is still open at the old 20s mark (0:40 left); "Next Wave Now" starts the wave immediately with the full minute left; a real Shepherd Militia purchase at 35s remaining charges Manna, re-renders the shop and leaves the deadline and the displayed 0:35 untouched, as does a page flip, and the wave still auto-starts at the original deadline; goal-wave `waveClear()` opens the victory choice with no timer (two simulated minutes pass, nothing starts), Continue Endless arms a fresh 60s and wave 11 auto-starts.
+- No regressions: tools/verify_upgrade3.js (47/47), tools/verify_upgrade4.js (32/32), tools/verify_upgrade5.js (40/40) all still pass as they stand after the music ruling.
+- NOT verified (no live browser in this environment — needs kennin's or a playtest's hands): countdown legibility at phone size in the shop footer; whether a full minute feels right in a real run (long enough to shop, short enough to keep momentum); behavior across an actual device sleep/wake during a shop.
