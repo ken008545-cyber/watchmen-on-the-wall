@@ -29,6 +29,8 @@ window.SFX = (function(){
     build(){ tone('triangle',440,660,0.12,0.15); setTimeout(()=>tone('triangle',660,880,0.12,0.12),90); },
     leak(){ tone('sine',200,80,0.4,0.25); },
     stomp(){ tone('sine',90,30,0.6,0.5); nz(0.4,150,0.5,0.4,'lowpass'); },
+    // Upgrade 7: a champion's roar — phase changes and the escort call.
+    bossRoar(){ if(lim('roar',700)){ tone('sawtooth',82,41,0.7,0.28); tone('sawtooth',124,62,0.6,0.14); nz(0.5,220,0.6,0.2,'lowpass'); } },
     skill(){ tone('triangle',523,1046,0.25,0.15); },
     ult(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone('triangle',f,f,0.3,0.15),i*90)); },
     wave(){ tone('sawtooth',196,196,0.6,0.1); setTimeout(()=>tone('sawtooth',294,294,0.8,0.1),300); },
