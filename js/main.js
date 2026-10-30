@@ -19,11 +19,11 @@ const CAMP_FIRE={range:240, dmg:10, rate:1.2};
 // Timed buffs refresh their duration when re-bought — magnitude never stacks.
 // 'dur' is seconds (0 = instant effect). Costs are Grokonians (Tokens.spend).
 const ORBS=[
-  {id:'strength', name:'Orb of Strength', short:'Strength', color:0xd83a2a, css:'#ff9a86', cost:15, dur:60},
-  {id:'swiftness', name:'Orb of Swiftness', short:'Swiftness', color:0x3ac8d8, css:'#9ae8f2', cost:12, dur:60},
-  {id:'mending', name:'Orb of Mending', short:'Mending', color:0x63c74d, css:'#a8e89a', cost:20, dur:0},
-  {id:'iron', name:'Orb of Iron', short:'Iron', color:0xc8ccd4, css:'#e8ecf2', cost:18, dur:30},
-  {id:'thunder', name:'Orb of Thunder', short:'Thunder', color:0xf2c14e, css:'#ffe08a', cost:25, dur:0},
+  {id:'strength', name:'Orb of Strength', short:'Strength', color:0xd83a2a, css:'#ff9a86', cost:15, dur:60, fx:'Hero damage +50% for 60s'},
+  {id:'swiftness', name:'Orb of Swiftness', short:'Swiftness', color:0x3ac8d8, css:'#9ae8f2', cost:12, dur:60, fx:'Hero and squads move +30% faster for 60s'},
+  {id:'mending', name:'Orb of Mending', short:'Mending', color:0x63c74d, css:'#a8e89a', cost:20, dur:0, fx:'Hero restored, squads healed +50%, camp +75 — right now'},
+  {id:'iron', name:'Orb of Iron', short:'Iron', color:0xc8ccd4, css:'#e8ecf2', cost:18, dur:30, fx:'The camp cannot be harmed for 30s'},
+  {id:'thunder', name:'Orb of Thunder', short:'Thunder', color:0xf2c14e, css:'#ffe08a', cost:25, dur:0, fx:'Lightning strikes every enemy on the field — right now'},
 ];
 const ORB_CD=15; // seconds an orb sleeps after a purchase
 const ORB_RANGE=90; // the hero must stand this close to touch an orb
@@ -54,6 +54,17 @@ const BOSS={ p2At:2/3, p3At:1/3,
   heavyEvery:6, heavyWindup:1.1, heavyMul:3, heavyRangePad:26,
   slamEvery:7, slamDelay:1.2, slamRadius:110, slamMul:2, escortCount:4,
   enrageSpeedMul:1.35, enrageRateMul:0.7, enrageHeavyEvery:4.5, enrageHeavyMul:4 };
+// Upgrade 9: COMMAND & CARE — kennin's three rulings from the 2026-10-30
+// call. (1) The army no longer trails the hero by default: squads post where
+// they stand until directed (tap-to-order, below); the command bar speaks
+// to the SELECTED squad, or to the whole army when the hero is selected;
+// Follow Me is an order again, not the default. (2) The camp's care
+// (Fortify / Repair / Swift Return / Watch Fire) is reachable MID-WAVE
+// from a camp panel that shares the shop's single state and prices.
+// (3) Orbs announce themselves like a Minecraft potion: banner, splash,
+// drink sound and a labeled buff chip — and one tap from anywhere sends
+// the hero to buy (the pending purchase fires on arrival).
+const ORDER_NAMES={charge:'Charge',hold:'Hold',follow:'Follow Me',flank:'Flank',fallback:'Fall Back',shieldwall:'Shield Wall'};
 // Upgrade 8: HELD-POWER MASTERY — "patience is power", kennin's own mechanic
 // grown from his own play (2026-10-30): cornered by five hard trolls, he held
 // his power moves until the moment was forced, spent them, and lived. Every
@@ -73,21 +84,11 @@ const BOSS={ p2At:2/3, p3At:1/3,
 const HELD={ temperAt:20, perfectAt:45, mul:[1,1.5,2.25], names:['Ready','Tempered','Perfect'], perfectStun:0.6 };
 const INPUT_BUFFER=0.15;
 // Upgrade 8, second half — kennin's combat-controls design (voice,
-// 2026-10-30, minutes after the Held-Power brief): TWO HANDS — ONE MARCHES,
-// ONE FIGHTS. One hand taps the map to move (tap-to-move, unchanged); the
-// other works an on-screen FIGHT CLUSTER on the right side of the screen,
-// laid out where thumbs expect it (his references: Minecraft, Brawlhalla).
-// The hero is the fighting-game character now: he does NOT auto-fire —
-// the range circle is a warning/range indicator only, and the PLAYER
-// presses to strike. Squads keep their existing behavior; only the hero
-// went manual. The kit:
-//  LIGHT — quick strike: lightDmg x the hero's basic damage, ready again
-//    after lightCd x his basic rate. The old auto-attack's numbers live
-//    here now, split into a fast hand and a heavy hand.
-//  HEAVY — the committed strike: heavyDmg x damage after a heavyWindup
-//    wind-up the enemy can make whiff by killing the moment; ready again
-//    after heavyCd x rate. Melee heavies cleave (nearby enemies take
-//    half); ranged heavies splash.
+// 2026-10-30): TWO HANDS — ONE MARCHES, ONE FIGHTS. One hand taps the map
+// to move (tap-to-move, unchanged); the other works an on-screen FIGHT
+// CLUSTER on the right side of the screen. Upgrade 8 made the hero's
+// basic attacks manual (LIGHT/HEAVY buttons); Upgrade 10 (below) carries
+// kennin's reversal of that half. What survives of the kit:
 //  DODGE — a dodgeDist dash in the facing / last-move direction with
 //    dodgeIframes of true invulnerability: the skilled answer to the
 //    champion's telegraphed heavies, beside repositioning (U7's intent).
@@ -96,15 +97,27 @@ const INPUT_BUFFER=0.15;
 //    lands through a guard). Guarding drains stamina and impacts cost
 //    more; an emptied guard BREAKS for guardBreak seconds.
 //  SPRINT — a toggle: sprintMul movement, draining stamina while moving,
-//    impossible while blocking (and blocking cancels it). Striking out of
-//    a real sprint (openerMinTime of motion) earns the openerMul opener.
+//    impossible while blocking (and blocking cancels it). (Upgrade 8's
+//    sprint OPENER — a bonus on a strike pressed out of a sprint —
+//    retired with the manual strikes in Upgrade 10: it was a property
+//    of the press, and there is no press anymore.)
 //  Stamina is one pool shared by block and sprint, so the two hands argue
 //  over a single resource — that argument is the fighting game.
-const FIGHT={ lightDmg:0.75, lightCd:0.55, heavyDmg:2.1, heavyCd:1.9, heavyWindup:0.28, heavyCleave:46, heavySplash:38,
-  dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6,
+const FIGHT={ dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6,
   blockMit:0.65, blockHeavyMit:0.45, blockDrain:12, blockHitCost:8, blockHeavyCost:18, guardBreak:1.2,
-  sprintMul:1.45, sprintDrain:8, openerMul:1.25, openerMinTime:0.2,
+  sprintMul:1.45, sprintDrain:8,
   stamMax:100, stamRegen:16, stamDelay:0.6 };
+// Upgrade 10 — AUTO-FIRE, kennin's reversal (voice, 2026-10-30, after
+// playtesting the manual scheme): "I would much rather have it auto
+// fire. Instead of have a light and heavy attack." The hero's basic
+// attacks are automatic again — nearest enemy in range, on his own
+// attack clock, the pre-Upgrade-8 behavior — AND the player can turn
+// auto-fire OFF (skills and ults still fire by button; the hero simply
+// holds his basic attacks). The toggle sits top-right of the battle HUD,
+// defaults ON, and the choice persists in localStorage.
+const AUTOFIRE_KEY='gxhub_wotw_autofire';
+function loadAutoFire(){ try{ const v=localStorage.getItem(AUTOFIRE_KEY); return v===null?true:v==='1'; }catch(e){ return true; } }
+function saveAutoFire(on){ try{ localStorage.setItem(AUTOFIRE_KEY,on?'1':'0'); }catch(e){} }
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -147,8 +160,12 @@ const LOAD_TIPS=[
   'Tip: Glowing orbs in the field sell powers for Grokonians — walk your hero up and tap one, even mid-wave.',
   'Tip: The goal-wave champion telegraphs its heavy blows — when the red ring closes or a circle is marked, MOVE.',
   'Tip: Held Power: a power move left ready grows stronger — Tempered, then Perfect. Spend it at the forced moment. But a heavy blow knocks Perfect out of your hands.',
-  'Tip: Two hands: one taps the field to march, the other fights — LIGHT and HEAVY strike only when you press. The circle is your range, not a trigger.',
-  'Tip: DODGE makes you untouchable for a blink; BLOCK softens a blow but a boss heavy still lands through it. Sprint in, strike the opener, get out.'
+  'Tip: Your hero strikes on his own — auto-fire. The big AUTO-FIRE button (top right) turns it off if you want power moves only.',
+  'Tip: Rally plants a banner: tap Rally, then tap the ground — the selected squad, or the whole army, moves to it and holds.',
+  'Tip: DODGE makes you untouchable for a blink; BLOCK softens a blow but a boss heavy still lands through it. Sprint in, strike the opener, get out.',
+  'Tip: Your squads hold their ground until you direct them — tap a squad, then tap where it should post up. Orders from the command bar go to the selected squad, or to the whole army when your hero is selected.',
+  'Tip: The camp can be cared for mid-wave — tap the camp or the CAMP button to Fortify, Repair, and light the Watch Fire without leaving the fight.',
+  'Tip: Tap an orb once and your hero will walk up and buy it — watch for the banner: it names the power and what it does.'
 ];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
   preload(){ this.load.image('logo','assets/logo.png'); }
@@ -290,7 +307,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.heldSpent=[0,0,0];
     this.wave=0; this.wavesCleared=0; this.endless=false; this.cleared=false; this.over=false;
     this.coins=[]; this.coinT=3; this.coinSeq=0; this.coinCount=0;
-    this.order='follow'; this.volleyMode=false; this.volleyCd=0; }
+    // Upgrade 9: the standing army order at run start is Hold — squads post
+    // where they are bought (at the camp) and stay until directed. Follow
+    // exists only as an order now. selSquad is the marching hand's current
+    // squad (null = the hero is selected, the default); campPanelOpen and
+    // campItems are the mid-wave camp panel's state.
+    this.order='hold'; this.volleyMode=false; this.volleyCd=0; this.rallyMode=false; this.rallyPoint=null;
+    this.selSquad=null; this.campPanelOpen=false; this.campItems=[];
+    this.autoFire=loadAutoFire(); } // Upgrade 10: the player's saved choice (default ON)
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -308,6 +332,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.manna=ERAS.startManna; this.speed=1; this.time.timeScale=1;
     this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.victoryOpen=false; this.shopT=0; this.shopEndsAt=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
     this.fx=this.add.graphics().setDepth(20);
+    this.selFx=this.add.graphics().setDepth(6); // Upgrade 9: the selection ring (world layer, under the fight furniture)
+    this.rallyFx=this.add.graphics().setDepth(5); // Upgrade 10: rally banners (world layer, under the selection ring)
     this.buildHero(); this.buildOrbs(); this.buildHUD();
     this.cameras.main.setBounds(0,0,this.worldW,this.worldH);
     this.cameras.main.startFollow(this.hero.spr,true,0.08,0.08);
@@ -325,23 +351,39 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 5: live orb buff timers ride a second, smaller line under the stats.
     this.buffTxt=txt(this,12,36,'',15,'#f2c14e').setDepth(31);
     this.orderTxt=txt(this,12,HUD_Y+8,'',16,GOLD).setDepth(31);
+    // Upgrade 10: the command row rebuilt to the approved sketch — one
+    // row of LARGE labeled buttons (110x56) along the bottom: the six
+    // orders, Volley, CAMP, and Rally (the approved addition seats
+    // ninth; the row starts at x 130 so all nine keep the full size).
+    // The order line at HUD_Y+8 stays clear above them; speed and
+    // Fullscreen keep the far right.
     const cmds=[['charge','Charge'],['hold','Hold'],['follow','Follow Me'],['flank','Flank'],['fallback','Fall Back'],['shieldwall','Shield Wall']];
     this.cmdBtns={};
-    cmds.forEach(([id,label],i)=>{ const b=button(this,330+i*118,HUD_Y+26,112,36,label,()=>{ this.order=id; this.volleyMode=false; this.refreshHUD(); this.toast('Order: '+label);
-      // Upgrade 8: the order echoes above the hero, in the world — the
-      // player sees the army heard it, not just a HUD line changing.
-      if(this.hero) this.floatText(this.hero.x,this.hero.y-64,label+'!','#f2c14e'); },{size:15}); b.setDepth(31); this.cmdBtns[id]=b; });
-    const vb=button(this,330+6*118,HUD_Y+26,112,36,'Volley',()=>this.pressVolley(),{size:15}); vb.setDepth(31); this.cmdBtns.volley=vb;
+    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,label,()=>this.giveOrder(id),{size:16}); b.setDepth(31); this.cmdBtns[id]=b; });
+    const vb=button(this,130+6*117,HUD_Y+55,110,56,'Volley',()=>this.pressVolley(),{size:16}); vb.setDepth(31); this.cmdBtns.volley=vb;
     // Upgrade 8: Volley carries a cooldown sweep like the skill buttons.
-    vb.sx=330+6*118; vb.sy=HUD_Y+26; vb.sw=112; vb.sh=36; vb.sweep=this.add.graphics().setDepth(32);
-    const h=this.heroDef; this.skillBtns=[];
-    [...h.skills,h.ult].forEach((k,i)=>{ const b=button(this,110+i*185,HUD_Y+80,175,44,k.name,()=>this.pressSkill(i),{size:16}); b.setDepth(31);
-      // Upgrade 8: Held Power state lives on the button itself — cd/cdMax
-      // drive the cooldown sweep, held accrues charge while the move sits
-      // ready, buffered remembers a press that landed a breath too early.
-      b.cd=0; b.cdMax=k.cd; b.def=k; b.held=0; b.buffered=false; b._tierShown=0;
-      b.sx=110+i*185; b.sy=HUD_Y+80; b.sw=175; b.sh=44; b.sweep=this.add.graphics().setDepth(32);
-      this.skillBtns.push(b); });
+    vb.sx=130+6*117; vb.sy=HUD_Y+55; vb.sw=110; vb.sh=56; vb.sweep=this.add.graphics().setDepth(32);
+    // Upgrade 9: the active-buff chips — each live orb power wears a labeled
+    // chip (color disc + name + seconds) under the stat lines, so what the
+    // hero is carrying is readable at a glance, not just a timer line.
+    this.buffGfx=this.add.graphics().setDepth(32);
+    this.buffChipTxts=[0,1,2].map(()=>txt(this,0,0,'',13,'#ffffff').setDepth(33).setVisible(false));
+    // Upgrade 9: the CAMP button — the camp's care, one tap away mid-wave.
+    // Upgrade 10: it rides the command row now, as the approved sketch
+    // draws it — camp care sits with the army's orders. Same panel, same
+    // CAMP_UPGRADES / CAMP_REPAIR state and prices behind it.
+    this.campBtn=button(this,130+7*117,HUD_Y+55,110,56,'CAMP',()=>this.toggleCampPanel(),{size:16}); this.campBtn.setDepth(31);
+    this.campBtnRect={x:130+7*117,y:HUD_Y+55,w:110,h:56};
+    // Upgrade 10 (approved addition): RALLY — the ninth seat on the row.
+    // The whole row shifted left (start x 130) so Rally sits at the same
+    // 110x56 as every other seat instead of shrinking any button. Tap
+    // Rally, then tap the ground: the banner is planted there and the
+    // selected squad — or the whole army, hero selected — moves to it
+    // and holds (plantRally).
+    this.rallyBtn=button(this,130+8*117,HUD_Y+55,110,56,'Rally',()=>this.pressRally(),{size:16}); this.rallyBtn.setDepth(31);
+    // Upgrade 10: the hero's power buttons are built in
+    // buildFightControls() now — they ride the right-thumb stack under
+    // the AUTO-FIRE toggle, as the approved sketch draws them.
     this.spdBtn=button(this,1221,HUD_Y+80,110,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:18}).setDepth(31);
     const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:13}); fsb.setDepth(31);
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
@@ -349,37 +391,117 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   phaseName(){ return this.wave%2===0&&this.wave>0?'Night':'Day'; }
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
     this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
-    this.orderTxt.setText('Order: '+({charge:'Charge',hold:'Hold',follow:'Follow Me',flank:'Flank',fallback:'Fall Back',shieldwall:'Shield Wall'})[this.order]+(this.volleyMode?'   •   VOLLEY: tap a spot':''));
+    // Upgrade 9: the order line names WHO the command bar speaks to — the
+    // selected squad and its own order, or the army order when the hero is
+    // selected.
+    const selAlive=this.selSquad&&!this.selSquad.dead, disp=selAlive?(this.selSquad.ord||this.order):this.order;
+    if(selAlive) this.orderTxt.setText('Squad: '+this.selSquad.def.name+' — '+(this.selSquad.ord==='post'?'Posted':(disp==='rally'?'Rally':(ORDER_NAMES[disp]||disp)))+(this.volleyMode?'   •   VOLLEY: tap a spot':'')+(this.rallyMode?'   •   RALLY: tap a spot':''));
+    else this.orderTxt.setText('Order: '+(this.order==='rally'?'Rally':ORDER_NAMES[this.order])+(this.volleyMode?'   •   VOLLEY: tap a spot':'')+(this.rallyMode?'   •   RALLY: tap a spot':''));
     if(this.buffTxt){ const bp=[]; if(this.buffStrT>0) bp.push('STR '+Math.ceil(this.buffStrT)+'s'); if(this.buffSpdT>0) bp.push('SPD '+Math.ceil(this.buffSpdT)+'s'); if(this.buffIronT>0) bp.push('IRON '+Math.ceil(this.buffIronT)+'s'); this.buffTxt.setText(bp.join('    ·    ')); }
-    if(this._lastOrder!==this.order){ this._lastOrder=this.order; Object.entries(this.cmdBtns).forEach(([id,b])=>{ if(b.redraw) b.redraw(id===this.order); }); }
-    Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; }); }
+    const okey=(selAlive?this.selSquad.def.id:'army')+'|'+disp;
+    if(this._lastOrder!==okey){ this._lastOrder=okey; Object.entries(this.cmdBtns).forEach(([id,b])=>{ if(b.redraw) b.redraw(id===disp); }); }
+    Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; });
+    this.drawBuffChips(); }
+  // Upgrade 9: the buff chips — one per live timed orb power, drawn under
+  // the stat lines: colored disc, power name, seconds remaining. The old
+  // timer-only line (buffTxt) still rides above them.
+  drawBuffChips(){ if(!this.buffGfx||!this.buffChipTxts) return; const g=this.buffGfx; g.clear();
+    const live=[]; if(this.buffStrT>0) live.push({def:ORBS[0],t:this.buffStrT}); if(this.buffSpdT>0) live.push({def:ORBS[1],t:this.buffSpdT}); if(this.buffIronT>0) live.push({def:ORBS[3],t:this.buffIronT});
+    let x=12; const y=64;
+    this.buffChipTxts.forEach((t,i)=>{ const c=live[i];
+      if(!c){ t.setVisible(false); return; }
+      const label=c.def.short.toUpperCase()+' '+Math.ceil(c.t)+'s', w=34+label.length*7.4;
+      g.fillStyle(0x140c07,0.85); g.fillRoundedRect(x,y,w,22,10); g.lineStyle(1,c.def.color,0.9); g.strokeRoundedRect(x,y,w,22,10);
+      g.fillStyle(c.def.color,1); g.fillCircle(x+11,y+11,6);
+      t.setText(label); t.setPosition(x+22,y+4); t.setVisible(true);
+      x+=w+8; }); }
   toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40).setScrollFactor(0); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
   onTap(p){ if(this.over||this.shopOpen||this.victoryOpen||p.y>=HUD_Y) return;
+    // Upgrade 9: while the camp panel is open, field taps belong to the
+    // panel's own buttons — never to the marching hand behind it.
+    if(this.campPanelOpen) return;
     // Upgrade 8: a tap on the fight cluster is a fight input, never a
     // march order — the two hands stay separate.
     if(this.overFight(p)) return;
+    // Upgrade 9: the same wall for the CAMP button — its tap is a button
+    // press, not a march order at whatever world point lies beneath it.
+    if(this.campBtnRect&&Math.abs(p.x-this.campBtnRect.x)<=this.campBtnRect.w/2+4&&Math.abs(p.y-this.campBtnRect.y)<=this.campBtnRect.h/2+4) return;
     // p.y is a screen coordinate (the HUD check); the tap itself lands in the world.
     const wx=(p.worldX!==undefined?p.worldX:p.x), wy=(p.worldY!==undefined?p.worldY:p.y);
     if(this.volleyMode){ this.doVolley(wx,wy); return; }
+    // Upgrade 10: a tap while Rally is armed plants the banner there —
+    // it is a planting, never a march or selection tap.
+    if(this.rallyMode){ this.plantRally(wx,wy); return; }
     // Upgrade 5: a tap on an orb is a purchase attempt, not a move order.
     const orb=(this.orbs||[]).find(o=>Math.hypot(wx-o.x,wy-o.y)<=42);
     if(orb){ this.tryBuyOrb(orb); return; }
+    // Upgrade 9: a tap on the camp (hero selected) opens the camp panel —
+    // the camp's care, mid-wave. With a squad selected the same tap is a
+    // post order like any other ground.
+    if(!this.selSquad&&this.campPos&&Math.hypot(wx-this.campPos.x,wy-this.campPos.y)<=56){ this.openCampPanel(); return; }
+    // Upgrade 9: a tap on a character selects them — a squad by its body,
+    // the hero by his. Repeated taps on a crowded spot cycle through
+    // whoever stands there, so a stacked squad is never unselectable.
+    const cand=[];
+    if(this.hero&&this.hero.down<=0){ const d=Math.hypot(wx-this.hero.x,wy-this.hero.y); if(d<=44) cand.push({who:'hero',d}); }
+    (this.squads||[]).forEach(s=>{ if(s.dead) return; const d=Math.hypot(wx-s.x,wy-s.y); if(d<=44) cand.push({who:s,d}); });
+    if(cand.length){ cand.sort((a,b)=>a.d-b.d); const cur=this.selSquad||'hero';
+      let pick=cand[0];
+      if(cand.length>1){ const ci=cand.findIndex(c=>c.who===cur); if(ci>=0) pick=cand[(ci+1)%cand.length]; }
+      if(pick.who==='hero') this.selectHero(); else this.selectSquad(pick.who);
+      return; }
+    // Ground: the selected squad posts where tapped and holds; the hero
+    // marches as he always has.
+    if(this.selSquad&&!this.selSquad.dead){ const s=this.selSquad;
+      s.ord='post'; s.post={x:Math.max(20,Math.min(this.worldW-20,wx)),y:Math.max(40,Math.min(this.worldH-20,wy))};
+      this.floatText(s.post.x,s.post.y-16,'Hold here','#f2c14e'); this.refreshHUD(); return; }
     this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); }
   doVolley(x,y){ this.volleyMode=false; this._volleyBuf=false; this.volleyCd=12; let n=0;
     this.squads.filter(s=>s.def.role==='ranged'&&!s.dead).forEach((s,i)=>{ n++; this.time.delayedCall(i*90,()=>{ this.shoot(s.x,s.y-20,{x,y,dead:false},'stone',{dmg:s.dmg*3,type:'physical',splash:90,splashAt:{x,y}},800); }); });
     if(!n){ this.toast('No ranged squads for a volley'); this.volleyCd=0; } else { SFX.sling(); this.toast('Volley away!'); }
     this.refreshHUD(); }
+  // --- Upgrade 9: selection and orders (the marching hand directs) ---
+  // Selection is the marching hand's focus: the hero (selSquad null, the
+  // default at wave start) or one squad. Orders from the command bar go to
+  // the selection: a squad carries its own order (s.ord) until countermanded;
+  // with the hero selected the order is army-wide, as before — and giving
+  // one returns every squad to army control (s.ord cleared).
+  selectSquad(s){ this.selSquad=s; this.floatText(s.x,s.y-60,s.def.name,'#f2c14e'); this.refreshHUD(); }
+  selectHero(){ this.selSquad=null; if(this.hero) this.floatText(this.hero.x,this.hero.y-64,this.hero.def.name,'#f2c14e'); this.refreshHUD(); }
+  giveOrder(id){ const label=ORDER_NAMES[id]; if(!label) return; this.volleyMode=false; this.rallyMode=false;
+    if(this.selSquad&&!this.selSquad.dead){ const s=this.selSquad; s.ord=id;
+      this.toast(s.def.name+': '+label); this.floatText(s.x,s.y-64,label+'!','#f2c14e'); }
+    else { this.order=id; this.squads.forEach(s=>{ s.ord=null; });
+      this.toast('Order: '+label);
+      // Upgrade 8: the order echoes above the hero, in the world — the
+      // player sees the army heard it, not just a HUD line changing.
+      if(this.hero) this.floatText(this.hero.x,this.hero.y-64,label+'!','#f2c14e'); }
+    this.refreshHUD(); }
+  squadOrder(s){ return s.ord||this.order; }
+  // Where a squad is headed this frame, by its effective order: its post
+  // (the default — bought squads post at the camp and hold), the army's
+  // charge/hold/fall-back, or its slot in the formation around the hero
+  // (Follow Me / Flank / Shield Wall).
+  squadTarget(s,idx,h){ const eo=this.squadOrder(s);
+    // Upgrade 10: rally — the squad's own banner point when the order is
+    // its own, else the army's shared point. Arrival is a hold, like a post.
+    if(eo==='rally'){ const rp=(s.ord==='rally'&&s.rally)?s.rally:this.rallyPoint; if(rp) return {x:rp.x,y:rp.y}; }
+    if(eo==='post'&&s.post) return {x:s.post.x,y:s.post.y};
+    if(eo==='charge'){ const e2=this.nearestEnemy(s.x,s.y,9999); return e2?{x:e2.x,y:e2.y}:{x:h.x,y:h.y}; }
+    if(eo==='hold') return {x:s.x,y:s.y};
+    if(eo==='fallback') return {x:this.campPos.x+70+Math.floor(idx/3)*30,y:this.campPos.y+(idx%3-1)*40};
+    const o=this.formationOffset(idx,eo); return {x:h.x+o.dx,y:h.y+o.dy}; }
   // --- hero ---
   buildHero(){ const h=this.heroDef, hx=this.campPos.x+60, hy=this.campPos.y;
-    // Upgrade 8: the fight state rides the hero — manual attack recovery
-    // and buffer, the heavy wind-up and its locked target/aim, dodge dash
-    // and i-frames, facing (last-move direction), block/sprint and the
-    // stamina pool they share. The range ring below is now ONLY a
-    // warning/range indicator: entering it starts nothing by itself.
+    // The fight state rides the hero: cd is the AUTO-FIRE clock (Upgrade
+    // 10 restored the pre-Upgrade-8 automatic basic attack — the range
+    // ring is its reach again), plus the surviving Upgrade 8 kit — dodge
+    // dash and i-frames, facing (last-move direction), block/sprint and
+    // the stamina pool they share. Upgrade 8's manual-attack state
+    // (recovery/buffer, heavy wind-up) is gone with the manual scheme.
     this.hero={def:h,x:hx,y:hy,tx:hx,ty:hy,cd:0,hp:h.hp,down:0,
-      atkCd:0,atkBuf:null,heavyWind:0,heavyTarget:null,heavyAim:null,heavyMul:1,
       dodgeT:0,dodgeCd:0,iframes:0,dodgeDx:1,dodgeDy:0,faceX:1,faceY:0,
-      blocking:false,sprint:false,sprintT:0,stamina:FIGHT.stamMax,stamDelay:0,guardBreakT:0};
+      blocking:false,sprint:false,stamina:FIGHT.stamMax,stamDelay:0,guardBreakT:0};
     this.hero.spr=spr(this,hx,hy,h.id).setDepth(8); this.hero.hpBar=this.add.graphics().setDepth(12);
     this.hero.guardFx=this.add.graphics().setDepth(15);
     this.hero.ring=this.add.circle(hx,hy,h.range,0xffffff,0.04).setStrokeStyle(1,0xd9a441,0.4).setDepth(3); }
@@ -403,19 +525,61 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(heavy&&this.skillBtns){ let lost=false;
       this.skillBtns.forEach(b=>{ if(b.cd<=0&&this.heldTierOf(b)===2){ b.held=HELD.temperAt; b._tierShown=1; lost=true; } });
       if(lost) this.floatText(h.x,h.y-84,'Perfect lost!','#ff8a6a'); }
-    if(h.hp<=0){ h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; h.sprintT=0; h.heavyWind=0; h.atkBuf=null; this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } }
+    if(h.hp<=0){ h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } }
   // --- Upgrade 8: Held Power + button weight ---
   heldTierOf(b){ const s=b.held||0; return s>=HELD.perfectAt?2:(s>=HELD.temperAt?1:0); }
   // A press on a skill button: fires at once when ready; a press inside the
   // input-buffer window before the cooldown ends is remembered and fired
   // by update() the moment the move is ready — mastery feels responsive,
   // never sticky. A press earlier than the window is simply a press too soon.
+  // Upgrade 10 (approved addition): the POWER-READY WHISPER — when one
+  // of the two great powers (the hero's second skill and his ult — for
+  // David, Psalm and Five Stones) finishes cooling, it says so quietly:
+  // a soft glow pulse on its button and one gentle SFX cue. No toast,
+  // no banner, no clutter. update() calls this only on the tick the
+  // cooldown crosses to ready AND the move stays ready (a buffered cast
+  // spends the crossing and re-cools instead), and a move sitting ready
+  // can never re-trigger it — it must be spent and cool again first.
+  powerReady(b){ b.readyPulse=1; SFX.ready(b.def.id); }
   pressSkill(i){ const b=this.skillBtns&&this.skillBtns[i]; if(!b||this.over||this.shopOpen) return;
     if(b.cd>0){ if(b.cd<=INPUT_BUFFER) b.buffered=true; return; }
     this.useSkill(i); }
   pressVolley(){ if(this.over||this.shopOpen) return;
     if(this.volleyCd>0){ if(this.volleyCd<=INPUT_BUFFER) this._volleyBuf=true; else this.toast('Volley ready in '+Math.ceil(this.volleyCd)+'s'); return; }
-    this.volleyMode=true; this.toast('Volley: tap a target spot'); }
+    this.volleyMode=true; this.rallyMode=false; this.toast('Volley: tap a target spot'); }
+  // Upgrade 10 (approved addition): RALLY — tap the button, then tap the
+  // ground to plant the banner. A targeting mode like Volley's, and the
+  // two modes cancel each other.
+  pressRally(){ if(this.over||this.shopOpen) return;
+    this.volleyMode=false; this.rallyMode=true; this.toast('Rally: tap where the banner goes'); }
+  // Planting the banner follows Upgrade 9's scoping law: the selected
+  // squad answers alone (its own order becomes 'rally', the point its
+  // own), or — with the hero selected — the whole army answers (army
+  // order 'rally', every squad returned to army control, one shared
+  // point). Planting again moves the point. 'rally' is an order like
+  // any other in the ord model, so any later order supersedes it: a
+  // command-bar order, a direct tap-to-place, or a new rally point.
+  plantRally(x,y){ this.rallyMode=false;
+    const px=Math.max(20,Math.min(this.worldW-20,x)), py=Math.max(40,Math.min(this.worldH-20,y));
+    if(this.selSquad&&!this.selSquad.dead){ const s=this.selSquad; s.ord='rally'; s.rally={x:px,y:py};
+      this.toast(s.def.name+': Rally!'); this.floatText(px,py-24,'Rally!','#f2c14e'); }
+    else { this.order='rally'; this.rallyPoint={x:px,y:py}; this.squads.forEach(s=>{ s.ord=null; });
+      this.toast('Army: Rally!'); this.floatText(px,py-24,'Rally!','#f2c14e');
+      if(this.hero) this.floatText(this.hero.x,this.hero.y-64,'Rally!','#f2c14e'); }
+    this.refreshHUD(); }
+  // The banners that currently fly: the army's point, while at least one
+  // army-order squad holds it, plus each squad's own point while that
+  // squad holds its rally. When the last holder is given another order
+  // the banner comes down — it flies only while someone holds it.
+  rallyPoints(){ const pts=[];
+    if(this.order==='rally'&&this.rallyPoint&&this.squads.some(s=>!s.dead&&!s.ord)) pts.push(this.rallyPoint);
+    this.squads.forEach(s=>{ if(!s.dead&&s.ord==='rally'&&s.rally) pts.push(s.rally); });
+    return pts; }
+  drawRallyBanners(){ if(!this.rallyFx) return; const g=this.rallyFx; g.clear();
+    const bob=Math.sin((this._pulse||0)*3)*2;
+    this.rallyPoints().forEach(p=>{ g.lineStyle(3,0x8a6a3a,1); g.lineBetween(p.x,p.y,p.x,p.y-52+bob);
+      g.fillStyle(0xd9a441,0.95); g.fillRect(p.x,p.y-52+bob,20,12);
+      g.fillStyle(0x000000,0.35); g.fillCircle(p.x,p.y,7); g.lineStyle(2,0xf2c14e,0.8); g.strokeCircle(p.x,p.y,7); }); }
   // The button carries its own state on its face: a dark cooldown sweep
   // that drains as the move returns, then a charge bar along the bottom
   // that fills toward the next Held tier — gold at Tempered, bright and
@@ -427,72 +591,67 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const f=t===2?1:(t===1?(b.held-HELD.temperAt)/(HELD.perfectAt-HELD.temperAt):(b.held||0)/HELD.temperAt);
     g.fillStyle(t===2?0xffe98a:(t===1?0xf2c14e:0x8a7a4a),t===2?0.95:0.8); g.fillRect(x,y+b.sh-5,b.sw*Math.max(0,Math.min(1,f)),5);
     if(t===2){ g.lineStyle(3,0xffe98a,0.6+0.4*Math.sin((this._pulse||0)*6)); g.strokeRect(x,y,b.sw,b.sh); }
-    else if(t===1){ g.lineStyle(2,0xf2c14e,0.8); g.strokeRect(x,y,b.sw,b.sh); } }
-  // --- Upgrade 8: the fight cluster — one hand marches, one hand fights ---
-  // Five buttons on the RIGHT of the screen, clear of the command bar and
-  // the skill row: HEAVY over LIGHT (the two hands of the kit), DODGE and
-  // BLOCK beside them, SPRINT above. They are screen furniture (depth
-  // 31/32, pinned by fixUI), and onTap refuses taps that land on them —
+    else if(t===1){ g.lineStyle(2,0xf2c14e,0.8); g.strokeRect(x,y,b.sw,b.sh); }
+    // Upgrade 10: the whisper's glow — a soft halo that swells once when
+    // a great power comes ready, then fades (b.readyPulse decays in update()).
+    if(b.readyPulse>0){ g.lineStyle(3,0xffe98a,0.15+0.5*b.readyPulse); g.strokeRect(x-2,y-2,b.sw+4,b.sh+4); } }
+  // --- Upgrade 10: the right-thumb stack — kennin's approved button UI ---
+  // One wide column on the right of the screen (196px wide, every button
+  // 56px tall, real text labels, the game's stone-and-gold): the AUTO-FIRE
+  // toggle at the top, the stamina readout under it, then DODGE, BLOCK
+  // (a hold) and SPRINT, then the hero's power moves as their OWN named
+  // buttons, driven from the hero data — for David: SMOOTH STONE, PSALM,
+  // FIVE STONES. Each power button keeps Upgrade 8's Held Power state and
+  // cooldown sweep. They are screen furniture (depth 31/32, pinned by
+  // fixUI), clear of the command row below (the stack ends at y=524, the
+  // bar starts at HUD_Y=610), and onTap refuses taps that land on them —
   // a press here is never also a march order.
   buildFightControls(){ this.fightBtns={}; this.fightRects=[];
+    if(this.autoFire===undefined) this.autoFire=loadAutoFire();
     const mk=(id,x,y,w,h,label,cb,size)=>{ const b=button(this,x,y,w,h,label,cb,{size:size||15}); b.setDepth(31);
       b.sx=x; b.sy=y; b.sw=w; b.sh=h; b.sweep=this.add.graphics().setDepth(32);
       this.fightBtns[id]=b; this.fightRects.push({x,y,w,h}); return b; };
-    mk('heavy',1184,296,92,64,'HEAVY',()=>this.pressAttack('heavy'),16);
-    mk('light',1184,384,92,64,'LIGHT',()=>this.pressAttack('light'),16);
-    mk('dodge',1076,428,92,56,'DODGE',()=>this.pressDodge(),14);
-    const bb=mk('block',1184,472,92,56,'BLOCK',()=>{},14);
-    mk('sprint',1076,340,92,56,'SPRINT',()=>this.toggleSprint(),14);
+    const SX=1178, SW=196;
+    this.autoBtn=mk('autofire',SX,70,SW,56,this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF',()=>this.toggleAutoFire(),17);
+    mk('dodge',SX,176,SW,56,'DODGE',()=>this.pressDodge(),16);
+    const bb=mk('block',SX,240,SW,56,'BLOCK',()=>{},16);
+    mk('sprint',SX,304,SW,56,'SPRINT',()=>this.toggleSprint(),16);
     // BLOCK is a HOLD, not a press: down raises the guard, up or out drops
     // it. (These ride beside the shared helper's own press handlers.)
     bb.on('pointerdown',()=>this.setBlock(true));
     bb.on('pointerup',()=>this.setBlock(false));
     bb.on('pointerout',()=>this.setBlock(false));
     this.input.on('pointerup',()=>this.setBlock(false)); // a release anywhere ends a hold
+    // The hero's power moves, from the data: his two skills and his ult,
+    // in data order. Held Power state lives on the button itself — cd/
+    // cdMax drive the cooldown sweep, held accrues charge while the move
+    // sits ready, buffered remembers a press that landed a breath early.
+    const h=this.heroDef; this.skillBtns=[];
+    [...h.skills,h.ult].forEach((k,i)=>{ const b=mk('skill'+i,SX,368+i*64,SW,56,k.name,()=>this.pressSkill(i),15);
+      b.cd=0; b.cdMax=k.cd; b.def=k; b.held=0; b.buffered=false; b._tierShown=0;
+      this.skillBtns.push(b); });
     this.fightBar=this.add.graphics().setDepth(32);
-    this.fightStat=txt(this,1130,238,'',13,'#f2c14e').setOrigin(0.5).setDepth(31); }
+    this.fightStat=txt(this,SX,112,'',13,'#f2c14e').setOrigin(0.5).setDepth(31); }
+  // The AUTO-FIRE toggle: the choice is the player's and it persists.
+  toggleAutoFire(){ this.autoFire=!this.autoFire; saveAutoFire(this.autoFire);
+    if(this.autoBtn) this.autoBtn.label.setText(this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF');
+    this.toast(this.autoFire?'Auto-fire ON — '+this.heroDef.name+' strikes on his own':'Auto-fire OFF — power moves only, by button'); }
   overFight(p){ if(!this.fightRects) return false;
     return this.fightRects.some(r=>Math.abs(p.x-r.x)<=r.w/2+6&&Math.abs(p.y-r.y)<=r.h/2+6); }
-  // The strike's target: an enemy standing where the marching hand last
-  // tapped (within a hand's breadth of the tap point) is aimed at first;
-  // otherwise the nearest enemy inside the range circle. Outside the
-  // circle there is no target and the press is free — whiffing on air
-  // costs no recovery.
-  attackTarget(){ const h=this.hero, hd=h.def; if(!h||h.down>0) return null;
-    const inR=this.enemies.filter(e=>!e.dead&&Phaser.Math.Distance.Between(h.x,h.y,e.x,e.y)<=hd.range+(hd.range<80?8:0));
-    if(!inR.length) return null;
-    const aimed=inR.filter(e=>Phaser.Math.Distance.Between(h.tx,h.ty,e.x,e.y)<=85)
-      .sort((a,b)=>Phaser.Math.Distance.Between(h.tx,h.ty,a.x,a.y)-Phaser.Math.Distance.Between(h.tx,h.ty,b.x,b.y))[0];
-    return aimed||this.nearestEnemy(h.x,h.y,hd.range+8); }
-  // One recovery clock for both hands: a press during recovery buffers
-  // (inside the window) or is forgotten — alternating buttons cannot
-  // machine-gun. Attacking drops the guard and spends a sprint opener.
-  pressAttack(kind){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
-    if(h.atkCd>0){ if(h.atkCd<=INPUT_BUFFER) h.atkBuf=kind; return 'buffered'; }
-    const t=this.attackTarget();
-    if(!t){ this.floatText(h.x,h.y-64,'No target in range','#a08a6a'); return 'none'; }
+  // Upgrade 10: AUTO-FIRE — the hero's basic attack, restored. When the
+  // toggle is ON the hero strikes the nearest enemy inside his range
+  // circle on his own attack clock (h.cd against hd.rate): melee damage
+  // at hand range, a sling stone beyond it, through the orb multiplier
+  // like every hero hit — the pre-Upgrade-8 behavior, numbers unchanged.
+  // When the toggle is OFF he performs NO basic attacks at all; his
+  // power moves still fire by button. Striking drops a raised guard.
+  heroAutoFire(){ const h=this.hero, hd=h.def; if(!this.autoFire||!h||h.down>0||h.cd>0) return;
+    const t=this.nearestEnemy(h.x,h.y,hd.range+(hd.range<80?8:0));
+    if(!t) return;
+    h.cd=hd.rate;
     if(h.blocking) this.setBlock(false);
-    let mul=1;
-    if(h.sprint&&h.sprintT>=FIGHT.openerMinTime){ mul=FIGHT.openerMul; h.sprintT=0; this.floatText(h.x,h.y-72,'Opener!','#f2c14e'); }
-    const hd=h.def;
-    if(kind==='heavy'){ h.heavyTarget=t; h.heavyAim={x:t.x,y:t.y}; h.heavyMul=mul; h.heavyWind=FIGHT.heavyWindup;
-      h.atkCd=hd.rate*FIGHT.heavyCd; SFX.skill(); }
-    else { h.atkCd=hd.rate*FIGHT.lightCd; this.lightStrike(t,mul); }
-    return 'struck'; }
-  lightStrike(t,mul){ const h=this.hero, hd=h.def, dmg=hd.dmg*FIGHT.lightDmg*mul;
-    if(hd.range<80){ this.damage(t,dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); }
-    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); SFX.sling(); } }
-  // The heavy lands when its wind-up completes, where it was aimed: a
-  // target that died in the wind-up leaves its ground to the cleave /
-  // splash. Melee heavies cleave — enemies near the victim take half.
-  heavyStrike(t,aim,mul){ const h=this.hero, hd=h.def; if(!h||h.down>0) return; const dmg=hd.dmg*FIGHT.heavyDmg*mul;
-    if(hd.range<80){ const cx=t&&!t.dead?t.x:aim.x, cy=t&&!t.dead?t.y:aim.y;
-      this.enemies.slice().forEach(e=>{ if(e.dead) return; const d=Phaser.Math.Distance.Between(cx,cy,e.x,e.y);
-        if(e===t||d<=FIGHT.heavyCleave) this.damage(e,dmg*this.orbDmgMul()*(e===t?1:0.5),hd.dmgType,{crit:0.12}); });
-      this.spark(cx,cy,0xe8e0c8,6); SFX.hit(); }
-    else { const tgt=t&&!t.dead?t:this.nearestEnemy(aim.x,aim.y,60);
-      if(tgt) this.shoot(h.x,h.y,tgt,hd.dmgType==='holy'?'ember':'stone',{dmg:dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.15,splash:FIGHT.heavySplash},720);
-      SFX.sling(); } }
+    if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); }
+    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); SFX.sling(); } }
   pressDodge(){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
     if(h.dodgeCd>0){ if(h.dodgeCd<=INPUT_BUFFER) h.dodgeBuf=true; return 'buffered'; }
     // Dash where the hero is heading (his march target), else where he faces.
@@ -503,7 +662,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     SFX.sling(); return 'dodged'; }
   setBlock(on){ const h=this.hero; if(!h) return false;
     if(on){ if(h.down>0||h.guardBreakT>0||h.stamina<=1) return false;
-      if(h.sprint){ h.sprint=false; h.sprintT=0; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); }
+      if(h.sprint){ h.sprint=false; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); }
       h.blocking=true; }
     else h.blocking=false;
     if(this.fightBtns&&this.fightBtns.block) this.fightBtns.block.redraw(h.blocking);
@@ -511,44 +670,39 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   toggleSprint(){ const h=this.hero; if(!h||this.over||this.shopOpen||h.down>0) return;
     if(h.blocking){ this.toast('Cannot sprint behind a raised guard'); return; }
     if(!h.sprint&&h.stamina<=5){ this.toast('Too winded to sprint'); return; }
-    h.sprint=!h.sprint; if(!h.sprint) h.sprintT=0;
+    h.sprint=!h.sprint;
     if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(h.sprint);
     this.floatText(h.x,h.y-64,h.sprint?'Sprint!':'Sprint off','#f2c14e'); }
-  // Per-frame fight bookkeeping: recovery + buffer, the heavy wind-up,
-  // dodge cooldown and i-frames, guard break, and the stamina economy —
-  // block and sprint drain one pool; rest refills it after a breath.
+  // Per-frame fight bookkeeping: dodge cooldown and i-frames, the dodge
+  // press buffer, guard break, and the stamina economy — block and
+  // sprint drain one pool; rest refills it after a breath. (Upgrade 10:
+  // the manual-attack recovery/buffer and the heavy wind-up left with
+  // the manual scheme; auto-fire keeps its own clock in update().)
   fightTick(dt){ const h=this.hero; if(!h) return;
     if(h.dodgeCd>0) h.dodgeCd-=dt;
     if(h.iframes>0) h.iframes-=dt;
     if(h.guardBreakT>0) h.guardBreakT-=dt;
     if(h.dodgeBuf&&h.dodgeCd<=0){ h.dodgeBuf=false; this.pressDodge(); }
-    if(h.atkCd>0){ h.atkCd-=dt;
-      if(h.atkCd<=0){ h.atkCd=0; if(h.atkBuf){ const kind=h.atkBuf; h.atkBuf=null; this.pressAttack(kind); } } }
-    if(h.heavyWind>0){ h.heavyWind-=dt;
-      if(h.heavyWind<=0){ const t=h.heavyTarget, aim=h.heavyAim||{x:h.x,y:h.y}, mul=h.heavyMul||1;
-        h.heavyTarget=null; h.heavyAim=null; this.heavyStrike(t,aim,mul); } }
     let drained=false;
     if(h.blocking){ h.stamina=Math.max(0,h.stamina-FIGHT.blockDrain*dt); h.stamDelay=FIGHT.stamDelay; drained=true;
       if(h.stamina<=0){ this.setBlock(false); h.guardBreakT=FIGHT.guardBreak; this.floatText(h.x,h.y-84,'Guard broken!','#ff8a6a'); } }
     else if(h.sprint&&Math.hypot(h.tx-h.x,h.ty-h.y)>6){ h.stamina=Math.max(0,h.stamina-FIGHT.sprintDrain*dt); h.stamDelay=FIGHT.stamDelay; drained=true;
-      if(h.stamina<=0){ h.sprint=false; h.sprintT=0; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); this.floatText(h.x,h.y-84,'Winded!','#ff8a6a'); } }
+      if(h.stamina<=0){ h.sprint=false; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); this.floatText(h.x,h.y-84,'Winded!','#ff8a6a'); } }
     if(!drained){ if(h.stamDelay>0) h.stamDelay-=dt;
       else if(h.stamina<FIGHT.stamMax) h.stamina=Math.min(FIGHT.stamMax,h.stamina+FIGHT.stamRegen*dt); }
     this.drawFightUI(); }
-  // The cluster's faces: recovery veils on LIGHT/HEAVY/DODGE, the stamina
-  // pool as a bar over the cluster and as the BLOCK/SPRINT bases.
-  drawFightUI(){ const B=this.fightBtns; if(!B||!this.hero) return; const h=this.hero, hd=h.def;
+  // The stack's faces: the dodge recovery veil, the stamina pool as a
+  // bar under the AUTO-FIRE toggle and as the BLOCK button's base strip.
+  drawFightUI(){ const B=this.fightBtns; if(!B||!this.hero) return; const h=this.hero;
     const veil=(b,frac)=>{ if(!b||!b.sweep) return; const g=b.sweep; g.clear();
       if(frac>0){ g.fillStyle(0x000000,0.55); g.fillRect(b.sx-b.sw/2,b.sy-b.sh/2,b.sw,b.sh*Math.min(1,frac)); } };
-    veil(B.light,h.atkCd>0?h.atkCd/(hd.rate*FIGHT.lightCd):0);
-    veil(B.heavy,h.atkCd>0?h.atkCd/(hd.rate*FIGHT.heavyCd):0);
     veil(B.dodge,h.dodgeCd>0?h.dodgeCd/FIGHT.dodgeCd:0);
     if(B.block&&B.block.sweep){ const g=B.block.sweep; g.clear();
       g.fillStyle(h.guardBreakT>0?0xa33b20:0x5aa33b,0.9); g.fillRect(B.block.sx-B.block.sw/2,B.block.sy+B.block.sh/2-5,B.block.sw*Math.max(0,h.stamina)/FIGHT.stamMax,5); }
     if(this.fightBar){ const g=this.fightBar; g.clear();
-      g.fillStyle(0x000000,0.7); g.fillRect(1010,246,240,10);
-      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(1010,246,240*Math.max(0,h.stamina)/FIGHT.stamMax,10);
-      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(1010,246,240,10); }
+      g.fillStyle(0x000000,0.7); g.fillRect(1080,122,196,10);
+      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(1080,122,196*Math.max(0,h.stamina)/FIGHT.stamMax,10);
+      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(1080,122,196,10); }
     const st=Math.ceil(h.stamina);
     if(this.fightStat&&this._stamShown!==st){ this._stamShown=st; this.fightStat.setText('STAMINA '+st); } }
   // Upgrade 3: the hero returns only while the camp stands. If the camp has
@@ -574,10 +728,40 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(u.hpAdd){ this.campMax+=u.hpAdd; this.campHp=Math.min(this.campMax,this.campHp+u.hpAdd); }
     if(u.id==='swift') this.respawnTime=4;
     if(u.id==='watchfire') this.campFireCd=0;
-    SFX.build(); this.renderShop(false); this.refreshHUD(); return true; }
+    SFX.build(); this.afterCampBuy(); this.refreshHUD(); return true; }
   buyCampRepair(){ if(this.campHp>=this.campMax||this.manna<CAMP_REPAIR.cost) return false;
     this.manna-=CAMP_REPAIR.cost; this.campHp=Math.min(this.campMax,this.campHp+CAMP_REPAIR.heal);
-    SFX.build(); this.renderShop(false); this.refreshHUD(); return true; }
+    SFX.build(); this.afterCampBuy(); this.refreshHUD(); return true; }
+  // Upgrade 9: a camp purchase re-renders whichever surface sold it — the
+  // between-wave shop's camp strip or the mid-wave camp panel. One state,
+  // one price list (CAMP_UPGRADES / CAMP_REPAIR), two doors.
+  afterCampBuy(){ if(this.shopOpen) this.renderShop(false); else if(this.campPanelOpen) this.renderCampPanel(); }
+  // --- Upgrade 9: the camp panel — camp care reachable mid-wave ---
+  // Tapping the camp (or the CAMP button) opens a compact overlay with the
+  // same purchases at the same prices. The wave does NOT pause: the fight
+  // continues behind it, field taps are walled off while it is open
+  // (onTap), and purchases land instantly, exactly as in the shop.
+  toggleCampPanel(){ if(this.over||this.shopOpen||this.victoryOpen) return;
+    if(this.campPanelOpen) this.closeCampPanel(); else this.openCampPanel(); }
+  openCampPanel(){ if(this.campPanelOpen||this.shopOpen||this.over) return; this.campPanelOpen=true; this.renderCampPanel(); }
+  closeCampPanel(){ this.campPanelOpen=false; this.clearCampPanel(); }
+  campAdd(o){ if(!this.campItems) this.campItems=[]; this.campItems.push(o); return o; }
+  clearCampPanel(){ (this.campItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.campItems=[]; }
+  renderCampPanel(){ this.clearCampPanel();
+    const px=340,py=148,pw=600,ph=384;
+    const g=this.add.graphics().setDepth(50); g.fillStyle(0x140c07,0.95); g.fillRoundedRect(px,py,pw,ph,12); g.lineStyle(3,0xd9a441); g.strokeRoundedRect(px,py,pw,ph,12); this.campAdd(g);
+    this.campAdd(txt(this,px+pw/2,py+30,'THE CAMP',26,GOLD).setOrigin(0.5).setDepth(51));
+    this.campAdd(txt(this,px+pw/2,py+62,'Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+' HP   ·   Manna '+Math.floor(this.manna),16,PARCH).setOrigin(0.5).setDepth(51));
+    const colX=[px+150,px+450], rowY=[py+118,py+176,py+234];
+    const campBtn=(u,x,y)=>{ if(this.campUp[u.id]){ this.campAdd(txt(this,x,y,u.name+' ✓',15,'#8fd06a').setOrigin(0.5).setDepth(51)); return; }
+      const locked=this.campUpLocked(u);
+      const b=button(this,x,y,268,46,(locked?'🔒 ':'')+u.name+' · '+u.cost,()=>this.buyCampUpgrade(u),{size:15,disabled:locked||this.manna<u.cost}); b.setDepth(51); this.campAdd(b); };
+    campBtn(CAMP_UPGRADES[0],colX[0],rowY[0]); campBtn(CAMP_UPGRADES[1],colX[0],rowY[1]); campBtn(CAMP_UPGRADES[2],colX[0],rowY[2]);
+    campBtn(CAMP_UPGRADES[3],colX[1],rowY[0]); campBtn(CAMP_UPGRADES[4],colX[1],rowY[1]);
+    const full=this.campHp>=this.campMax;
+    const rb=button(this,colX[1],rowY[2],268,46,'Repair +'+CAMP_REPAIR.heal+' · '+CAMP_REPAIR.cost,()=>this.buyCampRepair(),{size:15,disabled:full||this.manna<CAMP_REPAIR.cost}); rb.setDepth(51); this.campAdd(rb);
+    const cb=button(this,px+pw/2,py+ph-40,220,46,'Close',()=>this.closeCampPanel(),{size:16}); cb.setDepth(51); this.campAdd(cb);
+    this.fixUI(); }
   // Watch Fire: a camp that has bought its fire fights back — an ember at the
   // nearest enemy in range every CAMP_FIRE.rate seconds, with a gold spark at
   // the camp so the shot has a visible source.
@@ -613,7 +797,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       const label=txt(this,x,y-58,def.short+' · '+def.cost+' G',14,def.css).setOrigin(0.5).setDepth(6);
       this.tweens.add({targets:img,scale:1.07,duration:1100,yoyo:true,repeat:-1,ease:'Sine.inOut'});
       this.tweens.add({targets:glow,alpha:0.07,duration:1100,yoyo:true,repeat:-1,ease:'Sine.inOut'});
-      this.orbs.push({def,x,y,img,glow,label,cd:0,hinted:false}); }); }
+      this.orbs.push({def,x,y,img,glow,label,cd:0,hinted:false,pending:0}); }); }
   // The two timed multipliers, consulted exactly where damage and speed are
   // computed (hero attack + movement, squad movement) — no parallel systems.
   orbDmgMul(){ return this.buffStrT>0?1.5:1; }
@@ -624,11 +808,34 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(Math.hypot(h.x-o.x,h.y-o.y)>ORB_RANGE){ this.toast('Move closer to the orb');
       // walk the hero to a spot beside the orb; the next tap buys
       h.tx=Math.max(20,Math.min(this.worldW-20,o.x-58)); h.ty=Math.max(40,Math.min(this.worldH-20,o.y));
+      // Upgrade 9: ONE tap is now the whole instruction — the purchase is
+      // pending, and orbTick completes it the moment the hero arrives in
+      // range (while the orb is awake). One clear tap, one clear result.
+      o.pending=6;
       return 'far'; }
     if(!Tokens.spend('orb:'+o.def.id,o.def.cost)){ this.toast('Not enough Grokonians (have '+Tokens.balance()+')'); return 'funds'; }
-    o.cd=ORB_CD; o._cdShown=null;
-    this.applyOrb(o); SFX.orbBuy(); this.spark(o.x,o.y-8,o.def.color,10); this.refreshHUD();
+    o.cd=ORB_CD; o._cdShown=null; o.pending=0;
+    this.applyOrb(o); SFX.orbBuy(); if(SFX.orbDrink) SFX.orbDrink(); this.orbBanner(o); this.spark(o.x,o.y-8,o.def.color,10); this.refreshHUD();
     return 'bought'; }
+  // Upgrade 9: the potion moment — a purchase you cannot miss. A colored
+  // burst and a closing ring at the hero in the orb's own color, and a
+  // banner at the top of the screen naming the power and what it does, in
+  // the orb's voice: NAME — effect. (Scenes without a graphics factory —
+  // the verification harnesses — skip the banner furniture; the burst and
+  // the buff itself still land.)
+  orbBanner(o){ const d=o.def, h=this.hero;
+    if(h){ this.spark(h.x,h.y-10,d.color,16);
+      if(this.add.circle){ const ring=this.add.circle(h.x,h.y,14,d.color,0.35).setDepth(17);
+        this.tweens.add({targets:ring,scale:3.2,alpha:0,duration:450,onComplete:()=>ring.destroy()}); } }
+    if(!this.add.graphics||!this.add.text) return;
+    const items=[]; const bw=440,bh=64,bx=W/2-bw/2,by=64;
+    const g=this.add.graphics().setDepth(45); g.fillStyle(0x140c07,0.92); g.fillRoundedRect(bx,by,bw,bh,10); g.lineStyle(3,d.color,1); g.strokeRoundedRect(bx,by,bw,bh,10); items.push(g);
+    g.fillStyle(d.color,1); g.fillCircle(bx+30,by+bh/2,11);
+    const n=txt(this,bx+52,by+8,d.name.toUpperCase(),20,d.css).setDepth(46); items.push(n);
+    const f=txt(this,bx+52,by+36,d.fx,14,PARCH).setDepth(46); items.push(f);
+    items.forEach(it=>{ if(it.setScrollFactor) it.setScrollFactor(0); });
+    this._orbBanner=items;
+    this.tweens.add({targets:items,alpha:0,delay:1700,duration:500,onComplete:()=>items.forEach(it=>{ try{it.destroy();}catch(e){} })}); }
   applyOrb(o){ const d=o.def, h=this.hero;
     if(d.id==='strength'){ this.buffStrT=d.dur; this.toast('Orb of Strength — hero damage +50% for 60s'); }
     else if(d.id==='swiftness'){ this.buffSpdT=d.dur; this.toast('Orb of Swiftness — hero and squads move +30% faster for 60s'); }
@@ -651,18 +858,25 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(o._cdShown!==c){ o._cdShown=c;
         if(c>0){ o.label.setText(o.def.short+' · '+c+'s'); o.img.setAlpha(0.45); o.glow.setVisible(false); }
         else { o.label.setText(o.def.short+' · '+o.def.cost+' G'); o.img.setAlpha(1); o.glow.setVisible(true); } }
+      // Upgrade 9: a pending one-tap purchase completes itself on arrival.
+      if(o.pending>0){ o.pending-=dt;
+        if(o.pending<=0) o.pending=0;
+        else if(o.cd<=0&&this.hero&&this.hero.down<=0&&Math.hypot(this.hero.x-o.x,this.hero.y-o.y)<=ORB_RANGE){ o.pending=0; this.tryBuyOrb(o); } }
       if(!o.hinted&&this.hero&&this.hero.down<=0&&Math.hypot(this.hero.x-o.x,this.hero.y-o.y)<140){ o.hinted=true; this.toast(o.def.name+' — '+o.def.cost+' Grokonians. Tap the orb to buy its power.',2400); } } }
   // --- squads ---
   addSquad(def,x,y){ const s={def,x:x||(this.campPos?this.campPos.x+60:170),y:y||(this.campPos?this.campPos.y:360),hp:def.hp,max:def.hp,dmg:def.dmg,range:def.range,rate:def.rate,speed:def.speed,
-      armor:def.role==='shield'?0.2:0,cd:0,buffRateT:0,buffDmgT:0,dead:false,upgrades:{}};
+      // Upgrade 9: a squad is born POSTED where it stands (beside the camp)
+      // and holds until directed. ord null means "under the army order".
+      armor:def.role==='shield'?0.2:0,cd:0,buffRateT:0,buffDmgT:0,dead:false,upgrades:{},ord:'post',post:null};
+    s.post={x:s.x,y:s.y};
     s.spr=uspr(this,s.x,s.y,def,def.img?58:54); applyTint(s.spr,def);
     s.bar=this.add.graphics().setDepth(12); this.squads.push(s); return s; }
-  hurtSquad(s,amt){ if(s.dead) return; let m=1-(s.armor||0); if(this.order==='shieldwall') m*=0.55; s.hp-=amt*m;
+  hurtSquad(s,amt){ if(s.dead) return; let m=1-(s.armor||0); if(this.squadOrder(s)==='shieldwall') m*=0.55; s.hp-=amt*m;
     s.spr.setTint(0xff6a5a); this.time.delayedCall(60,()=>{ if(!s.dead&&s.spr.active){ s.spr.clearTint(); applyTint(s.spr,s.def); } });
-    if(s.hp<=0){ s.dead=true; s.spr.destroy(); s.bar.destroy(); this.toast(s.def.name+' has fallen. Squad lost — the fallen do not return this run',2800); } }
-  formationOffset(i){ const col=Math.floor(i/3), row=i%3;
-    if(this.order==='flank') return {dx:-16-col*30,dy:(row-1)*74};
-    if(this.order==='shieldwall') return {dx:(this.squads[i]&&this.squads[i].def.role==='shield'?26:-30-col*30),dy:(row-1)*40};
+    if(s.hp<=0){ s.dead=true; if(this.selSquad===s) this.selSquad=null; s.spr.destroy(); s.bar.destroy(); this.toast(s.def.name+' has fallen. Squad lost — the fallen do not return this run',2800); } }
+  formationOffset(i,ord){ ord=ord||this.order; const col=Math.floor(i/3), row=i%3;
+    if(ord==='flank') return {dx:-16-col*30,dy:(row-1)*74};
+    if(ord==='shieldwall') return {dx:(this.squads[i]&&this.squads[i].def.role==='shield'?26:-30-col*30),dy:(row-1)*40};
     return {dx:-46-col*38,dy:(row-1)*38}; }
   // --- enemies & waves ---
   waveComp(w){ const E=this.roster.enemy, byId=id=>E.find(e=>e.id===id);
@@ -903,7 +1117,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // here. It lives on the scene, not on any shop widget, so buying, paging
   // and the re-renders they cause never reset or pause it. shopT is the
   // remaining-seconds mirror update() maintains from that deadline.
-  openShop(first){ this.shopOpen=true; this.shopFirst=!!first; this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; this.shopPage=0;
+  openShop(first){ if(this.campPanelOpen) this.closeCampPanel(); this.shopOpen=true; this.shopFirst=!!first; this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; this.shopPage=0;
     // squads and hero mend between waves
     this.squads.forEach(s=>{ s.hp=s.max; }); this.hero.hp=this.heroDef.hp;
     this.renderShop(first); }
@@ -1037,13 +1251,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     else { const dx=h.tx-h.x, dy=h.ty-h.y, dl=Math.hypot(dx,dy);
       if(dl>3){ h.faceX=dx/dl; h.faceY=dy/dl;
         const spd=hd.speed*this.orbSpdMul()*(h.sprint?FIGHT.sprintMul:1)*(h.blocking?0.45:1);
-        const st=Math.min(dl,spd*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0);
-        if(h.sprint) h.sprintT+=dt; else h.sprintT=0; }
-      else h.sprintT=0;
+        const st=Math.min(dl,spd*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0); }
       h.hp=Math.min(hd.hp,h.hp+hd.hp*0.01*dt); }
-    // NO AUTO-FIRE (Upgrade 8): enemies inside the range circle are a
-    // warning, not a trigger — the hero strikes only when a fight button
-    // is pressed (pressAttack). The old auto-attack block is gone.
+    // Upgrade 10: AUTO-FIRE — the hero's basic attack clock runs here,
+    // and heroAutoFire() strikes when the toggle is ON (kennin's reversal
+    // of Upgrade 8's manual scheme; OFF means no basic attacks at all).
+    if(h.cd>0) h.cd-=dt;
+    this.heroAutoFire();
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
     // Upgrade 8: a raised guard shows as an arc on the hero's facing side.
@@ -1051,19 +1265,36 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(h.blocking&&h.down<=0&&g.arc){ const a=Math.atan2(h.faceY,h.faceX); g.lineStyle(4,0x9ae8f2,0.9); g.beginPath(); g.arc(h.x,h.y,30,a-1.1,a+1.1,false); g.strokePath(); } }
     this.drawCampBar();
     this.campFireTick(dt);
+    // Upgrade 9: the selection ring — a breathing gold circle under whoever
+    // the marching hand currently directs: the selected squad, or the hero
+    // when the hero is selected (the default).
+    if(this.selFx){ const sg=this.selFx; sg.clear();
+      const st=this.selSquad&&!this.selSquad.dead?this.selSquad:(h.down<=0?h:null);
+      if(st){ const sr=(this.selSquad?27:31)*(1+0.07*Math.sin((this._pulse||0)*5)); sg.lineStyle(2,0xf2c14e,0.95); sg.strokeCircle(st.x,st.y+8,sr); } }
+    this.drawRallyBanners(); // Upgrade 10: a banner flies only while someone holds it
     // squads
     this.squads=this.squads.filter(s=>!s.dead);
+    if(this.selSquad&&this.selSquad.dead) this.selSquad=null;
     this.squads.forEach((s,idx)=>{ if(s.buffRateT>0) s.buffRateT-=dt; if(s.buffDmgT>0) s.buffDmgT-=dt;
       const rangeMul=(night&&s.def.role==='ranged')?1.1:1, range=s.range*rangeMul;
       const foe=this.nearestEnemy(s.x,s.y,range);
-      let tx,ty;
-      if(this.order==='charge'){ const e2=this.nearestEnemy(s.x,s.y,9999); if(e2){ tx=e2.x; ty=e2.y; } else { tx=h.x; ty=h.y; } }
-      else if(this.order==='hold'){ tx=s.x; ty=s.y; }
-      else if(this.order==='fallback'){ tx=this.campPos.x+70+Math.floor(idx/3)*30; ty=this.campPos.y+(idx%3-1)*40; }
-      else { const o=this.formationOffset(idx); tx=h.x+o.dx; ty=h.y+o.dy; }
-      const dx=tx-s.x, dy=ty-s.y, dl=Math.hypot(dx,dy), spd=s.speed*(this.order==='shieldwall'?0.6:1)*this.orbSpdMul();
+      // Upgrade 9: each squad marches by its EFFECTIVE order — its own
+      // directed order, or the army's when it carries none. Posted is the
+      // default: hold the ground you stand on and fight what comes.
+      const eo=this.squadOrder(s), tgt=this.squadTarget(s,idx,h);
+      let tx=tgt.x, ty=tgt.y;
+      // Upgrade 9: a posted squad GUARDS its post. An enemy that comes
+      // within guard reach (its range + 50) is met and fought at contact —
+      // a post is ground held, not a statue: without this, a melee squad
+      // posted on the road could be struck by an enemy standing at its own
+      // reach (44px) beyond the squad's shorter arm (38px), and camp
+      // defense would be a fiction. When the intruder falls or leaves, the
+      // squad returns to its post. Support squads (the healer) hold their
+      // post and work from it.
+      if((eo==='post'||eo==='rally')&&s.def.role!=='support'){ const gf=this.nearestEnemy(s.x,s.y,range+50); if(gf){ tx=gf.x; ty=gf.y; } } // Upgrade 10: a rallied squad guards its banner the way a posted squad guards its post
+      const dx=tx-s.x, dy=ty-s.y, dl=Math.hypot(dx,dy), spd=s.speed*(eo==='shieldwall'?0.6:1)*this.orbSpdMul();
       if(!foe&&dl>8){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; s.spr.setFlipX(dx<0); }
-      else if(foe&&dl>range*0.9&&this.order!=='hold'){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; }
+      else if(foe&&dl>range*0.9&&eo!=='hold'){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; }
       s.spr.setOrigin(0.5,0.9).setPosition(s.x,s.y+16).setDepth(7+s.y/1000);
       s.cd-=dt*(s.buffRateT>0?1.4:1);
       if(foe&&s.cd<=0){ s.cd=s.rate; const dmg=s.dmg*(s.buffDmgT>0?1.3:1);
@@ -1120,18 +1351,22 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // open, so patience cannot be farmed in the intermission). Crossing a
     // tier floats the tier name over the hero; the button's face — label,
     // colour and sweep — is redrawn from the same state.
-    this.skillBtns.forEach((b,bi)=>{ if(b.cd>0){ b.cd-=dt;
+    this.skillBtns.forEach((b,bi)=>{ const wasCd=b.cd>0; if(b.cd>0){ b.cd-=dt;
         if(b.cd<=0){ b.cd=0; if(b.buffered){ b.buffered=false; this.useSkill(bi); } } }
       if(b.cd>0){ b.label.setText(b.def.name+'\n'+Math.ceil(b.cd)+'s'); b.alpha=0.5; }
       else { b.held=(b.held||0)+dt; const t=this.heldTierOf(b);
         if(t>(b._tierShown||0)){ b._tierShown=t; this.floatText(h.x,h.y-72,b.def.name+' — '+HELD.names[t]+'!','#ffe98a'); }
         b.label.setText(b.def.name+(t>0?'\n'+HELD.names[t]:'')); if(b.label.setColor) b.label.setColor(t===2?'#ffe98a':(t===1?'#f2c14e':'#e8d9b0')); b.alpha=1; }
+      // Upgrade 10: the power-ready whisper — the crossing tick only,
+      // and only for the two great powers (second skill and ult).
+      if(wasCd&&b.cd<=0&&bi>=1) this.powerReady(b);
+      if(b.readyPulse>0) b.readyPulse=Math.max(0,b.readyPulse-dt*1.6);
       this.drawSkillSweep(b); });
     // wave end
     if(this.waveActive&&!this.spawnQ.length&&!this.enemies.length) this.waveClear();
     this.refreshHUD();
   }
-  end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false;
+  end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.closeCampPanel();
     const XP=DATA_P().xp;
     if(win){ this.tr('clears'); this.gx(XP.clear); this.earn('clear',DATA.grokonians.clear);
       if(!this.campHurtTotal){ this.earn('perfectClear',DATA.grokonians.perfectClear); this.tr('perfectClears'); this.gx(XP.perfectClear); }
