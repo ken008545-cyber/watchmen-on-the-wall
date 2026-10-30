@@ -1,5 +1,7 @@
 // Watchmen on the Wall — Conquest. Plain JS + Phaser 3. (Tower defense retired 2026-10-30; heroes/battle pass kept.)
 const W=1280,H=720,HUD_Y=610;
+// Upgrade 3: the camp's health is the run's life. CAMP_MAX hit points; if it falls, the run falls.
+const CAMP_MAX=500;
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -22,15 +24,47 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); SFX.unlock(); if(!opt.disabled) cb(); });
   c.label=t; c.redraw=draw; return c; }
 
+// ---------- Boot: a real loading screen (Upgrade 3) ----------
+// Only the logo is preloaded the classic way; everything else is queued from
+// create() behind the loading screen, so the logo, title, progress bar and a
+// rotating tip are on screen while the game loads. The screen holds for a
+// minimum beat after loading completes instead of flashing past.
+const LOAD_TIPS=[
+  'Tip: Fallen squads do not return — protect them, and mend them between waves.',
+  'Tip: Volley needs a ranged squad. Tap Volley, then tap a spot on the field.',
+  'Tip: Shield Wall slows your squads, but cuts the hurt they take.',
+  'Tip: Your hero returns only while the camp stands. Guard the tent.',
+  'Tip: Coins on the field are worth the walk — every sixth coin is a Grokonian.',
+  'Tip: Night waves: enemies march faster; your ranged squads shoot farther.',
+  'Tip: Enemies march on the camp. A defender close by can block their road.'
+];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
-  preload(){ this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); this.load.json('eras','data/eras.json'); this.load.json('units','data/units.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.image('logo','assets/logo.png'); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); UNIT_IMGS.forEach(k=>this.load.image(k,'assets/units/'+k+'.png')); }
-  create(){ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); ERAS=this.cache.json.get('eras'); UNITS=this.cache.json.get('units'); makeArt(this); makeArt2(this); this.scene.start('Menu'); } }
+  preload(){ this.load.image('logo','assets/logo.png'); }
+  create(){ const t0=performance.now();
+    this.add.rectangle(W/2,H/2,W,H,0x0d0906);
+    if(this.textures.exists('logo')){ const lg=this.add.image(W/2,225,'logo'); lg.setScale(280/lg.height); }
+    txt(this,W/2,415,'WATCHMEN ON THE WALL',44,GOLD).setOrigin(0.5);
+    txt(this,W/2,462,'Conquest',22,'#cdbd95').setOrigin(0.5);
+    const barBg=this.add.graphics(); barBg.lineStyle(2,0xd9a441,1); barBg.strokeRect(W/2-260,522,520,18);
+    const bar=this.add.graphics();
+    const pct=txt(this,W/2,566,'Loading… 0%',18,PARCH).setOrigin(0.5);
+    let tipI=0; const tip=txt(this,W/2,636,LOAD_TIPS[0],17,'#cdbd95',{align:'center',wordWrap:{width:900}}).setOrigin(0.5);
+    this.time.addEvent({delay:2400,loop:true,callback:()=>{ tipI=(tipI+1)%LOAD_TIPS.length; tip.setText(LOAD_TIPS[tipI]); }});
+    this.load.on('progress',v=>{ bar.clear(); bar.fillStyle(0xd9a441,1); bar.fillRect(W/2-256,526,512*v,10); pct.setText('Loading… '+Math.round(v*100)+'%'); });
+    this.load.on('loaderror',()=>{}); // a missing optional file (music, a unit PNG) must never stall the load
+    this.load.json('data','data/game.json'); this.load.json('prog','data/progression.json'); this.load.image('bg','assets/bg_elah.jpg'); this.load.json('worlds','data/worlds.json'); this.load.json('eras','data/eras.json'); this.load.json('units','data/units.json'); ['elah','jericho','egypt','babylon','liberty','toon'].forEach(w=>this.load.image('bg_'+w,'assets/bg_'+w+'.jpg')); this.load.atlas('spr','assets/sprites.png','assets/sprites.json'); UNIT_IMGS.forEach(k=>this.load.image(k,'assets/units/'+k+'.png'));
+    // Music slots (Upgrade 3): kennin's own tracks drop in here later. A 404 is fine — Music falls back to its pad.
+    try{ this.load.audio('mus_menu','assets/music/menu.mp3'); this.load.audio('mus_battle','assets/music/battle.mp3'); }catch(e){}
+    this.load.once('complete',()=>{ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); ERAS=this.cache.json.get('eras'); UNITS=this.cache.json.get('units'); makeArt(this); makeArt2(this);
+      const wait=Math.max(0,900-(performance.now()-t0));
+      this.time.delayedCall(wait,()=>this.scene.start('Menu')); });
+    this.load.start(); } }
 
 function backdrop(s,dim,key){ s.add.image(W/2,H/2,key||'bg').setDisplaySize(W,H); s.add.rectangle(W/2,H/2,W,H,0x0d0906,dim); }
 
 class Menu extends Phaser.Scene{ constructor(){super('Menu');}
-  create(){ backdrop(this,0.55);
-    const lg=this.add.image(W/2,128,'logo'); lg.setScale(232/lg.height); this.tweens.add({targets:lg,scale:lg.scale*1.03,duration:1800,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+  create(){ backdrop(this,0.55); Music.play(this,'menu');
+    const lg=this.add.image(W/2,124,'logo'); lg.setScale(252/lg.height); this.tweens.add({targets:lg,scale:lg.scale*1.03,duration:1800,yoyo:true,repeat:-1,ease:'Sine.inOut'});
     txt(this,W/2,262,'"I have set watchmen upon thy walls, O Jerusalem" Isaiah 62:6',20).setOrigin(0.5);
     const ds=Levels.dailySpec(), db=Levels.dailyBest(); txt(this,W/2,300,'Daily Challenge: '+Levels.world(ds.world).name+' '+(ds.index+1)+' (Hard)'+(db?'  •  best '+db.score:''),22).setOrigin(0.5);
     button(this,W/2-160,370,300,58,'Play',()=>this.scene.start('EraSelect'),{size:28});
@@ -38,7 +72,9 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     button(this,W/2-160,440,300,58,'Battle Pass',()=>this.scene.start('BattlePass'),{size:26});
     button(this,W/2+160,440,300,58,'Profile & Level',()=>this.scene.start('Profile'),{size:24});
     button(this,W/2-160,510,300,50,'Unlocks',()=>this.scene.start('Unlocks'),{size:22});
-    const m=button(this,W/2+160,510,300,50,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); });
+    const m=button(this,725,510,140,50,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); },{size:16});
+    const mu=button(this,875,510,140,50,'Music: '+(Music.enabled()?'on':'off'),()=>{ mu.label.setText('Music: '+(Music.toggle()?'on':'off')); },{size:16});
+    button(this,1150,42,220,46,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:17});
     const L=Progress.level(), T=Progress.state.title;
     txt(this,W/2,585,'Level '+L.lv+'  •  Account '+Progress.accountLevel()+'  •  Battle Pass tier '+Progress.bpTier()+'/30'+(T?'  •  "'+Progress.titleName(T)+'"':''),20).setOrigin(0.5);
     txt(this,W/2,630,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,680,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':''),18).setOrigin(0.5);
@@ -49,7 +85,7 @@ function lockLabel(h){ const u=h.unlock; return u.type==='grokonians'?u.cost+' G
 
 class HeroSelect extends Phaser.Scene{ constructor(){super('HeroSelect');}
   init(d){ this.browse=!!(d&&d.browse); this.level=(d&&d.level)||{era:'bible'}; }
-  create(){ backdrop(this,0.7);
+  create(){ backdrop(this,0.7); Music.play(this,'menu');
     txt(this,W/2,36,this.browse?'Heroes':'Choose your Hero',38,GOLD).setOrigin(0.5);
     txt(this,W/2,76,'Grokonians: '+Tokens.balance()+'   •   Mastery gives +2% damage and HP per level, and faster skills at level 5',17,GOLD).setOrigin(0.5);
     DATA.heroes.forEach((h,i)=>{ const col=i%6,row=Math.floor(i/6),x=113+col*211,y=230+row*286, ok=heroUnlocked(h), M=Progress.mastery(h.id);
@@ -99,7 +135,7 @@ const hpScaleForWave=w=>curveScale(w,0.03,0.015,0.007);
 const dmgScaleForWave=w=>curveScale(w,0.015,0.0075,0.0035);
 
 class EraSelect extends Phaser.Scene{ constructor(){super('EraSelect');}
-  create(){ backdrop(this,0.72);
+  create(){ backdrop(this,0.72); Music.play(this,'menu');
     txt(this,W/2,40,'Choose an Era',40,GOLD).setOrigin(0.5);
     txt(this,W/2,84,'Conquest — lead your hero and his squads.  Goal: survive wave '+ERAS.goalWave+'.',19).setOrigin(0.5);
     ERAS.eras.forEach((e,i)=>{ const col=i%4,row=Math.floor(i/4),x=172+col*312,y=row===0?252:512, open=!!e.playable;
@@ -121,8 +157,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.eraId=(d&&d.level&&d.level.era)||'bible'; this.era=eraById(this.eraId);
     this.roster=UNITS[this.eraId]||UNITS.bible;
     this.goalWave=ERAS.goalWave; this.squadCap=ERAS.squadCap;
+    this.worldW=this.era.worldW||1280; this.worldH=this.era.worldH||720;
     this.runXp=0; this.kills=0; this.pend={}; this.pendXp=0; this.shieldT=0; this.banquet=false; this.earned=0;
-    this.wave=0; this.wavesCleared=0; this.leakedTotal=0; this._campLossToast=false; this.endless=false; this.cleared=false; this.over=false;
+    // Upgrade 3: the camp is the defeat meter now — camp HP replaces lives.
+    this.campHp=CAMP_MAX; this.campHurtThisWave=false; this.campHurtTotal=false; this.campWarnedWave=0;
+    this.wave=0; this.wavesCleared=0; this.endless=false; this.cleared=false; this.over=false;
+    this.coins=[]; this.coinT=3; this.coinSeq=0; this.coinCount=0;
     this.order='follow'; this.volleyMode=false; this.volleyCd=0; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
@@ -131,16 +171,27 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(!this.over) Progress.takeEvents().forEach((m,i)=>this.time.delayedCall(i*1300,()=>this.toast(m,1600))); }
   earn(reason,n){ this.earned+=n; Tokens.earn(reason,n); }
 
-  create(){ backdrop(this,0.15,this.era.bg||'bg');
-    this.campPos={x:110,y:360}; this.add.image(85,350,'camp').setDepth(2);
-    this.manna=ERAS.startManna; this.lives=20; this.maxLives=20; this.speed=1; this.time.timeScale=1;
+  create(){ Music.play(this,'battle');
+    // Upgrade 3: a bigger, explorable world. The battlefield stretches to the
+    // era's world size and the camera follows the hero through it.
+    const bgImg=this.add.image(0,0,this.era.bg||'bg').setOrigin(0,0).setDisplaySize(this.worldW,this.worldH).setDepth(0);
+    this.add.rectangle(this.worldW/2,this.worldH/2,this.worldW,this.worldH,0x0d0906,0.15).setDepth(1);
+    this.campPos={x:150,y:600}; this.campSpr=this.add.image(this.campPos.x,this.campPos.y,'camp').setDepth(2);
+    this.campBar=this.add.graphics().setDepth(12);
+    this.manna=ERAS.startManna; this.speed=1; this.time.timeScale=1;
     this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.victoryOpen=false; this.shopT=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
     this.fx=this.add.graphics().setDepth(20);
     this.buildHero(); this.buildHUD();
+    this.cameras.main.setBounds(0,0,this.worldW,this.worldH);
+    this.cameras.main.startFollow(this.hero.spr,true,0.08,0.08);
+    this.fixUI();
     this.input.on('pointerdown',p=>this.onTap(p));
     this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:''),4200);
     this.openShop(true);
   }
+  // HUD, command bar, toasts, shop and overlays are screen furniture: anything
+  // at depth >= 30 is pinned to the camera so the world can scroll beneath it.
+  fixUI(){ this.children.list.forEach(o=>{ if(o&&o.depth>=30&&o.setScrollFactor) o.setScrollFactor(0); }); }
   // --- HUD: stats, command bar, hero skills ---
   buildHUD(){ const bar=this.add.graphics().setDepth(30); bar.fillStyle(0x1a110a,0.94); bar.fillRect(0,HUD_Y,W,H-HUD_Y); bar.lineStyle(3,0xd9a441); bar.lineBetween(0,HUD_Y,W,HUD_Y);
     this.stat=txt(this,12,8,'',20,PARCH).setDepth(31);
@@ -152,29 +203,60 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const h=this.heroDef; this.skillBtns=[];
     [...h.skills,h.ult].forEach((k,i)=>{ const b=button(this,110+i*185,HUD_Y+80,175,44,k.name,()=>this.useSkill(i),{size:16}); b.setDepth(31); b.cd=0; b.def=k; this.skillBtns.push(b); });
     this.spdBtn=button(this,1221,HUD_Y+80,110,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:18}).setDepth(31);
-    this.refreshHUD(); }
+    const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:13}); fsb.setDepth(31);
+    this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave%2===0&&this.wave>0?'Night':'Day'; }
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
-    this.stat.setText('Manna '+Math.floor(this.manna)+'   Lives '+this.lives+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
+    this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+CAMP_MAX+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
     this.orderTxt.setText('Order: '+({charge:'Charge',hold:'Hold',follow:'Follow Me',flank:'Flank',fallback:'Fall Back',shieldwall:'Shield Wall'})[this.order]+(this.volleyMode?'   •   VOLLEY: tap a spot':''));
     if(this._lastOrder!==this.order){ this._lastOrder=this.order; Object.entries(this.cmdBtns).forEach(([id,b])=>{ if(b.redraw) b.redraw(id===this.order); }); }
     Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; }); }
-  toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
+  toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40).setScrollFactor(0); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
   onTap(p){ if(this.over||this.shopOpen||this.victoryOpen||p.y>=HUD_Y) return;
-    if(this.volleyMode){ this.doVolley(p.x,p.y); return; }
-    this.hero.tx=p.x; this.hero.ty=p.y; }
+    // p.y is a screen coordinate (the HUD check); the tap itself lands in the world.
+    const wx=(p.worldX!==undefined?p.worldX:p.x), wy=(p.worldY!==undefined?p.worldY:p.y);
+    if(this.volleyMode){ this.doVolley(wx,wy); return; }
+    this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); }
   doVolley(x,y){ this.volleyMode=false; this.volleyCd=12; let n=0;
     this.squads.filter(s=>s.def.role==='ranged'&&!s.dead).forEach((s,i)=>{ n++; this.time.delayedCall(i*90,()=>{ this.shoot(s.x,s.y-20,{x,y,dead:false},'stone',{dmg:s.dmg*3,type:'physical',splash:90,splashAt:{x,y}},800); }); });
     if(!n){ this.toast('No ranged squads for a volley'); this.volleyCd=0; } else { SFX.sling(); this.toast('Volley away!'); }
     this.refreshHUD(); }
   // --- hero ---
-  buildHero(){ const h=this.heroDef; this.hero={def:h,x:170,y:360,tx:170,ty:360,cd:0,hp:h.hp,down:0};
-    this.hero.spr=spr(this,170,360,h.id).setDepth(8); this.hero.hpBar=this.add.graphics().setDepth(12);
-    this.hero.ring=this.add.circle(170,360,h.range,0xffffff,0.04).setStrokeStyle(1,0xd9a441,0.4).setDepth(3); }
+  buildHero(){ const h=this.heroDef, hx=this.campPos.x+60, hy=this.campPos.y; this.hero={def:h,x:hx,y:hy,tx:hx,ty:hy,cd:0,hp:h.hp,down:0};
+    this.hero.spr=spr(this,hx,hy,h.id).setDepth(8); this.hero.hpBar=this.add.graphics().setDepth(12);
+    this.hero.ring=this.add.circle(hx,hy,h.range,0xffffff,0.04).setStrokeStyle(1,0xd9a441,0.4).setDepth(3); }
   hurtHero(n){ const h=this.hero; if(h.down>0) return; h.hp-=n; h.spr.setTint(0xff6a5a); this.time.delayedCall(80,()=>{ if(h.spr.active) h.spr.clearTint(); });
-    if(h.hp<=0){ h.down=10; h.hp=0; h.spr.setAlpha(0.35); this.toast(h.def.name+' is down! Back in 10s'); } }
+    if(h.hp<=0){ h.down=8; h.hp=0; h.spr.setAlpha(0.35); this.toast(h.def.name+' is down! Returns in 8s — while the camp stands',3000); } }
+  // Upgrade 3: the hero returns only while the camp stands. If the camp has
+  // fallen the run is already over, so a downed hero simply stays down.
+  tickHeroDown(dt){ const h=this.hero; if(h.down<=0) return; h.down-=dt;
+    if(h.down<=0&&this.campHp>0){ h.hp=h.def.hp; h.down=0; h.spr.setAlpha(1); h.x=h.tx=this.campPos.x+60; h.y=h.ty=this.campPos.y; this.toast(h.def.name+' returns!'); } }
+  // Upgrade 3: camp damage. Union Shield (shieldT) turns every blow aside.
+  // The goal-wave champion hits the camp three times as hard.
+  hitCamp(amt,e){ if(this.over) return; if(this.shieldT>0) return;
+    if(e&&e.boss) amt*=3;
+    this.campHp-=amt; this.campHurtThisWave=true; this.campHurtTotal=true;
+    if(this.campSpr){ this.campSpr.setTintFill(0xff8a6a); this.time.delayedCall(90,()=>{ if(this.campSpr&&this.campSpr.active) this.campSpr.clearTint(); }); }
+    SFX.campHit();
+    if(this.campWarnedWave!==this.wave){ this.campWarnedWave=this.wave; SFX.campWarning(); this.toast('The camp is under attack!',2600); }
+    if(this.campHp<=0){ this.campHp=0; this.refreshHUD(); this.end(false); return; }
+    this.refreshHUD(); }
+  drawCampBar(){ if(!this.campBar) return; const f=Math.max(0,this.campHp/CAMP_MAX), x=this.campPos.x-46, y=this.campPos.y-58, b=this.campBar;
+    b.clear(); b.fillStyle(0x000000,0.7); b.fillRect(x,y,92,8); b.fillStyle(f>0.3?0x5aa33b:0xa33b20,1); b.fillRect(x,y,92*f,8); b.lineStyle(1,0xd9a441,0.9); b.strokeRect(x,y,92,8); }
+  // --- field coins (Upgrade 3): the bigger map pays those who explore it ---
+  spawnCoin(){ this.coinSeq=(this.coinSeq||0)+1; const grok=this.coinSeq%6===0;
+    const x=Phaser.Math.Between(this.campPos.x+220,this.worldW-160), y=Phaser.Math.Between(90,this.worldH-90);
+    const spr=this.add.image(x,y,grok?'coing':'coin').setDepth(6);
+    this.tweens.add({targets:spr,scale:1.25,alpha:0.75,duration:650,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+    this.coins.push({spr,x,y,grok}); }
+  collectCoins(){ if(!this.hero||this.hero.down>0) return; const h=this.hero;
+    this.coins=this.coins.filter(c=>{ if(Math.hypot(c.x-h.x,c.y-h.y)>=28) return true;
+      this.tweens.killTweensOf(c.spr); c.spr.destroy(); this.coinCount++;
+      if(c.grok){ this.earn('coin',1); this.floatText(c.x,c.y-14,'+1 Grokonian','#fff3c0'); }
+      else { this.manna+=8; this.floatText(c.x,c.y-14,'+8 Manna',GOLD); }
+      SFX.coinPickup(c.grok); this.refreshHUD(); return false; }); }
   // --- squads ---
-  addSquad(def,x,y){ const s={def,x:x||170,y:y||360,hp:def.hp,max:def.hp,dmg:def.dmg,range:def.range,rate:def.rate,speed:def.speed,
+  addSquad(def,x,y){ const s={def,x:x||(this.campPos?this.campPos.x+60:170),y:y||(this.campPos?this.campPos.y:360),hp:def.hp,max:def.hp,dmg:def.dmg,range:def.range,rate:def.rate,speed:def.speed,
       armor:def.role==='shield'?0.2:0,cd:0,buffRateT:0,buffDmgT:0,dead:false,upgrades:{}};
     s.spr=uspr(this,s.x,s.y,def,def.img?58:54); applyTint(s.spr,def);
     s.bar=this.add.graphics().setDepth(12); this.squads.push(s); return s; }
@@ -202,10 +284,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       push(E[3].id,Math.min(2+w,10)); push(E[0].id,w>=5?Math.min(w-3,5):0); push(E[1].id,w>=4?Math.min(w-2,6):0); push(E[2].id,w>=6?Math.min(w-4,4):0);
     }
     return comp.filter(([,n])=>n>0); }
-  startWave(){ this.wave++; this.waveActive=true; this.leakedThisWave=0;
+  startWave(){ this.wave++; this.waveActive=true; this.campHurtThisWave=false;
     const night=this.wave%2===0;
     if(this.nightRect) this.nightRect.destroy();
-    if(night) this.nightRect=this.add.rectangle(W/2,HUD_Y/2,W,HUD_Y,0x0a1030,0.22).setDepth(18);
+    if(night) this.nightRect=this.add.rectangle(this.worldW/2,this.worldH/2,this.worldW,this.worldH,0x0a1030,0.22).setDepth(18);
     const hpM=hpScaleForWave(this.wave), dmM=dmgScaleForWave(this.wave);
     let t=0.6, bossDone=false;
     this.waveComp(this.wave).forEach(([def,n])=>{ for(let i=0;i<n;i++){ const boss=(this.wave===this.goalWave&&def.id==='idol_golem'&&i===n-1&&!this.endless&&!bossDone); if(boss) bossDone=true;
@@ -214,12 +296,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     SFX.wave(); this.toast('Wave '+this.wave+(night?' — Night':' — Day')+(this.wave===this.goalWave&&!this.endless?' — the goal wave!':'')); this.refreshHUD(); }
   spawn(q){ const d=q.def, hpM=this.waveHpM*(q.boss?5:1), dmM=this.waveDmM*(q.boss?1.6:1);
     const e={def:d,hp:d.hp*hpM,max:d.hp*hpM,dmg:d.dmg*dmM,range:d.range,rate:d.rate,speed:d.speed*(this.wave%2===0?1.08:1),
-      x:1300+Math.random()*30,y:80+Math.random()*480,cd:0,dead:false,boss:q.boss,armorType:'flesh',ph:Math.random()*6};
+      x:this.worldW+20+Math.random()*30,y:120+Math.random()*Math.max(60,this.worldH-280),cd:0,dead:false,boss:q.boss,armorType:'flesh',ph:Math.random()*6};
     e.spr=uspr(this,e.x,e.y,d,q.boss?120:(d.img?66:(SZ[d.sprite]||54))); applyTint(e.spr,d);
     e.spr.setDepth(7); e.bar=this.add.graphics().setDepth(12); if(d.heals) e.healCd=1.5; if(q.boss) this.setupBoss(e); this.enemies.push(e); return e; }
   // --- goal-wave champion: boss name + health bar (the old TD treatment) ---
-  setupBoss(e){ this.boss=e; this.bossBar=this.add.graphics().setDepth(32);
-    this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+' — GOAL-WAVE CHAMPION',20,GOLD).setOrigin(0.5).setDepth(32);
+  setupBoss(e){ this.boss=e; this.bossBar=this.add.graphics().setDepth(32).setScrollFactor(0);
+    this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+' — GOAL-WAVE CHAMPION',20,GOLD).setOrigin(0.5).setDepth(32).setScrollFactor(0);
     this.cameras.main.shake(400,0.008); SFX.stomp(); this.toast(e.def.name+' has come out to fight!',2600); }
   bossTick(){ if(!this.bossBar) return; const e=this.boss; if(!e||e.dead){ this.clearBoss(); return; }
     const f=Math.max(0,e.hp/e.max), bb=this.bossBar; bb.clear();
@@ -229,14 +311,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // --- combat core ---
   damage(e,amt,type,opt){ if(e.dead) return; opt=opt||{};
     let m=(DATA.armorTable[e.armorType]||{})[type]||1; if(opt.crit&&Math.random()<opt.crit){ m*=e.boss?2.5:2; this.floatText(e.x,e.y-20,'CRIT','#f2c14e'); }
-    e.hp-=amt*m;
+    e.hp-=amt*m; SFX.enemyHit();
     if(opt.slow){ e.slow=Math.max(e.slow||0,opt.slow); e.slowT=Math.max(e.slowT||0,1.2); }
     if(opt.stun){ e.stun=Math.max(e.stun||0,opt.stun*(e.boss?0.3:1)); }
     if(opt.burn){ e.burn=Math.max(e.burn||0,opt.burn[0]); e.burnT=Math.max(e.burnT||0,opt.burn[1]); }
     if(e.spr.active){ e.spr.setTintFill(0xffffff); this.time.delayedCall(60,()=>{ if(!e.dead&&e.spr.active){ e.spr.clearTint(); applyTint(e.spr,e.def); } }); }
     if(e.hp<=0) this.kill(e); }
   kill(e){ e.dead=true; this.kills++; this.manna+=e.def.bounty||5; this.tr('kills'); if(e.def.sprite==='locust') this.tr('flyKills');
-    if(e.boss){ this.tr('bossKills'); this.clearBoss(); this.toast(e.def.name+' has fallen!',2400); } this.gx(DATA_P().xp.kill); SFX.die(); this.spark(e.x,e.y,0xcdbd95,8);
+    if(e.boss){ this.tr('bossKills'); this.clearBoss(); this.toast(e.def.name+' has fallen!',2400); } this.gx(DATA_P().xp.kill); SFX.enemyDie(); this.spark(e.x,e.y,0xcdbd95,8);
     this.tweens.add({targets:e.spr,alpha:0,scale:0.3,duration:250,onComplete:()=>e.spr.destroy()}); e.bar.destroy(); this.refreshHUD(); }
   shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); this.shots.push({s,target,opt,speed:speed||560,lx:target.x,ly:target.y}); }
   spark(x,y,col,n){ for(let i=0;i<(n||4);i++){ const p=this.add.image(x,y,'spark').setTint(col).setDepth(16).setScale(0.8); this.tweens.add({targets:p,x:x+Phaser.Math.Between(-24,24),y:y+Phaser.Math.Between(-24,24),alpha:0,scale:0.2,duration:350,onComplete:()=>p.destroy()}); } }
@@ -261,7 +343,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'roar': near(150).forEach(e=>{ e.stun=Math.max(e.stun||0,1.5); }); ring(150,0xd8572a); this.cameras.main.shake(150,0.004); break;
       case 'geyser': near(150).forEach(e=>this.damage(e,80,'holy',{slow:0.4})); ring(150,0x6a9ad8); break;
       case 'manna': this.manna+=40; this.floatText(h.x,h.y-30,'+40 Manna',GOLD); this.refreshHUD(); break;
-      case 'sea': E.forEach(e=>{ if(!e.boss){ e.x=Math.min(1300,e.x+260); e.stun=Math.max(e.stun||0,1); } else this.damage(e,200,'holy'); }); this.cameras.main.flash(300,120,170,220); break;
+      case 'sea': E.forEach(e=>{ if(!e.boss){ e.x=Math.min(this.worldW+10,e.x+260); e.stun=Math.max(e.stun||0,1); } else this.damage(e,200,'holy'); }); this.cameras.main.flash(300,120,170,220); break;
       case 'altarflame': near(160).forEach(e=>this.damage(e,30,'fire',{burn:[22,4]})); ring(160,0xd8572a); break;
       case 'ravens': h.hp=Math.min(h.def.hp,h.hp+h.def.hp*0.5); this.floatText(h.x,h.y-30,'+HP','#8fd06a'); break;
       case 'chariot': E.forEach(e=>this.damage(e,120,'fire',{burn:[20,4]})); this.cameras.main.flash(300,242,140,60); break;
@@ -270,7 +352,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'time': this.squads.forEach(s=>{ s.cd=0; s.buffRateT=10; s.buffDmgT=10; }); this.cameras.main.flash(250,230,200,240); break;
       case 'pair': for(let j=0;j<6;j++) this.time.delayedCall(j*120,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,45,'physical'); this.spark(t.x,t.y,0xcdbd95,3); } }); break;
       case 'rain': near(220).forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=5; }); ring(220,0xdfe6ee); break;
-      case 'ark': this.lives+=5; E.forEach(e=>this.damage(e,100,'holy')); this.toast('The Ark: +5 lives'); this.refreshHUD(); break;
+      case 'ark': this.campHp=Math.min(CAMP_MAX,this.campHp+50); E.forEach(e=>this.damage(e,100,'holy')); this.floatText(this.campPos.x,this.campPos.y-70,'Camp +50','#8fd06a'); this.toast('The Ark: the camp is mended (+50)'); this.refreshHUD(); break;
       case 'kite': { let src=h, hit=[]; for(let j=0;j<4;j++){ const c=E.filter(e=>!hit.includes(e)&&Phaser.Math.Distance.Between(e.x,e.y,src.x,src.y)<220).sort((a,b2)=>Phaser.Math.Distance.Between(a.x,a.y,src.x,src.y)-Phaser.Math.Distance.Between(b2.x,b2.y,src.x,src.y))[0]; if(!c) break; this.fx.lineStyle(3,0xf2e07a,1).lineBetween(src.x,src.y,c.x,c.y); this.damage(c,90,'sonic',{stun:0.5}); hit.push(c); src=c; } this.time.delayedCall(150,()=>this.fx.clear()); if(!hit.length) return this.toast('No target'); break; }
       case 'bifocal': buffSquads(0,8); ring(260,0xf2e07a); break;
       case 'almanac': for(let j=0;j<10;j++) this.time.delayedCall(j*110,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,120,'sonic',{stun:0.4}); this.spark(t.x,t.y,0xf2e07a,5); } }); this.cameras.main.flash(200,240,230,150); break;
@@ -279,7 +361,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'forge': h.hp=h.def.hp; buffSquads(10,0); this.cameras.main.flash(250,200,210,240); break;
       case 'log': near(140).forEach(e=>e.stun=Math.max(e.stun||0,2.5)); ring(140,0x8a5a2a); break;
       case 'speech': buffSquads(0,10); ring(400,0xd9a441); break;
-      case 'union': this.shieldT=10; this.toast('Union Shield: no lives lost for 10s'); break;
+      case 'union': this.shieldT=10; this.toast('Union Shield: the camp takes no damage for 10s'); break;
       case 'trick': strongest(3,near(260)).forEach(t=>this.shoot(h.x,h.y,t,'stone',{dmg:100,type:'physical',crit:0.5},900)); break;
       case 'sharp': { const t=strongest(1,near(320))[0]; if(!t) return this.toast('No target'); this.shoot(h.x,h.y,t,'stone',{dmg:180,type:'physical',crit:0.5},1100); break; }
       case 'show': for(let j=0;j<15;j++) this.time.delayedCall(j*80,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length) this.shoot(h.x,h.y,Phaser.Utils.Array.GetRandom(L),'stone',{dmg:60,type:'physical',crit:0.3},1000); }); break;
@@ -296,6 +378,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   shopAdd(o){ this.shopItems.push(o); return o; }
   clearShop(){ this.shopItems.forEach(o=>{ try{o.destroy();}catch(e){} }); this.shopItems=[]; }
   ownedSquad(defId){ return this.squads.find(s=>s.def.id===defId&&!s.dead); }
+  // Upgrade 3: an upgrade with a "req" is locked until that upgrade is owned.
+  // Branch picks store their chosen name under 'branch', which counts as owned.
+  upgradeLocked(owned,u){ return !!(u.req&&!(owned.upgrades&&owned.upgrades[u.req])); }
   renderShop(first){ this.clearShop();
     const units=this.roster.player, pages=Math.ceil(units.length/6), pageUnits=units.slice(this.shopPage*6,this.shopPage*6+6);
     // Panel starts at y=38, below the HUD stat line, so the header is never clipped behind the shop.
@@ -303,7 +388,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const head=first?'Prepare your squads':('Wave '+this.wavesCleared+' survived!  +'+(this.lastBonus||0)+' manna');
     this.shopAdd(txt(this,W/2,52,head,26,GOLD).setOrigin(0.5).setDepth(51));
     this.shopHead2=this.shopAdd(txt(this,W/2,84,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
-    if(this.shopFirst) this.shopAdd(txt(this,W/2,622,'Fallen squads are gone for the run.',14,'#cdbd95').setOrigin(0.5).setDepth(51));
+    if(this.shopFirst) this.shopAdd(txt(this,W/2,622,'If the camp falls, the run falls — and the fallen hero only returns while it stands.',14,'#cdbd95').setOrigin(0.5).setDepth(51));
     pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=112+row*252,cx=x+190;
       const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(x,y,380,238,10); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(x,y,380,238,10); this.shopAdd(g);
       const im=uspr(this,x+42,y+44,def,58).setDepth(52); applyTint(im,def); this.shopAdd(im);
@@ -315,12 +400,21 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         const b=button(this,x+100,y+118,170,48,'Buy '+def.cost,()=>{ if(this.manna>=def.cost&&this.squads.length<this.squadCap){ this.manna-=def.cost; this.addSquad(def); SFX.build(); this.renderShop(false); this.refreshHUD(); } },{size:17,disabled:!canBuy}); b.setDepth(52); this.shopAdd(b);
         if(this.squads.length>=this.squadCap) this.shopAdd(txt(this,x+250,y+118,'Squad full ('+this.squadCap+')',14,'#a08a6a').setDepth(52));
       } else {
-        (def.upgrades||[]).forEach((u,ui)=>{ const ux=x+16+ui*0, uy=y+96;
-          if(u.id==='maxtier'){ this.shopAdd(txt(this,x+20,uy+18,'Max tier',16,'#8fd06a').setDepth(52)); return; }
-          if(owned.upgrades[u.id]){ this.shopAdd(txt(this,x+20,uy+18,u.id==='branch'?('Branch: '+owned.upgrades[u.id]):(u.name+' ✓'),16,'#8fd06a').setDepth(52)); return; }
-          if(u.id==='branch'){ u.options.forEach((op,oi)=>{ const b=button(this,x+92+oi*130,uy+22,124,42,op.name+' '+u.cost,()=>{ if(this.manna>=u.cost){ this.manna-=u.cost; owned.upgrades.branch=op.name; owned.max+=op.hpAdd||0; owned.hp=owned.max; owned.dmg+=op.dmgAdd||0; owned.speed+=op.speedAdd||0; this.tr('branches'); SFX.build(); this.renderShop(false); this.refreshHUD(); } },{size:14,disabled:this.manna<u.cost}); b.setDepth(52); this.shopAdd(b); });
-            this.shopAdd(txt(this,x+20,uy-2,'Pick one',13,'#cdbd95').setDepth(52)); return; }
-          const b=button(this,x+100,uy+22,190,42,u.name+' '+u.cost,()=>{ if(this.manna>=u.cost){ this.manna-=u.cost; owned.upgrades[u.id]=true; owned.max+=u.hpAdd||0; owned.hp=owned.max; owned.dmg+=u.dmgAdd||0; owned.armor+=u.armorAdd||0; if(u.id.startsWith('drill')) this.tr('branches'); SFX.build(); this.renderShop(false); this.refreshHUD(); } },{size:14,disabled:this.manna<u.cost}); b.setDepth(52); this.shopAdd(b);
+        // Upgrade 3: upgrades stack in rows so chained tiers (Drill t1 -> t2,
+        // Bulwark -> Bulwark t2, branch -> Veteran) each get their own line,
+        // and a "req" upgrade renders locked until its prerequisite is owned.
+        let rowY=y+96;
+        (def.upgrades||[]).forEach((u)=>{ const uy=rowY;
+          if(u.id==='maxtier'){ this.shopAdd(txt(this,x+20,uy+18,'Max tier',16,'#8fd06a').setDepth(52)); rowY+=48; return; }
+          if(owned.upgrades[u.id]){ this.shopAdd(txt(this,x+20,uy+18,u.id==='branch'?('Branch: '+owned.upgrades[u.id]):(u.name+' ✓'),16,'#8fd06a').setDepth(52)); rowY+=48; return; }
+          if(u.id==='branch'){ this.shopAdd(txt(this,x+20,uy+2,'Pick one',13,'#cdbd95').setDepth(52));
+            u.options.forEach((op,oi)=>{ const b=button(this,x+92+oi*130,uy+26,124,42,op.name+' '+u.cost,()=>{ if(this.manna>=u.cost){ this.manna-=u.cost; owned.upgrades.branch=op.name; owned.max+=op.hpAdd||0; owned.hp=owned.max; owned.dmg+=op.dmgAdd||0; owned.speed+=op.speedAdd||0; this.tr('branches'); SFX.build(); this.renderShop(false); this.refreshHUD(); } },{size:14,disabled:this.manna<u.cost}); b.setDepth(52); this.shopAdd(b); });
+            rowY+=54; return; }
+          const locked=this.upgradeLocked(owned,u);
+          const reqName=u.req?((((def.upgrades||[]).find(z=>z.id===u.req)||{}).name)||(u.req==='branch'?'a branch pick':u.req)):null;
+          const b=button(this,x+100,uy+22,190,42,u.name+' '+u.cost,()=>{ if(this.manna>=u.cost&&!this.upgradeLocked(owned,u)){ this.manna-=u.cost; owned.upgrades[u.id]=true; owned.max+=u.hpAdd||0; owned.hp=owned.max; owned.dmg+=u.dmgAdd||0; owned.armor+=u.armorAdd||0; if(u.rateMul) owned.rate*=u.rateMul; if(u.id.startsWith('drill')) this.tr('branches'); SFX.build(); this.renderShop(false); this.refreshHUD(); } },{size:14,disabled:locked||this.manna<u.cost}); b.setDepth(52); this.shopAdd(b);
+          if(locked) this.shopAdd(txt(this,x+212,uy+22,'🔒 Needs '+reqName,13,'#a08a6a').setDepth(52));
+          rowY+=48;
         });
         if(!(def.upgrades||[]).length) this.shopAdd(txt(this,x+20,y+114,'Max tier',16,'#8fd06a').setDepth(52));
       }
@@ -331,12 +425,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       const nx=button(this,560,668,60,48,'▶',()=>{ this.shopPage=(this.shopPage+1)%pages; this.renderShop(false); },{size:18}); nx.setDepth(52); this.shopAdd(nx); }
     const go=button(this,820,668,300,54,'Next wave ▶',()=>this.closeShop(),{size:22}); go.setDepth(52); this.shopAdd(go);
     this.shopTimerTxt=this.shopAdd(txt(this,1090,668,this.shopFirst?'Auto-start off — take your time':'Auto-start in 20s',16,'#cdbd95').setOrigin(0.5).setDepth(52));
+    this.fixUI();
   }
   updateShopHead(){ if(this.shopHead2) this.shopHead2.setText('Manna '+Math.floor(this.manna)+'  •  Squads '+this.squads.length+'/'+this.squadCap+'  •  Next: wave '+(this.wave+1)+' ('+((this.wave+1)%2===0?'night':'day')+')  •  Goal: wave '+this.goalWave+(this.endless?' (cleared — Endless)':'')); }
   closeShop(){ this.shopOpen=false; this.shopFirst=false; this.clearShop(); this.startWave(); }
   waveClear(){ this.waveActive=false; this.wavesCleared=this.wave;
     let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*1.5); this.banquet=false; }
-    const perfect=this.leakedThisWave===0; this.manna+=bonus; this.lastBonus=bonus;
+    const perfect=!this.campHurtThisWave; this.manna+=bonus; this.lastBonus=bonus;
     this.tr('waves'); this.gx(DATA_P().xp.wave); if(perfect){ this.tr('perfectWaves'); this.gx(DATA_P().xp.perfectWave); }
     this.earn('wave',DATA.grokonians.perWave+(perfect?DATA.grokonians.perfectWaveBonus:0));
     SFX.win();
@@ -344,13 +439,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     else { this.toast('Wave '+this.wave+' cleared  +'+bonus+' Manna'+(perfect?'  (perfect)':'')); this.flush(); this.openShop(false); }
     this.refreshHUD(); }
   showVictory(){ this.victoryOpen=true; const s=[];
-    const stars=this.lives>=this.maxLives?3:(this.lives>=this.maxLives/2?2:1);
+    const campFrac=Math.max(0,this.campHp/CAMP_MAX);
+    const stars=campFrac>=0.85?3:(campFrac>=0.45?2:1);
     const bg=this.add.graphics().setDepth(55); bg.fillStyle(0x140c07,0.94); bg.fillRect(340,180,600,330); bg.lineStyle(3,0xd9a441); bg.strokeRect(340,180,600,330); s.push(bg);
     s.push(txt(this,W/2,225,this.era.name+': Held!',38,GOLD).setOrigin(0.5).setDepth(56));
     s.push(txt(this,W/2,275,'★'.repeat(stars)+'☆'.repeat(3-stars),36,GOLD).setOrigin(0.5).setDepth(56));
     s.push(txt(this,W/2,325,'Goal wave '+this.goalWave+' survived. Endless waves go on from here —\nhow deep can your squads march?',18,PARCH,{align:'center'}).setOrigin(0.5).setDepth(56));
     const c=button(this,W/2-160,440,290,56,'Continue Endless',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.endless=true; this.flush(); this.openShop(false); },{size:19}); c.setDepth(56); s.push(c);
-    const f=button(this,W/2+160,440,290,56,'Finish run',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.end(true); },{size:19}); f.setDepth(56); s.push(f); }
+    const f=button(this,W/2+160,440,290,56,'Finish run',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.end(true); },{size:19}); f.setDepth(56); s.push(f); this.fixUI(); }
   // --- main loop ---
   update(time,delta){ if(this.over) return;
     if(this.shopOpen){ if(this.shopFirst){ if(this.shopTimerTxt) this.shopTimerTxt.setText('Auto-start off — take your time'); }
@@ -361,10 +457,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.volleyCd>0){ this.volleyCd-=dt; if(this.volleyCd<=0) this.refreshHUD(); }
     // spawns
     if(this.waveActive){ this.waveClock+=dt; while(this.spawnQ.length&&this.spawnQ[0].at<=this.waveClock) this.spawn(this.spawnQ.shift()); }
+    // field coins (Upgrade 3): one every ~6s of an active wave, max 8 out
+    if(this.waveActive){ this.coinT-=dt; if(this.coinT<=0){ this.coinT=6; if(this.coins.length<8) this.spawnCoin(); } }
+    this.collectCoins();
     const night=this.wave%2===0;
     // hero movement + combat
     const h=this.hero, hd=h.def;
-    if(h.down>0){ h.down-=dt; if(h.down<=0){ h.hp=hd.hp; h.spr.setAlpha(1); h.x=h.tx=this.campPos.x+60; h.y=h.ty=this.campPos.y; this.toast(hd.name+' returns!'); } }
+    if(h.down>0){ this.tickHeroDown(dt); }
     else { const dx=h.tx-h.x, dy=h.ty-h.y, dl=Math.hypot(dx,dy);
       if(dl>3){ const st=Math.min(dl,hd.speed*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0); }
       h.hp=Math.min(hd.hp,h.hp+hd.hp*0.01*dt);
@@ -373,6 +472,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         else this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg,type:hd.dmgType,crit:0.1},600); } } }
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
+    this.drawCampBar();
     // squads
     this.squads=this.squads.filter(s=>!s.dead);
     this.squads.forEach((s,idx)=>{ if(s.buffRateT>0) s.buffRateT-=dt; if(s.buffDmgT>0) s.buffDmgT-=dt;
@@ -389,8 +489,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       s.spr.setOrigin(0.5,0.9).setPosition(s.x,s.y+16).setDepth(7+s.y/1000);
       s.cd-=dt*(s.buffRateT>0?1.4:1);
       if(foe&&s.cd<=0){ s.cd=s.rate; const dmg=s.dmg*(s.buffDmgT>0?1.3:1);
-        if(s.def.role==='ranged') this.shoot(s.x,s.y-20,foe,'stone',{dmg,type:'physical',crit:0.08},620);
+        if(s.def.role==='ranged'||s.def.role==='support') this.shoot(s.x,s.y-20,foe,'stone',{dmg,type:'physical',crit:0.08},620);
         else { this.damage(foe,dmg,'physical',{crit:0.08}); this.spark(foe.x,foe.y,0xe8e0c8,2); } }
+      // Levite Healer (Upgrade 3): mends the most-wounded squad within 120px at 6 HP/s.
+      if(s.def.healsSquads){ let tgt=null,bf=1; for(const o of this.squads){ if(o!==s&&!o.dead&&o.hp<o.max&&Math.hypot(o.x-s.x,o.y-s.y)<120){ const f=o.hp/o.max; if(f<bf){ bf=f; tgt=o; } } }
+        if(tgt){ tgt.hp=Math.min(tgt.max,tgt.hp+6*dt); s.healFxT=(s.healFxT||0)-dt; if(s.healFxT<=0){ s.healFxT=0.5; this.spark(tgt.x,tgt.y-12,0x8fd06a,1); } } }
       s.bar.clear(); if(s.hp<s.max){ s.bar.fillStyle(0x000000,0.7); s.bar.fillRect(s.x-16,s.y-34,32,4); s.bar.fillStyle(0x5aa33b,1); s.bar.fillRect(s.x-16,s.y-34,32*Math.max(0,s.hp)/s.max,4); }
     });
     // enemies
@@ -401,20 +504,23 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(e.slowT>0) e.slowT-=dt; else e.slow=0;
       if(e.stun>0){ e.stun-=dt; }
       else if(e.confuse>0){ e.confuse-=dt; e.x+=e.speed*0.6*dt; }
-      else { // pick target: nearest squad/hero in aggro, else the camp
-        let tgt=null,bd=230;
-        if(h.down<=0){ const d=Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y); if(d<bd){ bd=d; tgt={x:h.x,y:h.y,kind:'hero'}; } }
-        for(const s of this.squads){ const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; tgt={x:s.x,y:s.y,kind:'squad',s}; } }
-        if(!tgt) tgt={x:this.campPos.x,y:this.campPos.y,kind:'camp'};
-        const dx=tgt.x-e.x, dy=tgt.y-e.y, dl=Math.hypot(dx,dy)||1;
-        if(bd>e.range+8||tgt.kind==='camp'&&dl>26){ const sp=e.speed*(1-(e.slow||0)); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
-        else if(tgt.kind!=='camp'){ e.cd-=dt; if(e.cd<=0){ e.cd=e.rate;
-          if(tgt.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(tgt.s,e.dmg);
-          this.spark(tgt.x,tgt.y,0xc0392b,2); } }
-        if(e.x<=this.campPos.x+16&&Math.abs(e.y-this.campPos.y)<70){ e.dead=true; e.spr.destroy(); e.bar.destroy(); if(e.boss) this.clearBoss();
-          const loss=this.shieldT>0?0:(e.boss?5:1); this.lives-=loss; this.leakedThisWave+=loss; this.leakedTotal+=loss; SFX.leak(); this.cameras.main.shake(120,0.005); this.refreshHUD();
-          if(loss>0&&!this._campLossToast){ this._campLossToast=true; this.toast('The camp lost a life — hold the line at the tent',2800); }
-          if(this.lives<=0) return this.end(false); continue; } }
+      else { // Upgrade 3: the camp is the prize. A defender within 90px blocks
+        // the road and the enemy stops to fight it; otherwise it marches on
+        // the camp and, on arrival, stays and attacks it. It never vanishes,
+        // and the run ends only when the camp itself falls.
+        let def=null,bd=90;
+        if(h.down<=0){ const d=Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y); if(d<bd){ bd=d; def={x:h.x,y:h.y,kind:'hero'}; } }
+        for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; def={x:s.x,y:s.y,kind:'squad',s}; } }
+        const dc=Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y);
+        if(def){ const dx=def.x-e.x, dy=def.y-e.y, dl=Math.hypot(dx,dy)||1;
+          if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0)); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
+          else { e.cd-=dt; if(e.cd<=0){ e.cd=e.rate;
+            if(def.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(def.s,e.dmg);
+            SFX.enemyAttack(); this.spark(def.x,def.y,0xc0392b,2); } }
+        } else if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
+          const sp=e.speed*(1-(e.slow||0)); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
+        } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } }
+      }
       const p={x:e.x,y:e.y}; e.spr.setOrigin(0.5,0.9).setPosition(p.x,p.y+(e.def.size||18)).setDepth((e.boss?9:7)+p.y/1000);
       e.bar.clear(); if(e.hp<e.max){ e.bar.fillStyle(0x000000,0.7); e.bar.fillRect(e.x-16,e.y-36,32,4); e.bar.fillStyle(0xa33b20,1); e.bar.fillRect(e.x-16,e.y-36,32*Math.max(0,e.hp)/e.max,4); }
     }
@@ -437,14 +543,16 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false;
     const XP=DATA_P().xp;
     if(win){ this.tr('clears'); this.gx(XP.clear); this.earn('clear',DATA.grokonians.clear);
-      if(this.leakedTotal===0){ this.earn('perfectClear',DATA.grokonians.perfectClear); this.tr('perfectClears'); this.gx(XP.perfectClear); }
+      if(!this.campHurtTotal){ this.earn('perfectClear',DATA.grokonians.perfectClear); this.tr('perfectClears'); this.gx(XP.perfectClear); }
       if(this.eraId==='bible'){ const first=!Tokens.milestone('clearCh1'); Tokens.setMilestone('clearCh1'); this.newUnlock=first; }
       SFX.win(); } else SFX.lose();
-    const stars=win?(this.lives>=this.maxLives?3:(this.lives>=this.maxLives/2?2:1)):0;
+    // Upgrade 3: stars and score now read from the camp the player kept standing.
+    const campFrac=Math.max(0,this.campHp/CAMP_MAX);
+    const stars=win?(campFrac>=0.85?3:(campFrac>=0.45?2:1)):0;
     if(win) cqRecordStars(this.eraId,stars);
     this.flush(); const ev=Progress.takeEvents();
-    const rec={score:this.kills*10+Math.max(0,this.lives)*50+this.wavesCleared*100+stars*500};
-    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:this.leakedTotal===0,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless})); } }
+    const rec={score:this.kills*10+Math.round(campFrac*20)*50+this.wavesCleared*100+stars*500};
+    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless})); } }
 
 class End extends Phaser.Scene{ constructor(){super('End');}
   create(d){ backdrop(this,0.7);
