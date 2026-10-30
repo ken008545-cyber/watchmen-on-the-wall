@@ -418,3 +418,80 @@ scaling law, goal wave 10, heroes, battle pass and progression are untouched.
   track, audio unlock timing on first tap, camp-defense balance (500 HP
   against full waves designed for the lives system — first pass, expect
   to tune), and whether 16 shop units across 3 pages stays readable.
+
+## Upgrade 4 — camp upgrades (2026-10-30)
+
+kennin's addition, same day: "we should be able to upgrade the camp as
+well." The camp gained its own per-run upgrade track, bought with Manna in
+the between-wave shop. Nothing persists across runs; waves and scaling are
+untouched.
+
+### The camp strip (shop presentation)
+- A slim full-width strip under the shop header, **page 1 only**, so it
+  never consumes one of the 6 unit slots: left label "THE CAMP" with the
+  live "Camp x/y HP", then the five one-time upgrade buttons, then Repair.
+- To fit it, page 1's unit grid shifts down 24px (cards start y=136) and
+  the two header lines move up slightly (head y=50, head2 y=76). Pages 2+
+  render with the original geometry, byte for byte.
+- Locked tiers show "🔒 Name cost" on a disabled button (the unit cards'
+  separate "🔒 Needs …" side-label had no room in a one-row strip); owned
+  upgrades render as green "Name ✓" text, the same convention as units.
+
+### The track (constants in js/main.js: CAMP_UPGRADES / CAMP_REPAIR / CAMP_FIRE)
+- **Fortify I** — 200: camp max +150, and the camp heals by the same +150.
+- **Fortify II** — 320 (requires I): max +200, heal +200.
+- **Fortify III** — 450 (requires II): max +250, heal +250.
+  A full chain takes the camp from 500 to 1100 HP.
+- **Swift Return** — 300: hero respawn 8s -> 4s. hurtHero() now waits
+  `this.respawnTime`, and its "Returns in Ns" toast reads the same value.
+- **Watch Fire** — 500: the camp fights. Every 1.2s (campFireTick, called
+  from update) it shoots the nearest enemy within 240px for 10 fire damage
+  via the existing shoot() path ('ember'), with a gold spark at the camp
+  as the visible source. No target in range -> it re-checks in 0.25s
+  instead of holding a stale cooldown; it never fires between waves.
+- **Repair** — 90 per use, repeatable: +100 camp HP, never above max;
+  the button disables at full HP or under 90 Manna. Present in the first
+  shop too (camp starts full, so it simply shows disabled there).
+
+### campMax — one source for the current maximum
+- Upgrade 3 read the constant CAMP_MAX (500) wherever "current max" was
+  meant. Upgrade 4 adds `this.campMax` (starts at CAMP_MAX, grows with
+  Fortify) and points every such read at it: the HUD "Camp x/y" readout,
+  drawCampBar's fraction, the Ark skill's heal cap, the strip label, and
+  the victory/end-screen star + score fractions. Stars and score were
+  already fraction-based, so they scale with the bigger camp unchanged —
+  85% of an 1100-HP camp earns the same 3 stars as 85% of 500.
+
+### Design decisions kennin did not specify (made plainly, all reversible)
+1. The strip sits on page 1 only (his "pinned as the first card of page 1"
+   idea, as a strip). A player shopping page 2/3 pages back to repair —
+   accepted trade for zero changes to the other pages' layout.
+2. Fortify's heal is exactly its hpAdd (per his wording), not a full mend —
+   a camp at 300 buying Fortify I goes to 450/650, not 650/650.
+3. Watch Fire uses the 'ember' projectile and fire damage type, matching
+   the altar-flame visual language already in the game; no new art.
+4. Swift Return changes only the wait, not the respawn spot or the
+   camp-must-stand rule from Upgrade 3.
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all JS files; all 5 data JSONs parse (no data
+  files were changed — Upgrade 4 is code-only in js/main.js).
+- tools/verify_upgrade4.js (stubbed Phaser, real main.js): **32/32 checks
+  pass** — static wiring (track constants, strip page-1-only, campFireTick
+  in update, no stale CAMP_MAX reads), Fortify I max 500->650 with +150
+  heal from full and from damaged, one-time enforcement, II/III req
+  gating, full chain to 1100, insufficient-Manna refusal, Repair cap at
+  max / 90-per-use / repeatable / refused at full HP and when broke,
+  Swift Return halving the actual hurtHero() down-timer (8s -> 4s) with
+  respawn after the short wait, Watch Fire firing on its 1.2s interval at
+  an in-range enemy, silent out of range and between waves.
+- tools/verify_upgrade3.js still passes 47/47 — no regressions.
+- Local server: 200 for /, index.html, js/main.js, both data JSONs,
+  battle.mp3, and a unit PNG.
+- NOT verified (no live browser in this environment — needs kennin's or a
+  playtest's hands): the camp strip's on-screen layout — button label fit
+  at 142px wide for "Fortify III 450", the 24px grid shift's look on
+  page 1, and the tight first-shop explainer line between the unit cards
+  and the bottom buttons; Watch Fire's feel (is 10 dmg / 1.2s worth 500?);
+  and overall camp-economy balance (Fortify chain + Repair income vs wave
+  rewards is a first pass, expect to tune).
