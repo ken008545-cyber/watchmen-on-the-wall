@@ -13,6 +13,20 @@ const CAMP_UPGRADES=[
 ];
 const CAMP_REPAIR={cost:90, heal:100};
 const CAMP_FIRE={range:240, dmg:10, rate:1.2};
+// Upgrade 5: Grokonian orbs — kennin's wall-buys, modelled on the wall guns
+// of Black Ops Zombies. Five glowing stations stand fixed in the world; walk
+// the hero up, tap the orb, and spend Grokonians MID-WAVE for its power.
+// Timed buffs refresh their duration when re-bought — magnitude never stacks.
+// 'dur' is seconds (0 = instant effect). Costs are Grokonians (Tokens.spend).
+const ORBS=[
+  {id:'strength', name:'Orb of Strength', short:'Strength', color:0xd83a2a, css:'#ff9a86', cost:15, dur:60},
+  {id:'swiftness', name:'Orb of Swiftness', short:'Swiftness', color:0x3ac8d8, css:'#9ae8f2', cost:12, dur:60},
+  {id:'mending', name:'Orb of Mending', short:'Mending', color:0x63c74d, css:'#a8e89a', cost:20, dur:0},
+  {id:'iron', name:'Orb of Iron', short:'Iron', color:0xc8ccd4, css:'#e8ecf2', cost:18, dur:30},
+  {id:'thunder', name:'Orb of Thunder', short:'Thunder', color:0xf2c14e, css:'#ffe08a', cost:25, dur:0},
+];
+const ORB_CD=15; // seconds an orb sleeps after a purchase
+const ORB_RANGE=90; // the hero must stand this close to touch an orb
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -47,7 +61,8 @@ const LOAD_TIPS=[
   'Tip: Your hero returns only while the camp stands. Guard the tent.',
   'Tip: Coins on the field are worth the walk — every sixth coin is a Grokonian.',
   'Tip: Night waves: enemies march faster; your ranged squads shoot farther.',
-  'Tip: Enemies march on the camp. A defender close by can block their road.'
+  'Tip: Enemies march on the camp. A defender close by can block their road.',
+  'Tip: Glowing orbs in the field sell powers for Grokonians — walk your hero up and tap one, even mid-wave.'
 ];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
   preload(){ this.load.image('logo','assets/logo.png'); }
@@ -176,6 +191,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // (CAMP_MAX is only the un-upgraded base). campUp holds this run's bought
     // camp upgrades; respawnTime is what hurtHero() actually waits.
     this.campMax=CAMP_MAX; this.campUp={}; this.respawnTime=8; this.campFireCd=0;
+    // Upgrade 5: orb stations (built in create) and the timed buff timers
+    // they feed. buffIronT is the HUD-facing mirror of the Iron purchase;
+    // the invulnerability itself rides the existing shieldT (see applyOrb).
+    this.orbs=[]; this.buffStrT=0; this.buffSpdT=0; this.buffIronT=0;
     this.wave=0; this.wavesCleared=0; this.endless=false; this.cleared=false; this.over=false;
     this.coins=[]; this.coinT=3; this.coinSeq=0; this.coinCount=0;
     this.order='follow'; this.volleyMode=false; this.volleyCd=0; }
@@ -196,7 +215,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.manna=ERAS.startManna; this.speed=1; this.time.timeScale=1;
     this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.victoryOpen=false; this.shopT=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
     this.fx=this.add.graphics().setDepth(20);
-    this.buildHero(); this.buildHUD();
+    this.buildHero(); this.buildOrbs(); this.buildHUD();
     this.cameras.main.setBounds(0,0,this.worldW,this.worldH);
     this.cameras.main.startFollow(this.hero.spr,true,0.08,0.08);
     this.fixUI();
@@ -210,6 +229,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // --- HUD: stats, command bar, hero skills ---
   buildHUD(){ const bar=this.add.graphics().setDepth(30); bar.fillStyle(0x1a110a,0.94); bar.fillRect(0,HUD_Y,W,H-HUD_Y); bar.lineStyle(3,0xd9a441); bar.lineBetween(0,HUD_Y,W,HUD_Y);
     this.stat=txt(this,12,8,'',20,PARCH).setDepth(31);
+    // Upgrade 5: live orb buff timers ride a second, smaller line under the stats.
+    this.buffTxt=txt(this,12,36,'',15,'#f2c14e').setDepth(31);
     this.orderTxt=txt(this,12,HUD_Y+8,'',16,GOLD).setDepth(31);
     const cmds=[['charge','Charge'],['hold','Hold'],['follow','Follow Me'],['flank','Flank'],['fallback','Fall Back'],['shieldwall','Shield Wall']];
     this.cmdBtns={};
@@ -224,6 +245,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
     this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
     this.orderTxt.setText('Order: '+({charge:'Charge',hold:'Hold',follow:'Follow Me',flank:'Flank',fallback:'Fall Back',shieldwall:'Shield Wall'})[this.order]+(this.volleyMode?'   •   VOLLEY: tap a spot':''));
+    if(this.buffTxt){ const bp=[]; if(this.buffStrT>0) bp.push('STR '+Math.ceil(this.buffStrT)+'s'); if(this.buffSpdT>0) bp.push('SPD '+Math.ceil(this.buffSpdT)+'s'); if(this.buffIronT>0) bp.push('IRON '+Math.ceil(this.buffIronT)+'s'); this.buffTxt.setText(bp.join('    ·    ')); }
     if(this._lastOrder!==this.order){ this._lastOrder=this.order; Object.entries(this.cmdBtns).forEach(([id,b])=>{ if(b.redraw) b.redraw(id===this.order); }); }
     Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; }); }
   toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40).setScrollFactor(0); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
@@ -231,6 +253,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // p.y is a screen coordinate (the HUD check); the tap itself lands in the world.
     const wx=(p.worldX!==undefined?p.worldX:p.x), wy=(p.worldY!==undefined?p.worldY:p.y);
     if(this.volleyMode){ this.doVolley(wx,wy); return; }
+    // Upgrade 5: a tap on an orb is a purchase attempt, not a move order.
+    const orb=(this.orbs||[]).find(o=>Math.hypot(wx-o.x,wy-o.y)<=42);
+    if(orb){ this.tryBuyOrb(orb); return; }
     this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); }
   doVolley(x,y){ this.volleyMode=false; this.volleyCd=12; let n=0;
     this.squads.filter(s=>s.def.role==='ranged'&&!s.dead).forEach((s,i)=>{ n++; this.time.delayedCall(i*90,()=>{ this.shoot(s.x,s.y-20,{x,y,dead:false},'stone',{dmg:s.dmg*3,type:'physical',splash:90,splashAt:{x,y}},800); }); });
@@ -291,6 +316,58 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(c.grok){ this.earn('coin',1); this.floatText(c.x,c.y-14,'+1 Grokonian','#fff3c0'); }
       else { this.manna+=8; this.floatText(c.x,c.y-14,'+8 Manna',GOLD); }
       SFX.coinPickup(c.grok); this.refreshHUD(); return false; }); }
+  // --- Grokonian orbs (Upgrade 5): wall-buys for the conquest field ---
+  // Stations stand at fixed fractions of the world, so every era inherits the
+  // same five posts: Strength north-mid, Swiftness south-mid, Mending just
+  // east of the camp, Iron centre-field, Thunder deep toward the enemy edge.
+  // In the Bible world (1920x1200) those fractions land at (620,300),
+  // (620,900), (360,600), (1050,600) and (1500,600).
+  buildOrbs(){ const spots=[[0.323,0.25],[0.323,0.75],[0.1875,0.5],[0.547,0.5],[0.781,0.5]];
+    ORBS.forEach((def,i)=>{ const x=Math.round(spots[i][0]*this.worldW), y=Math.round(spots[i][1]*this.worldH);
+      const glow=this.add.circle(x,y-8,34,def.color,0.16).setDepth(4);
+      const img=this.add.image(x,y,'orb_'+def.id).setDepth(5);
+      const label=txt(this,x,y-58,def.short+' · '+def.cost+' G',14,def.css).setOrigin(0.5).setDepth(6);
+      this.tweens.add({targets:img,scale:1.07,duration:1100,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+      this.tweens.add({targets:glow,alpha:0.07,duration:1100,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+      this.orbs.push({def,x,y,img,glow,label,cd:0,hinted:false}); }); }
+  // The two timed multipliers, consulted exactly where damage and speed are
+  // computed (hero attack + movement, squad movement) — no parallel systems.
+  orbDmgMul(){ return this.buffStrT>0?1.5:1; }
+  orbSpdMul(){ return this.buffSpdT>0?1.3:1; }
+  tryBuyOrb(o){ const h=this.hero; if(!h) return 'none';
+    if(o.cd>0){ this.toast(o.def.name+' is recharging — '+Math.ceil(o.cd)+'s'); return 'cooldown'; }
+    if(h.down>0){ this.toast(h.def.name+' is down — no one stands to touch the orb'); return 'down'; }
+    if(Math.hypot(h.x-o.x,h.y-o.y)>ORB_RANGE){ this.toast('Move closer to the orb');
+      // walk the hero to a spot beside the orb; the next tap buys
+      h.tx=Math.max(20,Math.min(this.worldW-20,o.x-58)); h.ty=Math.max(40,Math.min(this.worldH-20,o.y));
+      return 'far'; }
+    if(!Tokens.spend('orb:'+o.def.id,o.def.cost)){ this.toast('Not enough Grokonians (have '+Tokens.balance()+')'); return 'funds'; }
+    o.cd=ORB_CD; o._cdShown=null;
+    this.applyOrb(o); SFX.orbBuy(); this.spark(o.x,o.y-8,o.def.color,10); this.refreshHUD();
+    return 'bought'; }
+  applyOrb(o){ const d=o.def, h=this.hero;
+    if(d.id==='strength'){ this.buffStrT=d.dur; this.toast('Orb of Strength — hero damage +50% for 60s'); }
+    else if(d.id==='swiftness'){ this.buffSpdT=d.dur; this.toast('Orb of Swiftness — hero and squads move +30% faster for 60s'); }
+    else if(d.id==='mending'){ h.hp=h.def.hp;
+      this.squads.forEach(s=>{ if(!s.dead) s.hp=Math.min(s.max,s.hp+s.max*0.5); });
+      this.campHp=Math.min(this.campMax,this.campHp+75);
+      this.floatText(h.x,h.y-56,'Mended!','#a8e89a'); this.spark(this.campPos.x,this.campPos.y-30,0x63c74d,6);
+      this.toast('Orb of Mending — hero restored, squads +50%, camp +75'); }
+    else if(d.id==='iron'){ // reuses the Union Shield mechanic: hitCamp already turns blows aside while shieldT runs
+      this.shieldT=Math.max(this.shieldT,d.dur); this.buffIronT=d.dur;
+      this.toast('Orb of Iron — the camp cannot be harmed for 30s'); }
+    else if(d.id==='thunder'){ this.enemies.slice().forEach(e=>{ if(!e.dead) this.damage(e,e.boss?75:150,'holy'); });
+      this.cameras.main.flash(180,255,240,180); SFX.stomp();
+      this.toast('Orb of Thunder — the storm falls on the whole enemy host'); } }
+  orbTick(dt){ if(this.buffStrT>0) this.buffStrT=Math.max(0,this.buffStrT-dt);
+    if(this.buffSpdT>0) this.buffSpdT=Math.max(0,this.buffSpdT-dt);
+    if(this.buffIronT>0) this.buffIronT=Math.max(0,this.buffIronT-dt);
+    for(const o of this.orbs){ if(o.cd>0) o.cd=Math.max(0,o.cd-dt);
+      const c=Math.ceil(o.cd);
+      if(o._cdShown!==c){ o._cdShown=c;
+        if(c>0){ o.label.setText(o.def.short+' · '+c+'s'); o.img.setAlpha(0.45); o.glow.setVisible(false); }
+        else { o.label.setText(o.def.short+' · '+o.def.cost+' G'); o.img.setAlpha(1); o.glow.setVisible(true); } }
+      if(!o.hinted&&this.hero&&this.hero.down<=0&&Math.hypot(this.hero.x-o.x,this.hero.y-o.y)<140){ o.hinted=true; this.toast(o.def.name+' — '+o.def.cost+' Grokonians. Tap the orb to buy its power.',2400); } } }
   // --- squads ---
   addSquad(def,x,y){ const s={def,x:x||(this.campPos?this.campPos.x+60:170),y:y||(this.campPos?this.campPos.y:360),hp:def.hp,max:def.hp,dmg:def.dmg,range:def.range,rate:def.rate,speed:def.speed,
       armor:def.role==='shield'?0.2:0,cd:0,buffRateT:0,buffDmgT:0,dead:false,upgrades:{}};
@@ -508,6 +585,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.victoryOpen) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
     if(this.volleyCd>0){ this.volleyCd-=dt; if(this.volleyCd<=0) this.refreshHUD(); }
+    this.orbTick(dt);
     // spawns
     if(this.waveActive){ this.waveClock+=dt; while(this.spawnQ.length&&this.spawnQ[0].at<=this.waveClock) this.spawn(this.spawnQ.shift()); }
     // field coins (Upgrade 3): one every ~6s of an active wave, max 8 out
@@ -518,11 +596,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const h=this.hero, hd=h.def;
     if(h.down>0){ this.tickHeroDown(dt); }
     else { const dx=h.tx-h.x, dy=h.ty-h.y, dl=Math.hypot(dx,dy);
-      if(dl>3){ const st=Math.min(dl,hd.speed*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0); }
+      if(dl>3){ const st=Math.min(dl,hd.speed*this.orbSpdMul()*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0); }
       h.hp=Math.min(hd.hp,h.hp+hd.hp*0.01*dt);
       h.cd-=dt; if(h.cd<=0){ const t=this.nearestEnemy(h.x,h.y,hd.range); if(t){ h.cd=hd.rate;
-        if(hd.range<80){ this.damage(t,hd.dmg,hd.dmgType,{crit:0.1}); this.spark(h.x+10,h.y,0xe8e0c8,3); }
-        else this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg,type:hd.dmgType,crit:0.1},600); } } }
+        if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(h.x+10,h.y,0xe8e0c8,3); }
+        else this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},600); } } }
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
     this.drawCampBar();
@@ -537,7 +615,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       else if(this.order==='hold'){ tx=s.x; ty=s.y; }
       else if(this.order==='fallback'){ tx=this.campPos.x+70+Math.floor(idx/3)*30; ty=this.campPos.y+(idx%3-1)*40; }
       else { const o=this.formationOffset(idx); tx=h.x+o.dx; ty=h.y+o.dy; }
-      const dx=tx-s.x, dy=ty-s.y, dl=Math.hypot(dx,dy), spd=s.speed*(this.order==='shieldwall'?0.6:1);
+      const dx=tx-s.x, dy=ty-s.y, dl=Math.hypot(dx,dy), spd=s.speed*(this.order==='shieldwall'?0.6:1)*this.orbSpdMul();
       if(!foe&&dl>8){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; s.spr.setFlipX(dx<0); }
       else if(foe&&dl>range*0.9&&this.order!=='hold'){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; }
       s.spr.setOrigin(0.5,0.9).setPosition(s.x,s.y+16).setDepth(7+s.y/1000);
