@@ -1347,3 +1347,140 @@ neither addition is exercised by the script). `node --check` clean;
 HTTP spot-check served the new main.js and sfx.js byte-identical;
 `js/gxhub.js` and `js/tokens.js` zero diff. Local commit only, NOT
 pushed.
+
+## Upgrade 11 — Tutorial mode: the camp teaches the fight (2026-10-30)
+
+kennin's approval (voice, 2026-10-30): "I like tutorial mode more...
+All right, I approve that. You can work on the tutorial mode." His
+shape: a tutorial that sits by the camp and teaches a new player the
+game's real systems, one step at a time, with no pressure — no wave
+timer, the camp cannot fall, the hero cannot die, practice targets
+instead of real waves. What was built is a GUIDED LAYER over the real
+battle scene and the real controls, not a mock: the same Game scene,
+the same hero, buttons, squads, camp panel and orbs — with
+`tutorial:true` in the scene data switching create() from the opening
+shop to `startTutorial()`. `waveActive` never turns on in here, so no
+wave, no shop, no victory screen and no `end()` can ever fire.
+
+**Entry.** A TUTORIAL button on the main menu (its own row under the
+button grid; the Level/Grokonians/footer lines moved down 585→612,
+630→652, 680→694 to seat it) — always present, locked by nothing,
+replayable any time. It starts `{hero:'david', level:{era:'bible'},
+tutorial:true}`. Also offered ONCE on a fresh profile's first battle
+entry: HeroSelect's Lead button checks `tutPromptNeeded()` (neither
+flag set) and shows a dismissible prompt — "New here?" with Tutorial /
+Start the battle side by side. Either choice is honored at once; the
+offered flag (`gxhub_wotw_tutorial_offered`) is set the moment the
+prompt SHOWS, so it never nags again; later battle entries go straight
+in. The completion flag (`gxhub_wotw_tutorial_done`) is set only at
+FINISH. Both flags exist solely to stop the game SUGGESTING the
+tutorial — they lock nothing, and the menu door stays open forever.
+
+**The seven steps** (each: one plain instruction line in a quiet panel
+across the top centre of the screen, a pulsing gold ring on the exact
+control or ground, advance only on the real action):
+(a) MOVE — tap the ground; detected in update()'s real march.
+(b) AUTO-FIRE — a practice dummy walks in and waits at the edge of the
+hero's circle; the step has two halves in either order: a real
+auto-fire strike (`heroAutoFire`) and a flip of the real AUTO-FIRE
+toggle (`toggleAutoFire`) — flip it off and leave it off counts; the
+line has three faces (waiting / auto-fire-is-off / now-flip-it).
+(c) DODGE, BLOCK, SPRINT — one step; each is credited by its real path
+(a successful `pressDodge`, a guard actually raised in `setBlock`, a
+sprint switched on in `toggleSprint`); the sub-line names what is left
+("Still to try: Block, Sprint"). Real play order applies: the held
+block must be lifted before sprint will engage, exactly as in battle.
+(d) POWER — a sturdier dummy; complete on any real cast, hooked at the
+END of `useSkill` (past every 'No target' return, beside the Held
+tally), so a cast that consumed nothing can never complete the step.
+The line names Psalm and Five Stones and points out the ready whisper.
+(e) COMMAND YOUR ARMY — one Shepherd Militia granted free at step
+entry (run-local `addSquad`, never bought, never saved); tap squad →
+tap ground posts it (the real U9 post, phase one); then RALLY — tap
+RALLY, tap ground, the banner plants through the real `plantRally`
+(phase two).
+(f) THE CAMP — complete when the real camp panel opens
+(`openCampPanel`, by CAMP button or camp tap); the line explains
+Fortify and Repair. Purchases inside use the run's own manna, as in
+any battle — run-local state, gone with the scene.
+(g) ORBS — complete on a successful buy at the nearest orb (the ring
+follows whichever station is nearest the hero). The buy is a GRANT:
+`tryBuyOrb`'s spend line is `if(!this.tutorial&&!Tokens.spend(...))`
+— Tokens is not called at all in here, and the instruction line says
+so: "this first buy is on the house, this once."
+(h) FINISH — a closing panel naming what was learned (march, auto-fire
+as your choice, dodge/block/sprint, Psalm and Five Stones and their
+whisper, post and rally, camp care from CAMP, the orbs), a Finish
+button back to the menu, and the completion flag set — the ONLY
+persistent write in the whole mode.
+
+**Freedom inside it.** SKIP STEP and EXIT TUTORIAL stand on the panel
+the whole time. Movement and every button stay live between steps.
+Exiting mid-way keeps no penalties and no partial rewards: nothing
+persists but the flags above. Detection is credit-based: `tutCred`
+records real actions WHENEVER they happen (a toggle flipped during
+step (a), Psalm cast four steps early), and `tutStepDone` is checked
+again on every step entry — an action done early is honored when its
+step arrives, never made to repeat (proven in the harness). The
+two-phase steps (auto-fire, army) turn on their own internal events
+the same way.
+
+**Safety, by construction.** The camp cannot fall: `hitCamp` returns
+at once in the tutorial. The hero cannot die: hurtHero's death branch
+leaves him standing at 1 HP with a quiet "You cannot fall here" (in
+practice nothing here deals damage at all — dummies deal 0 — so it is
+a promise kept, not a path taken). There is no timer anywhere.
+
+**Practice dummies.** The Pebble Golem's own figure and data path
+(`pebble_golem`, img `u_pebble_golem`), spawned through the real
+`spawn()` so every real system sees a real enemy — but outside the
+wave system: `spawn()` is called by hand, `spawnQ` is never fed, and
+wave multipliers are pinned to 1. Tutorial numbers (TUT_DUMMY): 120 HP
+for the auto-fire dummy, 320 for the power-step dummy, damage 0, speed
+26. A dedicated branch in the enemy loop walks a dummy to the hero and
+stops it at 110 px — inside David's 140 range so auto-fire can always
+reach it (the golem's own 150 range would have parked it outside) —
+and there it waits: it never strikes and never marches on the camp.
+
+**Economy firewall.** The tutorial cannot move real Manna/Grokonians,
+progression, battle pass, scores, or saved squads. Kills and casts
+fill only the scene's own pend (`tr`/`gx`), and `flush()` is only ever
+called from `end()`/victory — unreachable here; orb buys are grants;
+the granted squad is scene state; camp purchases spend run manna. The
+harness proves it with recording Tokens/Progress stubs across a FULL
+walkthrough plus a deliberate dummy kill: zero spends, zero earns,
+zero tracks, zero XP, `g.earned` unmoved. (A kill's bounty does land
+in run-local manna, exactly as in any battle — scene state that dies
+with the scene.)
+
+**Scope calls, stated plainly.** (1) The tutorial is always David in
+the Bible era: the power step names Psalm and Five Stones by design,
+as the task specified; other heroes' powers are the same buttons in
+the real game. (2) The instruction panel sits at the TOP centre
+(depth 44) — under the camp panel (50/51, whose Close stays clickable
+through the camp step) and under the orb banner (45/46), which keeps
+its one two-second moment over the panel when a buy lands; the panel
+never covers the fight stack, the command row, or the camp. (3) The
+camp step completes on OPEN, not on a purchase — Fortify/Repair are
+explained in the line; buying stays the player's free choice with the
+run's own manna. (4) The orb step rings the NEAREST station rather
+than naming one — shortest walk from wherever the lesson has taken
+the hero. (5) Skip-through still ends at an honest FINISH (the flag
+is set there and only there); EXIT never sets it. (6) A loading tip
+now points new players at the Tutorial. (7) Instruction WORDING is
+kennin's to judge on his own playthrough — the lines are plain and in
+his vocabulary (camp, rally banner, the whisper, Psalm, Five Stones),
+but they have not had his ears yet.
+
+**Verification:** `tools/verify_upgrade11.js` — **81 checks**: statics
+(flags, both entries, prompt behavior hooks, grant branch, guards,
+step hooks, dummy stats); `tutPromptNeeded()` as behavior across flag
+states; a full walkthrough driven through the real controls with the
+instruction line checked at every step; skip/exit batteries; the
+silent-credit battery; camp/hero invulnerability; the firewall at the
+kill itself; and the competent-play sim copied from U10 — champion
+clears in **32.5 s, camp 500/500**, the U10 benchmark exactly, so the
+real game is untouched. All suites green: U3 47, U4 32, U5 40, U6 34,
+U7 44, U8 93, U9 61, U10 77, U11 81 — **509 checks**. `node --check`
+clean. `js/gxhub.js` and `js/tokens.js` zero diff. Local commit only,
+NOT pushed.
