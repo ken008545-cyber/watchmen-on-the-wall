@@ -161,3 +161,92 @@ not touched by this upgrade.
 - Still no live-browser playtest from this environment (same Chromium
   policy limit as the original build); the served playtest address
   shows this build for a human pass.
+
+## Upgrade 2 — balance & clarity pass from the first conquest playtest (2026-10-30)
+Local commit on `muse/test` only; nothing pushed. Driven by a real
+playtest: 5 runs as David, all defeats at wave 5 ("The Camp has
+Fallen"), waves 3-4 draining lives ~17 -> 3-6 with squads dying
+permanently and no explanation. js/gxhub.js / js/tokens.js untouched
+(0-line diff). Enemy-side changes only — no squad stat buffs; the
+flattened scaling law and goal wave 10 are unchanged.
+
+### 1. Wave 3-5 softened (js/main.js waveComp, Bible)
+The wall was swarm volume plus Baal Priests (who heal the whole pack,
+Upgrade 1) arriving at wave 4. Changes: locusts min(3+w,10) ->
+min(2+w,9); frogs max(0,w-1) -> max(0,w-2); priests w>=4 min(w-2,5)
+-> w>=5 min(w-3,5). Spearmen, golems, idols and the HP/damage curves
+untouched. Harness-measured compositions (game's own waveComp):
+- Wave 3: 12 -> 10  (locust 6->5, frog 2->1, spearman 4)
+- Wave 4: 17 -> 13  (locust 7->6, frog 3->2, spearman 5, priest 2->0)
+- Wave 5: 23 -> 20  (locust 8->7, frog 4->3, spearman 6, priest 3->2,
+  pebble golem 2)
+- Wave 10: 45 -> 42 (formula totals incl. the goal-wave champion) —
+  the late game stays hard; only the early wall moved.
+Spawn staggering: locusts/frogs now carry a data "spawnGap"
+(1.05s / 1.0s vs the 0.75s melee default; startWave honours
+def.spawnGap), so the wave-5 swarm front is less dense (7 locusts
+spread over ~7.4s instead of 8 over 6.0s).
+
+### 2. Squad cap display — investigated, single-sourced
+The playtest reported shop "Squads 0/8" vs header "Squads 0/9". In
+this code both displays (refreshHUD stat line, updateShopHead) — and
+the buy gate — already read the one constant ERAS.squadCap = 8
+(data/eras.json); no second cap value exists anywhere in the tree
+(audit: zero numeric squadCap assignments in main.js, 7 references to
+this.squadCap). The "/9" could not be reproduced from the code as it
+stands. The one hardcoded label, "Squad full (8)", now renders
+'Squad full ('+this.squadCap+')', so every cap display in the game
+derives from the single constant and the mismatch is structurally
+impossible. Harness prints both live strings: HUD "Squads 0/8" and
+shop "Squads 0/8".
+
+### 3. Losses explained
+- Squad death toast now reads: "<name> has fallen. Squad lost — the
+  fallen do not return this run".
+- The first time an enemy actually costs the camp a life in a run, a
+  toast explains it: "The camp lost a life — hold the line at the
+  tent" (once per run, only when a life is really lost — not when
+  Union Shield blocks it).
+- The first shop of a run carries the line "Fallen squads are gone
+  for the run." under the header.
+
+### 4. First shop has no auto-start
+openShop tracks shopFirst. While the first shop of a run is open,
+update() does not run the countdown and the timer label reads
+"Auto-start off — take your time"; the wave starts only from the
+Next Wave button. From the second shop on, the 20s auto-start works
+exactly as before. Verified by driving the real update() shop branch
+with simulated time: first shop survives 30s unclosed with shopT
+untouched; a later shop shows "Auto-start in 1s" at 19s and
+auto-closes crossing 20s.
+
+### 5. Skill cast feedback
+Cooldown display already existed (skill buttons dim and count down
+in update()). What was missing was a cast confirmation: useSkill now
+floats the skill's name above the hero ("Psalm!", "Five Stones!")
+ on every successful cast — 'No target' casts still only toast and
+consume nothing. Psalm keeps its gold ring + squad haste buff and
+Five Stones its stones + camera flash; the name float makes the cast
+unmissable for both.
+
+### 6. Shop no longer clips the header
+The shop panel background moved from y=24 (height H-48) to y=38
+(height H-62), so it starts below the HUD stat line instead of
+covering its lower half.
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all 7 JS files; all 5 data JSONs parse.
+- Node harness (stubbed Phaser, game's own main.js):
+  - waveComp + startWave spawn queues for waves 3/4/5/10 — counts
+    above; goal wave still composes 42 spawns incl. champion.
+  - refreshHUD and updateShopHead strings printed from live code:
+    "Squads 0/8" in both, "Wave 0/10", "Goal: wave 10".
+  - Shop-timer harness (real update() branch): first shop never
+    auto-closes; later shops count down and close at 20s.
+- Served with python http.server (port 8903): HTTP 200 for /,
+  index.html, js/main.js, js/gxhub.js, js/tokens.js, data/eras.json,
+  data/units.json, data/game.json.
+- No live-browser playtest from this environment (same Chromium
+  policy limit as before) — the balance change is harness-verified,
+  not yet human-played; whether wave 5 now falls to a first-time
+  player needs a real run at the playtest address.

@@ -122,7 +122,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.roster=UNITS[this.eraId]||UNITS.bible;
     this.goalWave=ERAS.goalWave; this.squadCap=ERAS.squadCap;
     this.runXp=0; this.kills=0; this.pend={}; this.pendXp=0; this.shieldT=0; this.banquet=false; this.earned=0;
-    this.wave=0; this.wavesCleared=0; this.leakedTotal=0; this.endless=false; this.cleared=false; this.over=false;
+    this.wave=0; this.wavesCleared=0; this.leakedTotal=0; this._campLossToast=false; this.endless=false; this.cleared=false; this.over=false;
     this.order='follow'; this.volleyMode=false; this.volleyCd=0; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
@@ -180,7 +180,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     s.bar=this.add.graphics().setDepth(12); this.squads.push(s); return s; }
   hurtSquad(s,amt){ if(s.dead) return; let m=1-(s.armor||0); if(this.order==='shieldwall') m*=0.55; s.hp-=amt*m;
     s.spr.setTint(0xff6a5a); this.time.delayedCall(60,()=>{ if(!s.dead&&s.spr.active){ s.spr.clearTint(); applyTint(s.spr,s.def); } });
-    if(s.hp<=0){ s.dead=true; s.spr.destroy(); s.bar.destroy(); this.toast(s.def.name+' has fallen'); } }
+    if(s.hp<=0){ s.dead=true; s.spr.destroy(); s.bar.destroy(); this.toast(s.def.name+' has fallen. Squad lost — the fallen do not return this run',2800); } }
   formationOffset(i){ const col=Math.floor(i/3), row=i%3;
     if(this.order==='flank') return {dx:-16-col*30,dy:(row-1)*74};
     if(this.order==='shieldwall') return {dx:(this.squads[i]&&this.squads[i].def.role==='shield'?26:-30-col*30),dy:(row-1)*40};
@@ -189,9 +189,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   waveComp(w){ const E=this.roster.enemy, byId=id=>E.find(e=>e.id===id);
     const comp=[]; const push=(id,n)=>{ if(n>0) comp.push([byId(id),n]); };
     if(this.eraId==='bible'){
-      push('locust_swarm',Math.min(3+w,10)); push('plague_frog',Math.max(0,w-1));
+      // Upgrade 2 tuning: the wave 3-5 wall was swarm volume plus healing
+      // priests arriving a wave too early. Fewer locusts/frogs, priests held
+      // to wave 5; spearmen and the late curve untouched.
+      push('locust_swarm',Math.min(2+w,9)); push('plague_frog',Math.max(0,w-2));
       if(w>=2) push('philistine_spearman',Math.min(1+w,9));
-      if(w>=4) push('baal_priest',Math.min(w-2,5));
+      if(w>=5) push('baal_priest',Math.min(w-3,5));
       if(w>=5) push('pebble_golem',Math.min(w-3,6));
       if(w>=7) push('idol_golem',Math.min(w-5,4));
       if(w===this.goalWave) push('idol_golem',1); // goal-wave champion (boss-scaled at spawn)
@@ -206,7 +209,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const hpM=hpScaleForWave(this.wave), dmM=dmgScaleForWave(this.wave);
     let t=0.6, bossDone=false;
     this.waveComp(this.wave).forEach(([def,n])=>{ for(let i=0;i<n;i++){ const boss=(this.wave===this.goalWave&&def.id==='idol_golem'&&i===n-1&&!this.endless&&!bossDone); if(boss) bossDone=true;
-        this.spawnQ.push({def,at:t,boss}); t+=def.role==='ranged'?1.1:0.75; } t+=1.2; });
+        this.spawnQ.push({def,at:t,boss}); t+=def.spawnGap||(def.role==='ranged'?1.1:0.75); } t+=1.2; });
     this.spawnQ.sort((a,b)=>a.at-b.at); this.waveClock=0; this.waveHpM=hpM; this.waveDmM=dmM;
     SFX.wave(); this.toast('Wave '+this.wave+(night?' — Night':' — Day')+(this.wave===this.goalWave&&!this.endless?' — the goal wave!':'')); this.refreshHUD(); }
   spawn(q){ const d=q.def, hpM=this.waveHpM*(q.boss?5:1), dmM=this.waveDmM*(q.boss?1.6:1);
@@ -283,9 +286,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'pillars': E.forEach(e=>{ this.damage(e,300,'physical'); e.stun=Math.max(e.stun||0,2); }); this.cameras.main.shake(400,0.012); SFX.stomp(); break;
       default: { const t=strongest(1)[0]; if(!t) return this.toast('No target'); this.shoot(h.x,h.y,t,'stone',{dmg:100,type:'physical'},700); break; }
     }
+    this.floatText(h.x,h.y-56,k.name+'!','#f2c14e');
     if(k.id!=='five') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); } b.cd=k.cd; }
   // --- between-wave shop ---
-  openShop(first){ this.shopOpen=true; this.shopT=20; this.shopPage=0;
+  openShop(first){ this.shopOpen=true; this.shopFirst=!!first; this.shopT=20; this.shopPage=0;
     // squads and hero mend between waves
     this.squads.forEach(s=>{ s.hp=s.max; }); this.hero.hp=this.heroDef.hp;
     this.renderShop(first); }
@@ -294,10 +298,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   ownedSquad(defId){ return this.squads.find(s=>s.def.id===defId&&!s.dead); }
   renderShop(first){ this.clearShop();
     const units=this.roster.player, pages=Math.ceil(units.length/6), pageUnits=units.slice(this.shopPage*6,this.shopPage*6+6);
-    const bg=this.add.graphics().setDepth(50); bg.fillStyle(0x140c07,0.92); bg.fillRect(24,24,W-48,H-48); bg.lineStyle(3,0xd9a441); bg.strokeRect(24,24,W-48,H-48); this.shopAdd(bg);
+    // Panel starts at y=38, below the HUD stat line, so the header is never clipped behind the shop.
+    const bg=this.add.graphics().setDepth(50); bg.fillStyle(0x140c07,0.92); bg.fillRect(24,38,W-48,H-62); bg.lineStyle(3,0xd9a441); bg.strokeRect(24,38,W-48,H-62); this.shopAdd(bg);
     const head=first?'Prepare your squads':('Wave '+this.wavesCleared+' survived!  +'+(this.lastBonus||0)+' manna');
     this.shopAdd(txt(this,W/2,52,head,26,GOLD).setOrigin(0.5).setDepth(51));
     this.shopHead2=this.shopAdd(txt(this,W/2,84,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
+    if(this.shopFirst) this.shopAdd(txt(this,W/2,622,'Fallen squads are gone for the run.',14,'#cdbd95').setOrigin(0.5).setDepth(51));
     pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=112+row*252,cx=x+190;
       const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(x,y,380,238,10); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(x,y,380,238,10); this.shopAdd(g);
       const im=uspr(this,x+42,y+44,def,58).setDepth(52); applyTint(im,def); this.shopAdd(im);
@@ -307,7 +313,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       this.shopAdd(txt(this,x+78,y+44,def.role+'  ·  hp '+st.hp+'  ·  dmg '+st.dmg+(owned?'  ·  in squad ✓':''),15,PARCH).setDepth(52));
       if(!owned){ const canBuy=this.manna>=def.cost&&this.squads.length<this.squadCap;
         const b=button(this,x+100,y+118,170,48,'Buy '+def.cost,()=>{ if(this.manna>=def.cost&&this.squads.length<this.squadCap){ this.manna-=def.cost; this.addSquad(def); SFX.build(); this.renderShop(false); this.refreshHUD(); } },{size:17,disabled:!canBuy}); b.setDepth(52); this.shopAdd(b);
-        if(this.squads.length>=this.squadCap) this.shopAdd(txt(this,x+250,y+118,'Squad full (8)',14,'#a08a6a').setDepth(52));
+        if(this.squads.length>=this.squadCap) this.shopAdd(txt(this,x+250,y+118,'Squad full ('+this.squadCap+')',14,'#a08a6a').setDepth(52));
       } else {
         (def.upgrades||[]).forEach((u,ui)=>{ const ux=x+16+ui*0, uy=y+96;
           if(u.id==='maxtier'){ this.shopAdd(txt(this,x+20,uy+18,'Max tier',16,'#8fd06a').setDepth(52)); return; }
@@ -324,10 +330,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       this.shopAdd(txt(this,490,668,(this.shopPage+1)+'/'+pages,18,PARCH).setOrigin(0.5).setDepth(52));
       const nx=button(this,560,668,60,48,'▶',()=>{ this.shopPage=(this.shopPage+1)%pages; this.renderShop(false); },{size:18}); nx.setDepth(52); this.shopAdd(nx); }
     const go=button(this,820,668,300,54,'Next wave ▶',()=>this.closeShop(),{size:22}); go.setDepth(52); this.shopAdd(go);
-    this.shopTimerTxt=this.shopAdd(txt(this,1090,668,'Auto-start in 20s',16,'#cdbd95').setOrigin(0.5).setDepth(52));
+    this.shopTimerTxt=this.shopAdd(txt(this,1090,668,this.shopFirst?'Auto-start off — take your time':'Auto-start in 20s',16,'#cdbd95').setOrigin(0.5).setDepth(52));
   }
   updateShopHead(){ if(this.shopHead2) this.shopHead2.setText('Manna '+Math.floor(this.manna)+'  •  Squads '+this.squads.length+'/'+this.squadCap+'  •  Next: wave '+(this.wave+1)+' ('+((this.wave+1)%2===0?'night':'day')+')  •  Goal: wave '+this.goalWave+(this.endless?' (cleared — Endless)':'')); }
-  closeShop(){ this.shopOpen=false; this.clearShop(); this.startWave(); }
+  closeShop(){ this.shopOpen=false; this.shopFirst=false; this.clearShop(); this.startWave(); }
   waveClear(){ this.waveActive=false; this.wavesCleared=this.wave;
     let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*1.5); this.banquet=false; }
     const perfect=this.leakedThisWave===0; this.manna+=bonus; this.lastBonus=bonus;
@@ -347,8 +353,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const f=button(this,W/2+160,440,290,56,'Finish run',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.end(true); },{size:19}); f.setDepth(56); s.push(f); }
   // --- main loop ---
   update(time,delta){ if(this.over) return;
-    if(this.shopOpen){ this.shopT-=delta/1000; if(this.shopTimerTxt) this.shopTimerTxt.setText('Auto-start in '+Math.max(0,Math.ceil(this.shopT))+'s');
-      if(this.shopT<=0) this.closeShop(); return; }
+    if(this.shopOpen){ if(this.shopFirst){ if(this.shopTimerTxt) this.shopTimerTxt.setText('Auto-start off — take your time'); }
+      else { this.shopT-=delta/1000; if(this.shopTimerTxt) this.shopTimerTxt.setText('Auto-start in '+Math.max(0,Math.ceil(this.shopT))+'s');
+        if(this.shopT<=0) this.closeShop(); } return; }
     if(this.victoryOpen) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
     if(this.volleyCd>0){ this.volleyCd-=dt; if(this.volleyCd<=0) this.refreshHUD(); }
@@ -406,6 +413,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
           this.spark(tgt.x,tgt.y,0xc0392b,2); } }
         if(e.x<=this.campPos.x+16&&Math.abs(e.y-this.campPos.y)<70){ e.dead=true; e.spr.destroy(); e.bar.destroy(); if(e.boss) this.clearBoss();
           const loss=this.shieldT>0?0:(e.boss?5:1); this.lives-=loss; this.leakedThisWave+=loss; this.leakedTotal+=loss; SFX.leak(); this.cameras.main.shake(120,0.005); this.refreshHUD();
+          if(loss>0&&!this._campLossToast){ this._campLossToast=true; this.toast('The camp lost a life — hold the line at the tent',2800); }
           if(this.lives<=0) return this.end(false); continue; } }
       const p={x:e.x,y:e.y}; e.spr.setOrigin(0.5,0.9).setPosition(p.x,p.y+(e.def.size||18)).setDepth((e.boss?9:7)+p.y/1000);
       e.bar.clear(); if(e.hp<e.max){ e.bar.fillStyle(0x000000,0.7); e.bar.fillRect(e.x-16,e.y-36,32,4); e.bar.fillStyle(0xa33b20,1); e.bar.fillRect(e.x-16,e.y-36,32*Math.max(0,e.hp)/e.max,4); }

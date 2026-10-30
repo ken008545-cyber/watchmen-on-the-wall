@@ -332,6 +332,7 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 3,
+    "spawnGap": 1.05,
     "sprite": "locust"
    },
    {
@@ -344,6 +345,7 @@
     "rate": 0.9,
     "speed": 95,
     "bounty": 4,
+    "spawnGap": 1.0,
     "sprite": "frog"
    }
   ]
