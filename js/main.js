@@ -54,6 +54,57 @@ const BOSS={ p2At:2/3, p3At:1/3,
   heavyEvery:6, heavyWindup:1.1, heavyMul:3, heavyRangePad:26,
   slamEvery:7, slamDelay:1.2, slamRadius:110, slamMul:2, escortCount:4,
   enrageSpeedMul:1.35, enrageRateMul:0.7, enrageHeavyEvery:4.5, enrageHeavyMul:4 };
+// Upgrade 8: HELD-POWER MASTERY — "patience is power", kennin's own mechanic
+// grown from his own play (2026-10-30): cornered by five hard trolls, he held
+// his power moves until the moment was forced, spent them, and lived. Every
+// hero power move, while OFF cooldown and unspent, accrues charge in battle
+// (never in the shop — patience is earned in the fight): Ready at once,
+// Tempered after temperAt seconds held, Perfect after perfectAt. Spending
+// multiplies the MOVE's effect by mul[tier] — damage, control durations,
+// buff durations, yields — and a Perfect spend adds a perfectStun-second
+// stun rider to every enemy the move touches. The multipliers touch the
+// move only: enemy stats and the wave curve are never read from here, and a
+// player who spends everything at Ready (mul 1) plays exactly the pre-U8
+// game. The tension: a heavy hit (the champion's heavy strike / ground
+// slam class — hurtHero's heavy flag) knocks a Perfect charge out of the
+// hero's hands, down to Tempered; ordinary chip damage never does.
+// INPUT_BUFFER is the press forgiveness: a skill pressed within this many
+// seconds of its cooldown ending still fires the moment it is ready.
+const HELD={ temperAt:20, perfectAt:45, mul:[1,1.5,2.25], names:['Ready','Tempered','Perfect'], perfectStun:0.6 };
+const INPUT_BUFFER=0.15;
+// Upgrade 8, second half — kennin's combat-controls design (voice,
+// 2026-10-30, minutes after the Held-Power brief): TWO HANDS — ONE MARCHES,
+// ONE FIGHTS. One hand taps the map to move (tap-to-move, unchanged); the
+// other works an on-screen FIGHT CLUSTER on the right side of the screen,
+// laid out where thumbs expect it (his references: Minecraft, Brawlhalla).
+// The hero is the fighting-game character now: he does NOT auto-fire —
+// the range circle is a warning/range indicator only, and the PLAYER
+// presses to strike. Squads keep their existing behavior; only the hero
+// went manual. The kit:
+//  LIGHT — quick strike: lightDmg x the hero's basic damage, ready again
+//    after lightCd x his basic rate. The old auto-attack's numbers live
+//    here now, split into a fast hand and a heavy hand.
+//  HEAVY — the committed strike: heavyDmg x damage after a heavyWindup
+//    wind-up the enemy can make whiff by killing the moment; ready again
+//    after heavyCd x rate. Melee heavies cleave (nearby enemies take
+//    half); ranged heavies splash.
+//  DODGE — a dodgeDist dash in the facing / last-move direction with
+//    dodgeIframes of true invulnerability: the skilled answer to the
+//    champion's telegraphed heavies, beside repositioning (U7's intent).
+//  BLOCK — hold to mitigate: blockMit off ordinary blows, blockHeavyMit
+//    off heavy-class blows (reduced, NEVER erased — a boss heavy still
+//    lands through a guard). Guarding drains stamina and impacts cost
+//    more; an emptied guard BREAKS for guardBreak seconds.
+//  SPRINT — a toggle: sprintMul movement, draining stamina while moving,
+//    impossible while blocking (and blocking cancels it). Striking out of
+//    a real sprint (openerMinTime of motion) earns the openerMul opener.
+//  Stamina is one pool shared by block and sprint, so the two hands argue
+//  over a single resource — that argument is the fighting game.
+const FIGHT={ lightDmg:0.75, lightCd:0.55, heavyDmg:2.1, heavyCd:1.9, heavyWindup:0.28, heavyCleave:46, heavySplash:38,
+  dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6,
+  blockMit:0.65, blockHeavyMit:0.45, blockDrain:12, blockHitCost:8, blockHeavyCost:18, guardBreak:1.2,
+  sprintMul:1.45, sprintDrain:8, openerMul:1.25, openerMinTime:0.2,
+  stamMax:100, stamRegen:16, stamDelay:0.6 };
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -72,8 +123,12 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   const draw=(hl)=>{g.clear();g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95);g.fillRoundedRect(-w/2,-h/2,w,h,8);g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1);g.strokeRoundedRect(-w/2,-h/2,w,h,8);};
   draw(false); const t=txt(s,0,0,label,opt.size||20,opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
   c.add([g,t]); c.setSize(w,h).setInteractive({useHandCursor:true});
-  c.on('pointerover',()=>draw(true)); c.on('pointerout',()=>draw(false));
-  c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); SFX.unlock(); if(!opt.disabled) cb(); });
+  c.on('pointerover',()=>draw(true)); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
+  // Upgrade 8: button weight — every button in the game presses like it has
+  // mass: it dips and lights the instant a finger lands, and springs back on
+  // release, so a press is felt before the action lands.
+  c.on('pointerdown',()=>{ if(opt.disabled) return; c.setScale(0.93); draw(true); });
+  c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); c.setScale(1); draw(false); SFX.unlock(); if(!opt.disabled) cb(); });
   c.label=t; c.redraw=draw; return c; }
 
 // ---------- Boot: a real loading screen (Upgrade 3) ----------
@@ -90,7 +145,10 @@ const LOAD_TIPS=[
   'Tip: Night waves: enemies march faster; your ranged squads shoot farther.',
   'Tip: Enemies march on the camp. A defender close by can block their road.',
   'Tip: Glowing orbs in the field sell powers for Grokonians — walk your hero up and tap one, even mid-wave.',
-  'Tip: The goal-wave champion telegraphs its heavy blows — when the red ring closes or a circle is marked, MOVE.'
+  'Tip: The goal-wave champion telegraphs its heavy blows — when the red ring closes or a circle is marked, MOVE.',
+  'Tip: Held Power: a power move left ready grows stronger — Tempered, then Perfect. Spend it at the forced moment. But a heavy blow knocks Perfect out of your hands.',
+  'Tip: Two hands: one taps the field to march, the other fights — LIGHT and HEAVY strike only when you press. The circle is your range, not a trigger.',
+  'Tip: DODGE makes you untouchable for a blink; BLOCK softens a blow but a boss heavy still lands through it. Sprint in, strike the opener, get out.'
 ];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
   preload(){ this.load.image('logo','assets/logo.png'); }
@@ -226,6 +284,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // they feed. buffIronT is the HUD-facing mirror of the Iron purchase;
     // the invulnerability itself rides the existing shieldT (see applyOrb).
     this.orbs=[]; this.buffStrT=0; this.buffSpdT=0; this.buffIronT=0;
+    // Upgrade 8: per-run Held Power tally — power moves spent at each tier
+    // ([Ready, Tempered, Perfect]), read by the end-of-run summary and
+    // nowhere else; nothing persists beyond the run.
+    this.heldSpent=[0,0,0];
     this.wave=0; this.wavesCleared=0; this.endless=false; this.cleared=false; this.over=false;
     this.coins=[]; this.coinT=3; this.coinSeq=0; this.coinCount=0;
     this.order='follow'; this.volleyMode=false; this.volleyCd=0; }
@@ -265,12 +327,24 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.orderTxt=txt(this,12,HUD_Y+8,'',16,GOLD).setDepth(31);
     const cmds=[['charge','Charge'],['hold','Hold'],['follow','Follow Me'],['flank','Flank'],['fallback','Fall Back'],['shieldwall','Shield Wall']];
     this.cmdBtns={};
-    cmds.forEach(([id,label],i)=>{ const b=button(this,330+i*118,HUD_Y+26,112,36,label,()=>{ this.order=id; this.volleyMode=false; this.refreshHUD(); this.toast('Order: '+label); },{size:15}); b.setDepth(31); this.cmdBtns[id]=b; });
-    const vb=button(this,330+6*118,HUD_Y+26,112,36,'Volley',()=>{ if(this.volleyCd>0){ this.toast('Volley ready in '+Math.ceil(this.volleyCd)+'s'); return; } this.volleyMode=true; this.toast('Volley: tap a target spot'); },{size:15}); vb.setDepth(31); this.cmdBtns.volley=vb;
+    cmds.forEach(([id,label],i)=>{ const b=button(this,330+i*118,HUD_Y+26,112,36,label,()=>{ this.order=id; this.volleyMode=false; this.refreshHUD(); this.toast('Order: '+label);
+      // Upgrade 8: the order echoes above the hero, in the world — the
+      // player sees the army heard it, not just a HUD line changing.
+      if(this.hero) this.floatText(this.hero.x,this.hero.y-64,label+'!','#f2c14e'); },{size:15}); b.setDepth(31); this.cmdBtns[id]=b; });
+    const vb=button(this,330+6*118,HUD_Y+26,112,36,'Volley',()=>this.pressVolley(),{size:15}); vb.setDepth(31); this.cmdBtns.volley=vb;
+    // Upgrade 8: Volley carries a cooldown sweep like the skill buttons.
+    vb.sx=330+6*118; vb.sy=HUD_Y+26; vb.sw=112; vb.sh=36; vb.sweep=this.add.graphics().setDepth(32);
     const h=this.heroDef; this.skillBtns=[];
-    [...h.skills,h.ult].forEach((k,i)=>{ const b=button(this,110+i*185,HUD_Y+80,175,44,k.name,()=>this.useSkill(i),{size:16}); b.setDepth(31); b.cd=0; b.def=k; this.skillBtns.push(b); });
+    [...h.skills,h.ult].forEach((k,i)=>{ const b=button(this,110+i*185,HUD_Y+80,175,44,k.name,()=>this.pressSkill(i),{size:16}); b.setDepth(31);
+      // Upgrade 8: Held Power state lives on the button itself — cd/cdMax
+      // drive the cooldown sweep, held accrues charge while the move sits
+      // ready, buffered remembers a press that landed a breath too early.
+      b.cd=0; b.cdMax=k.cd; b.def=k; b.held=0; b.buffered=false; b._tierShown=0;
+      b.sx=110+i*185; b.sy=HUD_Y+80; b.sw=175; b.sh=44; b.sweep=this.add.graphics().setDepth(32);
+      this.skillBtns.push(b); });
     this.spdBtn=button(this,1221,HUD_Y+80,110,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:18}).setDepth(31);
     const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:13}); fsb.setDepth(31);
+    this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave%2===0&&this.wave>0?'Night':'Day'; }
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
@@ -281,6 +355,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; }); }
   toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40).setScrollFactor(0); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
   onTap(p){ if(this.over||this.shopOpen||this.victoryOpen||p.y>=HUD_Y) return;
+    // Upgrade 8: a tap on the fight cluster is a fight input, never a
+    // march order — the two hands stay separate.
+    if(this.overFight(p)) return;
     // p.y is a screen coordinate (the HUD check); the tap itself lands in the world.
     const wx=(p.worldX!==undefined?p.worldX:p.x), wy=(p.worldY!==undefined?p.worldY:p.y);
     if(this.volleyMode){ this.doVolley(wx,wy); return; }
@@ -288,16 +365,192 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const orb=(this.orbs||[]).find(o=>Math.hypot(wx-o.x,wy-o.y)<=42);
     if(orb){ this.tryBuyOrb(orb); return; }
     this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); }
-  doVolley(x,y){ this.volleyMode=false; this.volleyCd=12; let n=0;
+  doVolley(x,y){ this.volleyMode=false; this._volleyBuf=false; this.volleyCd=12; let n=0;
     this.squads.filter(s=>s.def.role==='ranged'&&!s.dead).forEach((s,i)=>{ n++; this.time.delayedCall(i*90,()=>{ this.shoot(s.x,s.y-20,{x,y,dead:false},'stone',{dmg:s.dmg*3,type:'physical',splash:90,splashAt:{x,y}},800); }); });
     if(!n){ this.toast('No ranged squads for a volley'); this.volleyCd=0; } else { SFX.sling(); this.toast('Volley away!'); }
     this.refreshHUD(); }
   // --- hero ---
-  buildHero(){ const h=this.heroDef, hx=this.campPos.x+60, hy=this.campPos.y; this.hero={def:h,x:hx,y:hy,tx:hx,ty:hy,cd:0,hp:h.hp,down:0};
+  buildHero(){ const h=this.heroDef, hx=this.campPos.x+60, hy=this.campPos.y;
+    // Upgrade 8: the fight state rides the hero — manual attack recovery
+    // and buffer, the heavy wind-up and its locked target/aim, dodge dash
+    // and i-frames, facing (last-move direction), block/sprint and the
+    // stamina pool they share. The range ring below is now ONLY a
+    // warning/range indicator: entering it starts nothing by itself.
+    this.hero={def:h,x:hx,y:hy,tx:hx,ty:hy,cd:0,hp:h.hp,down:0,
+      atkCd:0,atkBuf:null,heavyWind:0,heavyTarget:null,heavyAim:null,heavyMul:1,
+      dodgeT:0,dodgeCd:0,iframes:0,dodgeDx:1,dodgeDy:0,faceX:1,faceY:0,
+      blocking:false,sprint:false,sprintT:0,stamina:FIGHT.stamMax,stamDelay:0,guardBreakT:0};
     this.hero.spr=spr(this,hx,hy,h.id).setDepth(8); this.hero.hpBar=this.add.graphics().setDepth(12);
+    this.hero.guardFx=this.add.graphics().setDepth(15);
     this.hero.ring=this.add.circle(hx,hy,h.range,0xffffff,0.04).setStrokeStyle(1,0xd9a441,0.4).setDepth(3); }
-  hurtHero(n){ const h=this.hero; if(h.down>0) return; h.hp-=n; h.spr.setTint(0xff6a5a); this.time.delayedCall(80,()=>{ if(h.spr.active) h.spr.clearTint(); });
-    if(h.hp<=0){ h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } }
+  hurtHero(n,heavy){ const h=this.hero; if(h.down>0) return;
+    // Upgrade 8: dodge i-frames are true invulnerability — a blow timed
+    // into a dodge simply is not there, heavy or otherwise, and it cannot
+    // knock a Perfect charge loose either.
+    if(h.iframes>0) return;
+    // Upgrade 8: a held block mitigates — most of an ordinary blow, less
+    // than half of a heavy one (a boss heavy still lands through a guard:
+    // reduced, never erased). The impact itself costs stamina, and an
+    // impact that empties the pool breaks the guard.
+    if(h.blocking){ const mit=heavy?FIGHT.blockHeavyMit:FIGHT.blockMit; n=n*(1-mit);
+      h.stamina=Math.max(0,h.stamina-(heavy?FIGHT.blockHeavyCost:FIGHT.blockHitCost)-n*0.15); h.stamDelay=FIGHT.stamDelay;
+      if(h.stamina<=0){ this.setBlock(false); h.guardBreakT=FIGHT.guardBreak; this.floatText(h.x,h.y-84,'Guard broken!','#ff8a6a'); } }
+    h.hp-=n; h.spr.setTint(0xff6a5a); this.time.delayedCall(80,()=>{ if(h.spr.active) h.spr.clearTint(); });
+    // Upgrade 8: a HEAVY hit (the champion's heavy strike or ground slam —
+    // the boss code passes heavy=true; ordinary enemy blows never do)
+    // knocks a Perfect charge out of the hero's hands, down to Tempered.
+    // Chip damage, however frequent, can never do this.
+    if(heavy&&this.skillBtns){ let lost=false;
+      this.skillBtns.forEach(b=>{ if(b.cd<=0&&this.heldTierOf(b)===2){ b.held=HELD.temperAt; b._tierShown=1; lost=true; } });
+      if(lost) this.floatText(h.x,h.y-84,'Perfect lost!','#ff8a6a'); }
+    if(h.hp<=0){ h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; h.sprintT=0; h.heavyWind=0; h.atkBuf=null; this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } }
+  // --- Upgrade 8: Held Power + button weight ---
+  heldTierOf(b){ const s=b.held||0; return s>=HELD.perfectAt?2:(s>=HELD.temperAt?1:0); }
+  // A press on a skill button: fires at once when ready; a press inside the
+  // input-buffer window before the cooldown ends is remembered and fired
+  // by update() the moment the move is ready — mastery feels responsive,
+  // never sticky. A press earlier than the window is simply a press too soon.
+  pressSkill(i){ const b=this.skillBtns&&this.skillBtns[i]; if(!b||this.over||this.shopOpen) return;
+    if(b.cd>0){ if(b.cd<=INPUT_BUFFER) b.buffered=true; return; }
+    this.useSkill(i); }
+  pressVolley(){ if(this.over||this.shopOpen) return;
+    if(this.volleyCd>0){ if(this.volleyCd<=INPUT_BUFFER) this._volleyBuf=true; else this.toast('Volley ready in '+Math.ceil(this.volleyCd)+'s'); return; }
+    this.volleyMode=true; this.toast('Volley: tap a target spot'); }
+  // The button carries its own state on its face: a dark cooldown sweep
+  // that drains as the move returns, then a charge bar along the bottom
+  // that fills toward the next Held tier — gold at Tempered, bright and
+  // pulsing at Perfect. Drawn from live button state every frame.
+  drawSkillSweep(b){ const g=b.sweep; if(!g) return; g.clear();
+    const x=b.sx-b.sw/2, y=b.sy-b.sh/2;
+    if(b.cd>0){ const f=Math.min(1,b.cd/(b.cdMax||b.def.cd||1)); g.fillStyle(0x000000,0.55); g.fillRect(x,y,b.sw,b.sh*f); return; }
+    const t=this.heldTierOf(b);
+    const f=t===2?1:(t===1?(b.held-HELD.temperAt)/(HELD.perfectAt-HELD.temperAt):(b.held||0)/HELD.temperAt);
+    g.fillStyle(t===2?0xffe98a:(t===1?0xf2c14e:0x8a7a4a),t===2?0.95:0.8); g.fillRect(x,y+b.sh-5,b.sw*Math.max(0,Math.min(1,f)),5);
+    if(t===2){ g.lineStyle(3,0xffe98a,0.6+0.4*Math.sin((this._pulse||0)*6)); g.strokeRect(x,y,b.sw,b.sh); }
+    else if(t===1){ g.lineStyle(2,0xf2c14e,0.8); g.strokeRect(x,y,b.sw,b.sh); } }
+  // --- Upgrade 8: the fight cluster — one hand marches, one hand fights ---
+  // Five buttons on the RIGHT of the screen, clear of the command bar and
+  // the skill row: HEAVY over LIGHT (the two hands of the kit), DODGE and
+  // BLOCK beside them, SPRINT above. They are screen furniture (depth
+  // 31/32, pinned by fixUI), and onTap refuses taps that land on them —
+  // a press here is never also a march order.
+  buildFightControls(){ this.fightBtns={}; this.fightRects=[];
+    const mk=(id,x,y,w,h,label,cb,size)=>{ const b=button(this,x,y,w,h,label,cb,{size:size||15}); b.setDepth(31);
+      b.sx=x; b.sy=y; b.sw=w; b.sh=h; b.sweep=this.add.graphics().setDepth(32);
+      this.fightBtns[id]=b; this.fightRects.push({x,y,w,h}); return b; };
+    mk('heavy',1184,296,92,64,'HEAVY',()=>this.pressAttack('heavy'),16);
+    mk('light',1184,384,92,64,'LIGHT',()=>this.pressAttack('light'),16);
+    mk('dodge',1076,428,92,56,'DODGE',()=>this.pressDodge(),14);
+    const bb=mk('block',1184,472,92,56,'BLOCK',()=>{},14);
+    mk('sprint',1076,340,92,56,'SPRINT',()=>this.toggleSprint(),14);
+    // BLOCK is a HOLD, not a press: down raises the guard, up or out drops
+    // it. (These ride beside the shared helper's own press handlers.)
+    bb.on('pointerdown',()=>this.setBlock(true));
+    bb.on('pointerup',()=>this.setBlock(false));
+    bb.on('pointerout',()=>this.setBlock(false));
+    this.input.on('pointerup',()=>this.setBlock(false)); // a release anywhere ends a hold
+    this.fightBar=this.add.graphics().setDepth(32);
+    this.fightStat=txt(this,1130,238,'',13,'#f2c14e').setOrigin(0.5).setDepth(31); }
+  overFight(p){ if(!this.fightRects) return false;
+    return this.fightRects.some(r=>Math.abs(p.x-r.x)<=r.w/2+6&&Math.abs(p.y-r.y)<=r.h/2+6); }
+  // The strike's target: an enemy standing where the marching hand last
+  // tapped (within a hand's breadth of the tap point) is aimed at first;
+  // otherwise the nearest enemy inside the range circle. Outside the
+  // circle there is no target and the press is free — whiffing on air
+  // costs no recovery.
+  attackTarget(){ const h=this.hero, hd=h.def; if(!h||h.down>0) return null;
+    const inR=this.enemies.filter(e=>!e.dead&&Phaser.Math.Distance.Between(h.x,h.y,e.x,e.y)<=hd.range+(hd.range<80?8:0));
+    if(!inR.length) return null;
+    const aimed=inR.filter(e=>Phaser.Math.Distance.Between(h.tx,h.ty,e.x,e.y)<=85)
+      .sort((a,b)=>Phaser.Math.Distance.Between(h.tx,h.ty,a.x,a.y)-Phaser.Math.Distance.Between(h.tx,h.ty,b.x,b.y))[0];
+    return aimed||this.nearestEnemy(h.x,h.y,hd.range+8); }
+  // One recovery clock for both hands: a press during recovery buffers
+  // (inside the window) or is forgotten — alternating buttons cannot
+  // machine-gun. Attacking drops the guard and spends a sprint opener.
+  pressAttack(kind){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
+    if(h.atkCd>0){ if(h.atkCd<=INPUT_BUFFER) h.atkBuf=kind; return 'buffered'; }
+    const t=this.attackTarget();
+    if(!t){ this.floatText(h.x,h.y-64,'No target in range','#a08a6a'); return 'none'; }
+    if(h.blocking) this.setBlock(false);
+    let mul=1;
+    if(h.sprint&&h.sprintT>=FIGHT.openerMinTime){ mul=FIGHT.openerMul; h.sprintT=0; this.floatText(h.x,h.y-72,'Opener!','#f2c14e'); }
+    const hd=h.def;
+    if(kind==='heavy'){ h.heavyTarget=t; h.heavyAim={x:t.x,y:t.y}; h.heavyMul=mul; h.heavyWind=FIGHT.heavyWindup;
+      h.atkCd=hd.rate*FIGHT.heavyCd; SFX.skill(); }
+    else { h.atkCd=hd.rate*FIGHT.lightCd; this.lightStrike(t,mul); }
+    return 'struck'; }
+  lightStrike(t,mul){ const h=this.hero, hd=h.def, dmg=hd.dmg*FIGHT.lightDmg*mul;
+    if(hd.range<80){ this.damage(t,dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); }
+    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); SFX.sling(); } }
+  // The heavy lands when its wind-up completes, where it was aimed: a
+  // target that died in the wind-up leaves its ground to the cleave /
+  // splash. Melee heavies cleave — enemies near the victim take half.
+  heavyStrike(t,aim,mul){ const h=this.hero, hd=h.def; if(!h||h.down>0) return; const dmg=hd.dmg*FIGHT.heavyDmg*mul;
+    if(hd.range<80){ const cx=t&&!t.dead?t.x:aim.x, cy=t&&!t.dead?t.y:aim.y;
+      this.enemies.slice().forEach(e=>{ if(e.dead) return; const d=Phaser.Math.Distance.Between(cx,cy,e.x,e.y);
+        if(e===t||d<=FIGHT.heavyCleave) this.damage(e,dmg*this.orbDmgMul()*(e===t?1:0.5),hd.dmgType,{crit:0.12}); });
+      this.spark(cx,cy,0xe8e0c8,6); SFX.hit(); }
+    else { const tgt=t&&!t.dead?t:this.nearestEnemy(aim.x,aim.y,60);
+      if(tgt) this.shoot(h.x,h.y,tgt,hd.dmgType==='holy'?'ember':'stone',{dmg:dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.15,splash:FIGHT.heavySplash},720);
+      SFX.sling(); } }
+  pressDodge(){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
+    if(h.dodgeCd>0){ if(h.dodgeCd<=INPUT_BUFFER) h.dodgeBuf=true; return 'buffered'; }
+    // Dash where the hero is heading (his march target), else where he faces.
+    let dx=h.tx-h.x, dy=h.ty-h.y; const dl=Math.hypot(dx,dy);
+    if(dl>6){ dx/=dl; dy/=dl; } else { dx=h.faceX; dy=h.faceY; }
+    h.dodgeDx=dx; h.dodgeDy=dy; h.dodgeT=FIGHT.dodgeTime; h.iframes=FIGHT.dodgeIframes; h.dodgeCd=FIGHT.dodgeCd;
+    if(h.blocking) this.setBlock(false);
+    SFX.sling(); return 'dodged'; }
+  setBlock(on){ const h=this.hero; if(!h) return false;
+    if(on){ if(h.down>0||h.guardBreakT>0||h.stamina<=1) return false;
+      if(h.sprint){ h.sprint=false; h.sprintT=0; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); }
+      h.blocking=true; }
+    else h.blocking=false;
+    if(this.fightBtns&&this.fightBtns.block) this.fightBtns.block.redraw(h.blocking);
+    return h.blocking; }
+  toggleSprint(){ const h=this.hero; if(!h||this.over||this.shopOpen||h.down>0) return;
+    if(h.blocking){ this.toast('Cannot sprint behind a raised guard'); return; }
+    if(!h.sprint&&h.stamina<=5){ this.toast('Too winded to sprint'); return; }
+    h.sprint=!h.sprint; if(!h.sprint) h.sprintT=0;
+    if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(h.sprint);
+    this.floatText(h.x,h.y-64,h.sprint?'Sprint!':'Sprint off','#f2c14e'); }
+  // Per-frame fight bookkeeping: recovery + buffer, the heavy wind-up,
+  // dodge cooldown and i-frames, guard break, and the stamina economy —
+  // block and sprint drain one pool; rest refills it after a breath.
+  fightTick(dt){ const h=this.hero; if(!h) return;
+    if(h.dodgeCd>0) h.dodgeCd-=dt;
+    if(h.iframes>0) h.iframes-=dt;
+    if(h.guardBreakT>0) h.guardBreakT-=dt;
+    if(h.dodgeBuf&&h.dodgeCd<=0){ h.dodgeBuf=false; this.pressDodge(); }
+    if(h.atkCd>0){ h.atkCd-=dt;
+      if(h.atkCd<=0){ h.atkCd=0; if(h.atkBuf){ const kind=h.atkBuf; h.atkBuf=null; this.pressAttack(kind); } } }
+    if(h.heavyWind>0){ h.heavyWind-=dt;
+      if(h.heavyWind<=0){ const t=h.heavyTarget, aim=h.heavyAim||{x:h.x,y:h.y}, mul=h.heavyMul||1;
+        h.heavyTarget=null; h.heavyAim=null; this.heavyStrike(t,aim,mul); } }
+    let drained=false;
+    if(h.blocking){ h.stamina=Math.max(0,h.stamina-FIGHT.blockDrain*dt); h.stamDelay=FIGHT.stamDelay; drained=true;
+      if(h.stamina<=0){ this.setBlock(false); h.guardBreakT=FIGHT.guardBreak; this.floatText(h.x,h.y-84,'Guard broken!','#ff8a6a'); } }
+    else if(h.sprint&&Math.hypot(h.tx-h.x,h.ty-h.y)>6){ h.stamina=Math.max(0,h.stamina-FIGHT.sprintDrain*dt); h.stamDelay=FIGHT.stamDelay; drained=true;
+      if(h.stamina<=0){ h.sprint=false; h.sprintT=0; if(this.fightBtns&&this.fightBtns.sprint) this.fightBtns.sprint.redraw(false); this.floatText(h.x,h.y-84,'Winded!','#ff8a6a'); } }
+    if(!drained){ if(h.stamDelay>0) h.stamDelay-=dt;
+      else if(h.stamina<FIGHT.stamMax) h.stamina=Math.min(FIGHT.stamMax,h.stamina+FIGHT.stamRegen*dt); }
+    this.drawFightUI(); }
+  // The cluster's faces: recovery veils on LIGHT/HEAVY/DODGE, the stamina
+  // pool as a bar over the cluster and as the BLOCK/SPRINT bases.
+  drawFightUI(){ const B=this.fightBtns; if(!B||!this.hero) return; const h=this.hero, hd=h.def;
+    const veil=(b,frac)=>{ if(!b||!b.sweep) return; const g=b.sweep; g.clear();
+      if(frac>0){ g.fillStyle(0x000000,0.55); g.fillRect(b.sx-b.sw/2,b.sy-b.sh/2,b.sw,b.sh*Math.min(1,frac)); } };
+    veil(B.light,h.atkCd>0?h.atkCd/(hd.rate*FIGHT.lightCd):0);
+    veil(B.heavy,h.atkCd>0?h.atkCd/(hd.rate*FIGHT.heavyCd):0);
+    veil(B.dodge,h.dodgeCd>0?h.dodgeCd/FIGHT.dodgeCd:0);
+    if(B.block&&B.block.sweep){ const g=B.block.sweep; g.clear();
+      g.fillStyle(h.guardBreakT>0?0xa33b20:0x5aa33b,0.9); g.fillRect(B.block.sx-B.block.sw/2,B.block.sy+B.block.sh/2-5,B.block.sw*Math.max(0,h.stamina)/FIGHT.stamMax,5); }
+    if(this.fightBar){ const g=this.fightBar; g.clear();
+      g.fillStyle(0x000000,0.7); g.fillRect(1010,246,240,10);
+      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(1010,246,240*Math.max(0,h.stamina)/FIGHT.stamMax,10);
+      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(1010,246,240,10); }
+    const st=Math.ceil(h.stamina);
+    if(this.fightStat&&this._stamShown!==st){ this._stamShown=st; this.fightStat.setText('STAMINA '+st); } }
   // Upgrade 3: the hero returns only while the camp stands. If the camp has
   // fallen the run is already over, so a downed hero simply stays down.
   tickHeroDown(dt){ const h=this.hero; if(h.down<=0) return; h.down-=dt;
@@ -551,14 +804,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // Whoever stepped out takes nothing: the dodge is the skill.
   bossHeavyStrike(e){ const hr=e.range+BOSS.heavyRangePad, dmg=e.dmg*this.bossHeavyMul(e); let hit=false;
     const h=this.hero;
-    if(h&&h.down<=0&&Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<=hr){ this.hurtHero(dmg); hit=true; }
+    if(h&&h.down<=0&&Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<=hr){ this.hurtHero(dmg,true); hit=true; }
     this.squads.slice().forEach(s=>{ if(!s.dead&&Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y)<=hr){ this.hurtSquad(s,dmg); hit=true; } });
     if(!hit&&Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34) this.hitCamp(dmg,e);
     SFX.stomp(); this.cameras.main.shake(160,0.006); this.spark(e.x,e.y,0xff8a6a,8); }
   // The slam lands: slamMul x damage to everyone still inside the marked
   // circle; the camp, if the circle covers it, takes one normal camp blow.
   bossSlamImpact(e,s){ const dmg=e.dmg*BOSS.slamMul, h=this.hero;
-    if(h&&h.down<=0&&Phaser.Math.Distance.Between(s.x,s.y,h.x,h.y)<=BOSS.slamRadius) this.hurtHero(dmg);
+    if(h&&h.down<=0&&Phaser.Math.Distance.Between(s.x,s.y,h.x,h.y)<=BOSS.slamRadius) this.hurtHero(dmg,true);
     this.squads.slice().forEach(q=>{ if(!q.dead&&Phaser.Math.Distance.Between(s.x,s.y,q.x,q.y)<=BOSS.slamRadius) this.hurtSquad(q,dmg); });
     if(Phaser.Math.Distance.Between(s.x,s.y,this.campPos.x,this.campPos.y)<=BOSS.slamRadius) this.hitCamp(e.dmg,e);
     SFX.stomp(); this.cameras.main.shake(220,0.008);
@@ -581,51 +834,70 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   floatText(x,y,s,c){ const t=txt(this,x,y,s,14,c).setOrigin(0.5).setDepth(25); this.tweens.add({targets:t,y:y-26,alpha:0,duration:700,onComplete:()=>t.destroy()}); }
   nearestEnemy(x,y,r){ let best=null,bd=r; for(const e of this.enemies){ if(e.dead) continue; const d=Phaser.Math.Distance.Between(x,y,e.x,e.y); if(d<bd){ bd=d; best=e; } } return best; }
   useSkill(i){ const b=this.skillBtns[i]; if(this.over||b.cd>0||this.shopOpen) return; const k=b.def, h=this.hero, E=this.enemies.filter(e=>!e.dead);
+    // Upgrade 8: the Held tier is read at the moment of the cast. Every
+    // effect below flows through dmgS/shootS/buffS/ctrlS, which multiply it
+    // by HELD.mul[tier]; at Ready the multiplier is 1 and the move is
+    // byte-for-byte the pre-U8 move. A 'No target' return anywhere in the
+    // switch consumes NOTHING — no cooldown, no charge, no tally.
+    const tier=this.heldTierOf(b), mul=HELD.mul[tier];
+    const dmgS=(e,amt,type,opt)=>{ opt=Object.assign({},opt||{});
+      if(opt.stun) opt.stun*=mul; if(opt.slow) opt.slow*=mul;
+      if(opt.burn) opt.burn=[opt.burn[0]*mul,opt.burn[1]];
+      if(tier===2) opt.stun=Math.max(opt.stun||0,HELD.perfectStun); // Perfect flourish: the blow also stuns
+      this.damage(e,amt*mul,type,opt); };
+    const shootS=(x,y,t,key,opt,sp)=>{ opt=Object.assign({},opt||{}); opt.dmg=(opt.dmg||0)*mul;
+      if(opt.stun) opt.stun*=mul; if(tier===2) opt.stun=Math.max(opt.stun||0,HELD.perfectStun);
+      this.shoot(x,y,t,key,opt,sp); };
+    const buffS=(rate,dmg)=>buffSquads(rate?rate*mul:0,dmg?dmg*mul:0);
+    const ctrlS=v=>v*mul+(tier===2?HELD.perfectStun:0); // control durations scale; Perfect adds its stun rider
     const near=(r)=>E.filter(e=>Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<r);
     const strongest=(n,list)=>(list||E).slice().sort((a,b2)=>b2.hp-a.hp).slice(0,n);
     const ring=(r,col)=>{ const c=this.add.circle(h.x,h.y,10,col,0.3).setDepth(15); this.tweens.add({targets:c,radius:r,alpha:0,duration:500,onComplete:()=>c.destroy()}); };
     const buffSquads=(rate,dmg)=>this.squads.forEach(s=>{ if(rate) s.buffRateT=rate; if(dmg) s.buffDmgT=dmg; });
     switch(k.id){
-      case 'stone': { const t=strongest(1,near(h.def.range*2))[0]; if(!t) return this.toast('No target'); this.shoot(h.x,h.y,t,'stone',{dmg:120,type:'physical',stun:1.5,crit:0.2},700); break; }
-      case 'psalm': buffSquads(6,0); ring(240,0xd9a441); break;
-      case 'five': { const ts=strongest(5); if(!ts.length) return this.toast('No target'); ts.forEach((t,j)=>this.time.delayedCall(j*120,()=>this.shoot(h.x,h.y,t,'stone',{dmg:250*(t.boss?3:1),type:'physical',stun:0.5},800))); SFX.ult(); this.cameras.main.flash(200,217,164,65); break; }
-      case 'rally': buffSquads(0,8); ring(400,0xd9a441); break;
-      case 'palm': near(170).forEach(e=>e.stun=Math.max(e.stun||0,2)); ring(170,0x8a6a9a); break;
-      case 'song': E.forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=6; this.damage(e,60,'holy'); }); this.cameras.main.flash(250,200,180,230); break;
-      case 'lamp': near(180).forEach(e=>{ if(!e.boss) e.confuse=3; }); ring(180,0xf2c14e); break;
-      case 'three': for(let j=0;j<12;j++) this.time.delayedCall(j*70,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,40,'holy'); this.spark(t.x,t.y,0xf2c14e); } }); break;
-      case 'sword': E.forEach(e=>this.damage(e,150,'holy')); this.cameras.main.flash(250,242,193,78); break;
-      case 'jaw': near(90).forEach(e=>this.damage(e,90,'physical')); ring(90,0xe8e0c8); break;
-      case 'roar': near(150).forEach(e=>{ e.stun=Math.max(e.stun||0,1.5); }); ring(150,0xd8572a); this.cameras.main.shake(150,0.004); break;
-      case 'geyser': near(150).forEach(e=>this.damage(e,80,'holy',{slow:0.4})); ring(150,0x6a9ad8); break;
-      case 'manna': this.manna+=40; this.floatText(h.x,h.y-30,'+40 Manna',GOLD); this.refreshHUD(); break;
-      case 'sea': E.forEach(e=>{ if(!e.boss){ e.x=Math.min(this.worldW+10,e.x+260); e.stun=Math.max(e.stun||0,1); } else this.damage(e,200,'holy'); }); this.cameras.main.flash(300,120,170,220); break;
-      case 'altarflame': near(160).forEach(e=>this.damage(e,30,'fire',{burn:[22,4]})); ring(160,0xd8572a); break;
-      case 'ravens': h.hp=Math.min(h.def.hp,h.hp+h.def.hp*0.5); this.floatText(h.x,h.y-30,'+HP','#8fd06a'); break;
-      case 'chariot': E.forEach(e=>this.damage(e,120,'fire',{burn:[20,4]})); this.cameras.main.flash(300,242,140,60); break;
-      case 'banquet': this.banquet=true; this.toast('Royal Banquet: +50% Manna for the next wave clear'); break;
-      case 'plea': E.forEach(e=>{ e.slow=Math.max(e.slow||0,0.4); e.slowT=6; }); ring(400,0x8a6a9a); break;
-      case 'time': this.squads.forEach(s=>{ s.cd=0; s.buffRateT=10; s.buffDmgT=10; }); this.cameras.main.flash(250,230,200,240); break;
-      case 'pair': for(let j=0;j<6;j++) this.time.delayedCall(j*120,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,45,'physical'); this.spark(t.x,t.y,0xcdbd95,3); } }); break;
-      case 'rain': near(220).forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=5; }); ring(220,0xdfe6ee); break;
-      case 'ark': this.campHp=Math.min(this.campMax,this.campHp+50); E.forEach(e=>this.damage(e,100,'holy')); this.floatText(this.campPos.x,this.campPos.y-70,'Camp +50','#8fd06a'); this.toast('The Ark: the camp is mended (+50)'); this.refreshHUD(); break;
-      case 'kite': { let src=h, hit=[]; for(let j=0;j<4;j++){ const c=E.filter(e=>!hit.includes(e)&&Phaser.Math.Distance.Between(e.x,e.y,src.x,src.y)<220).sort((a,b2)=>Phaser.Math.Distance.Between(a.x,a.y,src.x,src.y)-Phaser.Math.Distance.Between(b2.x,b2.y,src.x,src.y))[0]; if(!c) break; this.fx.lineStyle(3,0xf2e07a,1).lineBetween(src.x,src.y,c.x,c.y); this.damage(c,90,'sonic',{stun:0.5}); hit.push(c); src=c; } this.time.delayedCall(150,()=>this.fx.clear()); if(!hit.length) return this.toast('No target'); break; }
-      case 'bifocal': buffSquads(0,8); ring(260,0xf2e07a); break;
-      case 'almanac': for(let j=0;j<10;j++) this.time.delayedCall(j*110,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); this.damage(t,120,'sonic',{stun:0.4}); this.spark(t.x,t.y,0xf2e07a,5); } }); this.cameras.main.flash(200,240,230,150); break;
-      case 'crossing': { const t=strongest(1)[0]; if(!t) return this.toast('No target'); h.x=h.tx=t.x; h.y=h.ty=t.y; near(110).forEach(e=>this.damage(e,100,'physical')); ring(110,0x3a5a9a); break; }
-      case 'cherry': { const t=strongest(1,near(160))[0]; if(!t) return this.toast('No target'); this.damage(t,220,'physical',{stun:1}); break; }
-      case 'forge': h.hp=h.def.hp; buffSquads(10,0); this.cameras.main.flash(250,200,210,240); break;
-      case 'log': near(140).forEach(e=>e.stun=Math.max(e.stun||0,2.5)); ring(140,0x8a5a2a); break;
-      case 'speech': buffSquads(0,10); ring(400,0xd9a441); break;
-      case 'union': this.shieldT=10; this.toast('Union Shield: the camp takes no damage for 10s'); break;
-      case 'trick': strongest(3,near(260)).forEach(t=>this.shoot(h.x,h.y,t,'stone',{dmg:100,type:'physical',crit:0.5},900)); break;
-      case 'sharp': { const t=strongest(1,near(320))[0]; if(!t) return this.toast('No target'); this.shoot(h.x,h.y,t,'stone',{dmg:180,type:'physical',crit:0.5},1100); break; }
-      case 'show': for(let j=0;j<15;j++) this.time.delayedCall(j*80,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length) this.shoot(h.x,h.y,Phaser.Utils.Array.GetRandom(L),'stone',{dmg:60,type:'physical',crit:0.3},1000); }); break;
-      case 'pillars': E.forEach(e=>{ this.damage(e,300,'physical'); e.stun=Math.max(e.stun||0,2); }); this.cameras.main.shake(400,0.012); SFX.stomp(); break;
-      default: { const t=strongest(1)[0]; if(!t) return this.toast('No target'); this.shoot(h.x,h.y,t,'stone',{dmg:100,type:'physical'},700); break; }
+      case 'stone': { const t=strongest(1,near(h.def.range*2))[0]; if(!t) return this.toast('No target'); shootS(h.x,h.y,t,'stone',{dmg:120,type:'physical',stun:1.5,crit:0.2},700); break; }
+      case 'psalm': buffS(6,0); ring(240,0xd9a441); break;
+      case 'five': { const ts=strongest(5); if(!ts.length) return this.toast('No target'); ts.forEach((t,j)=>this.time.delayedCall(j*120,()=>shootS(h.x,h.y,t,'stone',{dmg:250*(t.boss?3:1),type:'physical',stun:0.5},800))); SFX.ult(); this.cameras.main.flash(200,217,164,65); break; }
+      case 'rally': buffS(0,8); ring(400,0xd9a441); break;
+      case 'palm': near(170).forEach(e=>e.stun=Math.max(e.stun||0,ctrlS(2))); ring(170,0x8a6a9a); break;
+      case 'song': E.forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=6*mul; dmgS(e,60,'holy'); }); this.cameras.main.flash(250,200,180,230); break;
+      case 'lamp': near(180).forEach(e=>{ if(!e.boss) e.confuse=3*mul; }); ring(180,0xf2c14e); break;
+      case 'three': for(let j=0;j<12;j++) this.time.delayedCall(j*70,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); dmgS(t,40,'holy'); this.spark(t.x,t.y,0xf2c14e); } }); break;
+      case 'sword': E.forEach(e=>dmgS(e,150,'holy')); this.cameras.main.flash(250,242,193,78); break;
+      case 'jaw': near(90).forEach(e=>dmgS(e,90,'physical')); ring(90,0xe8e0c8); break;
+      case 'roar': near(150).forEach(e=>{ e.stun=Math.max(e.stun||0,ctrlS(1.5)); }); ring(150,0xd8572a); this.cameras.main.shake(150,0.004); break;
+      case 'geyser': near(150).forEach(e=>dmgS(e,80,'holy',{slow:0.4})); ring(150,0x6a9ad8); break;
+      case 'manna': { const gain=Math.round(40*mul); this.manna+=gain; this.floatText(h.x,h.y-30,'+'+gain+' Manna',GOLD); this.refreshHUD(); break; }
+      case 'sea': E.forEach(e=>{ if(!e.boss){ e.x=Math.min(this.worldW+10,e.x+260); e.stun=Math.max(e.stun||0,ctrlS(1)); } else dmgS(e,200,'holy'); }); this.cameras.main.flash(300,120,170,220); break;
+      case 'altarflame': near(160).forEach(e=>dmgS(e,30,'fire',{burn:[22,4]})); ring(160,0xd8572a); break;
+      case 'ravens': h.hp=Math.min(h.def.hp,h.hp+h.def.hp*0.5*mul); this.floatText(h.x,h.y-30,'+HP','#8fd06a'); break;
+      case 'chariot': E.forEach(e=>dmgS(e,120,'fire',{burn:[20,4]})); this.cameras.main.flash(300,242,140,60); break;
+      case 'banquet': this.banquet=1+0.5*mul; this.toast('Royal Banquet: +'+Math.round(50*mul)+'% Manna for the next wave clear'); break;
+      case 'plea': E.forEach(e=>{ e.slow=Math.max(e.slow||0,0.4); e.slowT=6*mul; }); ring(400,0x8a6a9a); break;
+      case 'time': this.squads.forEach(s=>{ s.cd=0; s.buffRateT=10*mul; s.buffDmgT=10*mul; }); this.cameras.main.flash(250,230,200,240); break;
+      case 'pair': for(let j=0;j<6;j++) this.time.delayedCall(j*120,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); dmgS(t,45,'physical'); this.spark(t.x,t.y,0xcdbd95,3); } }); break;
+      case 'rain': near(220).forEach(e=>{ e.slow=Math.max(e.slow||0,0.5); e.slowT=5*mul; }); ring(220,0xdfe6ee); break;
+      case 'ark': { const mend=Math.round(50*mul); this.campHp=Math.min(this.campMax,this.campHp+mend); E.forEach(e=>dmgS(e,100,'holy')); this.floatText(this.campPos.x,this.campPos.y-70,'Camp +'+mend,'#8fd06a'); this.toast('The Ark: the camp is mended (+'+mend+')'); this.refreshHUD(); break; }
+      case 'kite': { let src=h, hit=[]; for(let j=0;j<4;j++){ const c=E.filter(e=>!hit.includes(e)&&Phaser.Math.Distance.Between(e.x,e.y,src.x,src.y)<220).sort((a,b2)=>Phaser.Math.Distance.Between(a.x,a.y,src.x,src.y)-Phaser.Math.Distance.Between(b2.x,b2.y,src.x,src.y))[0]; if(!c) break; this.fx.lineStyle(3,0xf2e07a,1).lineBetween(src.x,src.y,c.x,c.y); dmgS(c,90,'sonic',{stun:0.5}); hit.push(c); src=c; } this.time.delayedCall(150,()=>this.fx.clear()); if(!hit.length) return this.toast('No target'); break; }
+      case 'bifocal': buffS(0,8); ring(260,0xf2e07a); break;
+      case 'almanac': for(let j=0;j<10;j++) this.time.delayedCall(j*110,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length){ const t=Phaser.Utils.Array.GetRandom(L); dmgS(t,120,'sonic',{stun:0.4}); this.spark(t.x,t.y,0xf2e07a,5); } }); this.cameras.main.flash(200,240,230,150); break;
+      case 'crossing': { const t=strongest(1)[0]; if(!t) return this.toast('No target'); h.x=h.tx=t.x; h.y=h.ty=t.y; near(110).forEach(e=>dmgS(e,100,'physical')); ring(110,0x3a5a9a); break; }
+      case 'cherry': { const t=strongest(1,near(160))[0]; if(!t) return this.toast('No target'); dmgS(t,220,'physical',{stun:1}); break; }
+      case 'forge': h.hp=h.def.hp; buffS(10,0); this.cameras.main.flash(250,200,210,240); break;
+      case 'log': near(140).forEach(e=>e.stun=Math.max(e.stun||0,ctrlS(2.5))); ring(140,0x8a5a2a); break;
+      case 'speech': buffS(0,10); ring(400,0xd9a441); break;
+      case 'union': this.shieldT=10*mul; this.toast('Union Shield: the camp takes no damage for '+Math.round(10*mul)+'s'); break;
+      case 'trick': strongest(3,near(260)).forEach(t=>shootS(h.x,h.y,t,'stone',{dmg:100,type:'physical',crit:0.5},900)); break;
+      case 'sharp': { const t=strongest(1,near(320))[0]; if(!t) return this.toast('No target'); shootS(h.x,h.y,t,'stone',{dmg:180,type:'physical',crit:0.5},1100); break; }
+      case 'show': for(let j=0;j<15;j++) this.time.delayedCall(j*80,()=>{ const L=this.enemies.filter(e=>!e.dead); if(L.length) shootS(h.x,h.y,Phaser.Utils.Array.GetRandom(L),'stone',{dmg:60,type:'physical',crit:0.3},1000); }); break;
+      case 'pillars': E.forEach(e=>{ dmgS(e,300,'physical'); e.stun=Math.max(e.stun||0,ctrlS(2)); }); this.cameras.main.shake(400,0.012); SFX.stomp(); break;
+      default: { const t=strongest(1)[0]; if(!t) return this.toast('No target'); shootS(h.x,h.y,t,'stone',{dmg:100,type:'physical'},700); break; }
     }
     this.floatText(h.x,h.y-56,k.name+'!','#f2c14e');
-    if(k.id!=='five') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); } b.cd=k.cd; }
+    if(tier>0) this.floatText(h.x,h.y-74,HELD.names[tier]+'!','#ffe98a');
+    if(k.id!=='five') SFX.skill(); if(i===2){ this.tr('ults'); if(k.id!=='five') SFX.ult(); }
+    // Upgrade 8: the cast spends the charge and is tallied at its tier.
+    this.heldSpent[tier]++; b.held=0; b._tierShown=0; b.buffered=false; b.cd=k.cd; b.cdMax=k.cd; }
   // --- between-wave shop ---
   // Upgrade 6: the intermission deadline is a wall-clock moment, set ONCE
   // here. It lives on the scene, not on any shop widget, so buying, paging
@@ -708,7 +980,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   updateShopHead(){ if(this.shopHead2) this.shopHead2.setText('Manna '+Math.floor(this.manna)+'  •  Squads '+this.squads.length+'/'+this.squadCap+'  •  Next: wave '+(this.wave+1)+' ('+((this.wave+1)%2===0?'night':'day')+')  •  Goal: wave '+this.goalWave+(this.endless?' (cleared — Endless)':'')); }
   closeShop(){ this.shopOpen=false; this.shopFirst=false; this.shopEndsAt=0; this.clearShop(); this.startWave(); }
   waveClear(){ this.waveActive=false; this.wavesCleared=this.wave;
-    let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*1.5); this.banquet=false; }
+    let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*this.banquet); this.banquet=0; } // banquet stores its multiplier (1.5 at Ready; a Held cast strengthens it, Upgrade 8)
     const perfect=!this.campHurtThisWave; this.manna+=bonus; this.lastBonus=bonus;
     this.tr('waves'); this.gx(DATA_P().xp.wave); if(perfect){ this.tr('perfectWaves'); this.gx(DATA_P().xp.perfectWave); }
     this.earn('wave',DATA.grokonians.perWave+(perfect?DATA.grokonians.perfectWaveBonus:0));
@@ -740,8 +1012,15 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       return; }
     if(this.victoryOpen) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
-    if(this.volleyCd>0){ this.volleyCd-=dt; if(this.volleyCd<=0) this.refreshHUD(); }
+    this._pulse=(this._pulse||0)+dt; // Upgrade 8: drives the Perfect glow pulse in drawSkillSweep
+    if(this.volleyCd>0){ this.volleyCd-=dt;
+      if(this.volleyCd<=0){ this.volleyCd=0; this.refreshHUD();
+        // Upgrade 8: a Volley press buffered in its last breath fires now.
+        if(this._volleyBuf){ this._volleyBuf=false; this.volleyMode=true; this.toast('Volley: tap a target spot'); } } }
+    { const vb=this.cmdBtns&&this.cmdBtns.volley; // Volley's cooldown sweep
+      if(vb&&vb.sweep){ vb.sweep.clear(); if(this.volleyCd>0){ const f=Math.min(1,this.volleyCd/12); vb.sweep.fillStyle(0x000000,0.55); vb.sweep.fillRect(vb.sx-vb.sw/2,vb.sy-vb.sh/2,vb.sw,vb.sh*f); } } }
     this.orbTick(dt);
+    this.fightTick(dt); // Upgrade 8: recovery, buffers, wind-ups, stamina
     // spawns
     if(this.waveActive){ this.waveClock+=dt; while(this.spawnQ.length&&this.spawnQ[0].at<=this.waveClock) this.spawn(this.spawnQ.shift()); }
     // field coins (Upgrade 3): one every ~6s of an active wave, max 8 out
@@ -751,14 +1030,25 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // hero movement + combat
     const h=this.hero, hd=h.def;
     if(h.down>0){ this.tickHeroDown(dt); }
+    else if(h.dodgeT>0){ // Upgrade 8: the dodge dash owns the body until it ends
+      const dst=FIGHT.dodgeDist/FIGHT.dodgeTime*dt; h.x+=h.dodgeDx*dst; h.y+=h.dodgeDy*dst; h.dodgeT-=dt;
+      h.x=Math.max(20,Math.min(this.worldW-20,h.x)); h.y=Math.max(40,Math.min(this.worldH-20,h.y));
+      h.spr.setFlipX(h.dodgeDx<0); }
     else { const dx=h.tx-h.x, dy=h.ty-h.y, dl=Math.hypot(dx,dy);
-      if(dl>3){ const st=Math.min(dl,hd.speed*this.orbSpdMul()*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0); }
-      h.hp=Math.min(hd.hp,h.hp+hd.hp*0.01*dt);
-      h.cd-=dt; if(h.cd<=0){ const t=this.nearestEnemy(h.x,h.y,hd.range); if(t){ h.cd=hd.rate;
-        if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(h.x+10,h.y,0xe8e0c8,3); }
-        else this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},600); } } }
+      if(dl>3){ h.faceX=dx/dl; h.faceY=dy/dl;
+        const spd=hd.speed*this.orbSpdMul()*(h.sprint?FIGHT.sprintMul:1)*(h.blocking?0.45:1);
+        const st=Math.min(dl,spd*dt); h.x+=dx/dl*st; h.y+=dy/dl*st; h.spr.setFlipX(dx<0);
+        if(h.sprint) h.sprintT+=dt; else h.sprintT=0; }
+      else h.sprintT=0;
+      h.hp=Math.min(hd.hp,h.hp+hd.hp*0.01*dt); }
+    // NO AUTO-FIRE (Upgrade 8): enemies inside the range circle are a
+    // warning, not a trigger — the hero strikes only when a fight button
+    // is pressed (pressAttack). The old auto-attack block is gone.
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
+    // Upgrade 8: a raised guard shows as an arc on the hero's facing side.
+    if(h.guardFx){ const g=h.guardFx; g.clear();
+      if(h.blocking&&h.down<=0&&g.arc){ const a=Math.atan2(h.faceY,h.faceX); g.lineStyle(4,0x9ae8f2,0.9); g.beginPath(); g.arc(h.x,h.y,30,a-1.1,a+1.1,false); g.strokePath(); } }
     this.drawCampBar();
     this.campFireTick(dt);
     // squads
@@ -824,7 +1114,19 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         else if(tg&&!tg.dead) this.damage(tg,s.opt.dmg,s.opt.type,s.opt); }
       else { s.s.x+=Math.cos(a)*step; s.s.y+=Math.sin(a)*step; s.s.rotation+=0.3; } }
     this.shots=this.shots.filter(s=>!s.done);
-    this.skillBtns.forEach(b=>{ if(b.cd>0){ b.cd-=dt; b.label.setText(b.def.name+'\n'+Math.ceil(b.cd)+'s'); b.alpha=0.5; } else { b.label.setText(b.def.name); b.alpha=1; } });
+    // Upgrade 8: skill buttons live here — cooldown drains, a buffered press
+    // fires the moment its move is ready, and a ready move accrues Held
+    // charge (battle time only: this loop never runs while the shop is
+    // open, so patience cannot be farmed in the intermission). Crossing a
+    // tier floats the tier name over the hero; the button's face — label,
+    // colour and sweep — is redrawn from the same state.
+    this.skillBtns.forEach((b,bi)=>{ if(b.cd>0){ b.cd-=dt;
+        if(b.cd<=0){ b.cd=0; if(b.buffered){ b.buffered=false; this.useSkill(bi); } } }
+      if(b.cd>0){ b.label.setText(b.def.name+'\n'+Math.ceil(b.cd)+'s'); b.alpha=0.5; }
+      else { b.held=(b.held||0)+dt; const t=this.heldTierOf(b);
+        if(t>(b._tierShown||0)){ b._tierShown=t; this.floatText(h.x,h.y-72,b.def.name+' — '+HELD.names[t]+'!','#ffe98a'); }
+        b.label.setText(b.def.name+(t>0?'\n'+HELD.names[t]:'')); if(b.label.setColor) b.label.setColor(t===2?'#ffe98a':(t===1?'#f2c14e':'#e8d9b0')); b.alpha=1; }
+      this.drawSkillSweep(b); });
     // wave end
     if(this.waveActive&&!this.spawnQ.length&&!this.enemies.length) this.waveClear();
     this.refreshHUD();
@@ -844,7 +1146,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.flush(); const ev=Progress.takeEvents();
     const rec={score:this.kills*10+Math.round(campFrac*20)*50+this.wavesCleared*100+stars*500};
     if(window.GXHub&&GXHub.submitScore) GXHub.submitScore(rec.score,this.wavesCleared); // GX Hub leaderboard (no-op standalone)
-    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless})); } }
+    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless,held:this.heldSpent?this.heldSpent.slice():[0,0,0]})); } }
 
 class End extends Phaser.Scene{ constructor(){super('End');}
   create(d){ backdrop(this,0.7);
@@ -853,6 +1155,9 @@ class End extends Phaser.Scene{ constructor(){super('End');}
     txt(this,W/2,262,d.win?'"The battle is the LORD\'s." 1 Samuel 17:47':'"Be strong and of a good courage." Joshua 1:9',22).setOrigin(0.5);
     txt(this,W/2,305,'Score '+(d.rec?d.rec.score:0)+(d.endless?'  •  Endless run — waves survived: '+d.waves:''),22,'#f2c14e').setOrigin(0.5);
     txt(this,W/2,340,'Grokonians earned this run: '+d.earned+(d.perfect&&d.win?'  (perfect clear!)':''),28,GOLD).setOrigin(0.5);
+    // Upgrade 8: the mastery readout — how the run's power moves were spent,
+    // so patience is a skill the player can see and chase run over run.
+    if(d.held&&(d.held[0]+d.held[1]+d.held[2])>0){ const hp=[]; if(d.held[2]) hp.push(d.held[2]+' Perfect'); if(d.held[1]) hp.push(d.held[1]+' Tempered'); if(d.held[0]) hp.push(d.held[0]+' Ready'); txt(this,W/2,366,'Held Power: '+hp.join(', '),18,'#ffe98a').setOrigin(0.5); }
     txt(this,W/2,385,'Total Grokonians: '+Tokens.balance(),22).setOrigin(0.5);
     const L=Progress.level(), M=Progress.mastery(d.hero);
     txt(this,W/2,425,'+'+d.xp+' XP   •   Level '+L.lv+' ('+L.into+'/'+L.need+')   •   Mastery '+M.lv+'   •   Battle Pass tier '+Progress.bpTier(),20).setOrigin(0.5);
