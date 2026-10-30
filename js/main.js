@@ -33,6 +33,27 @@ const ORB_RANGE=90; // the hero must stand this close to touch an orb
 // countdown, giving real time to upgrade and buy soldiers; at zero the next
 // wave starts on its own. "Next Wave Now" stays for finishing shopping early.
 const SHOP_COUNTDOWN=60; // seconds of intermission between waves
+// Upgrade 7: the goal-wave champion fights in THREE PHASES keyed to its HP
+// (bossPhaseSync / bossTick in the Game scene). Phases add mechanics and
+// tempo only — the champion's HP and base damage stay exactly on the
+// flattened curve (spawn: wave scale x5 HP / x1.6 dmg); nothing here
+// inflates them, so kennin's law holds: hard, skill-only, never impossible.
+//  Phase I   (100-66%): a telegraphed HEAVY STRIKE — heavyWindup seconds
+//    standing committed (red ring, range+heavyRangePad), then a cleave for
+//    heavyMul x a normal blow to everyone still inside; step out, it whiffs.
+//  Phase II  ( 66-33%): on entry the champion CALLS AN ESCORT (escortCount
+//    era enemies, once per entry, announced) and gains a periodic GROUND
+//    SLAM: a marked circle (slamRadius) drawn at its prey, slamDelay
+//    seconds to clear it, then slamMul x damage to everyone still inside.
+//  Phase III (below 33%): ENRAGE — movement x enrageSpeedMul, attack period
+//    x enrageRateMul, heavy strikes heavier (enrageHeavyMul) and more
+//    frequent (enrageHeavyEvery). No new summons, no stat growth: the
+//    pressure is tempo, not numbers. Phases are monotonic — a healed
+//    champion never un-enrages, and the escort is never re-called.
+const BOSS={ p2At:2/3, p3At:1/3,
+  heavyEvery:6, heavyWindup:1.1, heavyMul:3, heavyRangePad:26,
+  slamEvery:7, slamDelay:1.2, slamRadius:110, slamMul:2, escortCount:4,
+  enrageSpeedMul:1.35, enrageRateMul:0.7, enrageHeavyEvery:4.5, enrageHeavyMul:4 };
 // display heights (px) for atlas sprites
 const SZ={moses:60,elijah:58,esther:58,noah:60,franklite:56,washingtoon:60,lincolnlog:64,oakley:58,david:58,deborah:58,gideon:58,samson:66,locust:34,frog:38,froglet:22,spearman:52,priest:52,golem:66,bearer:56,goliath:140,tower:66};
 function spr(s,x,y,key,h){ const im=s.add.image(x,y,'spr',key); im.setScale((h||SZ[key]||50)/im.height); im.baseScale=im.scaleX; return im; }
@@ -68,7 +89,8 @@ const LOAD_TIPS=[
   'Tip: Coins on the field are worth the walk — every sixth coin is a Grokonian.',
   'Tip: Night waves: enemies march faster; your ranged squads shoot farther.',
   'Tip: Enemies march on the camp. A defender close by can block their road.',
-  'Tip: Glowing orbs in the field sell powers for Grokonians — walk your hero up and tap one, even mid-wave.'
+  'Tip: Glowing orbs in the field sell powers for Grokonians — walk your hero up and tap one, even mid-wave.',
+  'Tip: The goal-wave champion telegraphs its heavy blows — when the red ring closes or a circle is marked, MOVE.'
 ];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
   preload(){ this.load.image('logo','assets/logo.png'); }
@@ -424,16 +446,128 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // --- goal-wave champion: boss name + health bar (the old TD treatment) ---
   setupBoss(e){ this.boss=e; this.bossBar=this.add.graphics().setDepth(32).setScrollFactor(0);
     this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+' — GOAL-WAVE CHAMPION',20,GOLD).setOrigin(0.5).setDepth(32).setScrollFactor(0);
+    // Upgrade 7: phase state lives on the champion itself. heavyT counts to
+    // the next wind-up, heavyWind is the wind-up in progress (the champion
+    // stands committed while it runs), slamT/slam are the Phase II ground
+    // slam and its live telegraph, escorted makes the Phase II call once-only.
+    e.bossPhase=1; e.heavyT=BOSS.heavyEvery; e.heavyWind=0; e.slamT=BOSS.slamEvery; e.slam=null; e.escorted=false;
+    // Telegraphs are drawn in the WORLD (no scrollFactor): the wind-up ring
+    // around the champion and the slam's marked circle on the ground.
+    this.bossFx=this.add.graphics().setDepth(6);
     this.cameras.main.shake(400,0.008); SFX.stomp(); this.toast(e.def.name+' has come out to fight!',2600); }
-  bossTick(){ if(!this.bossBar) return; const e=this.boss; if(!e||e.dead){ this.clearBoss(); return; }
+  bossTick(dt){ if(!this.bossBar) return; const e=this.boss; if(!e||e.dead){ this.clearBoss(); return; }
+    dt=dt||0;
     const f=Math.max(0,e.hp/e.max), bb=this.bossBar; bb.clear();
     bb.fillStyle(0x000000,0.7); bb.fillRect(W/2-250,HUD_Y-16,500,12); bb.fillStyle(0xa33b20,1); bb.fillRect(W/2-250,HUD_Y-16,500*f,12);
-    bb.lineStyle(2,0xd9a441); bb.strokeRect(W/2-250,HUD_Y-16,500,12); }
-  clearBoss(){ if(this.bossBar){ this.bossBar.destroy(); this.bossBar=null; } if(this.bossName){ this.bossName.destroy(); this.bossName=null; } this.boss=null; }
+    bb.lineStyle(2,0xd9a441); bb.strokeRect(W/2-250,HUD_Y-16,500,12);
+    // Upgrade 7: phases + telegraphs. Phase sync is defensive here (damage()
+    // already fires it the instant a threshold is crossed); telegraphs are
+    // redrawn every tick so they can never lie about where death lands.
+    this.bossPhaseSync(e);
+    this.bossDrawFx(e);
+    if(e.stun>0) return; // a stunned champion's timers hold — the telegraph stays honest
+    // --- heavy strike: wind up committed, then the cleave ---
+    if(e.heavyWind>0){ e.heavyWind-=dt;
+      if(e.spr&&e.spr.setScale&&e.spr.baseScale) e.spr.setScale(e.spr.baseScale*(1+0.15*(1-Math.max(0,e.heavyWind)/BOSS.heavyWindup)));
+      if(e.heavyWind<=0){ e.heavyWind=0;
+        if(e.spr&&e.spr.active){ e.spr.clearTint(); applyTint(e.spr,e.def); if(e.spr.setScale&&e.spr.baseScale) e.spr.setScale(e.spr.baseScale); }
+        this.bossHeavyStrike(e); } }
+    else { e.heavyT-=dt;
+      if(e.heavyT<=0){ if(this.bossEngaged(e)){ e.heavyWind=BOSS.heavyWindup; e.heavyT=this.bossHeavyEvery(e);
+          if(e.spr&&e.spr.active) e.spr.setTintFill(0xff5a3a);
+          this.floatText(e.x,e.y-84,'!','#ff8a6a'); this.spark(e.x,e.y,0xff5a3a,4); }
+        else e.heavyT=0.5; } }
+    // --- ground slam (Phase II and beyond) ---
+    if((e.bossPhase||1)>=2){
+      if(e.slam){ e.slam.t-=dt;
+        if(e.slam.t<=0){ const s=e.slam; e.slam=null; e.slamT=BOSS.slamEvery; this.bossSlamImpact(e,s); } }
+      else { e.slamT-=dt;
+        if(e.slamT<=0){ const pos=this.bossSlamTarget(e);
+          if(pos){ e.slam={x:pos.x,y:pos.y,t:BOSS.slamDelay}; this.spark(pos.x,pos.y,0xff8a3a,4); }
+          else e.slamT=1; } } } }
+  clearBoss(){ if(this.bossBar){ this.bossBar.destroy(); this.bossBar=null; } if(this.bossName){ this.bossName.destroy(); this.bossName=null; } if(this.bossFx){ this.bossFx.destroy(); this.bossFx=null; } this.boss=null; }
+  // --- Upgrade 7: champion phases ---
+  // Effective tempo/stat helpers — the ONLY places phase multipliers live,
+  // so the champion's stored stats (hp, max, dmg, rate, speed) never change.
+  bossAtkRate(e){ return e.rate*((e.bossPhase||1)>=3?BOSS.enrageRateMul:1); }
+  bossMoveMul(e){ return (e.bossPhase||1)>=3?BOSS.enrageSpeedMul:1; }
+  bossHeavyMul(e){ return (e.bossPhase||1)>=3?BOSS.enrageHeavyMul:BOSS.heavyMul; }
+  bossHeavyEvery(e){ return (e.bossPhase||1)>=3?BOSS.enrageHeavyEvery:BOSS.heavyEvery; }
+  // Thresholds are fractions of MAX hp. Monotonic: phases never step back,
+  // and each crossed phase's entry fires exactly once, in order — a single
+  // huge hit through both lines lands the champion in Phase III with the
+  // escort called once on the way through, never twice, never skipped.
+  bossPhaseSync(e){ if(!e||e.dead||!e.boss) return; const f=e.hp/e.max;
+    const p=f>BOSS.p2At?1:(f>BOSS.p3At?2:3), cur=e.bossPhase||1;
+    if(p<=cur) return;
+    for(let k=cur+1;k<=p;k++) this.bossEnterPhase(e,k);
+    e.bossPhase=p; }
+  bossEnterPhase(e,p){ SFX.bossRoar();
+    if(this.bossName&&this.tweens) this.tweens.add({targets:this.bossName,scale:1.25,duration:160,yoyo:true,repeat:1,ease:'Sine.inOut'});
+    if(p===2){ e.slamT=BOSS.slamEvery; this.bossSummonEscort(e);
+      this.toast(e.def.name+' calls its servants! Phase II — watch the ground!',3000); }
+    if(p===3){ e.heavyT=Math.min(e.heavyT,BOSS.enrageHeavyEvery);
+      if(this.bossName){ this.bossName.setText(e.def.name.toUpperCase()+' — ENRAGED'); if(this.bossName.setColor) this.bossName.setColor('#ff8a6a'); }
+      this.toast(e.def.name+' is ENRAGED! Phase III — faster, heavier blows!',3000); }
+    this.floatText(e.x,e.y-96,'PHASE '+['','I','II','III'][p]+'!','#ff8a6a'); }
+  // The Phase II escort: a capped handful of the era's own soldiers, called
+  // once. Era-driven like everything else: spear first, then infantry and
+  // ranged; never the champion's own kind, never a healer.
+  bossSummonEscort(e){ if(e.escorted) return; e.escorted=true;
+    const E=this.roster.enemy, pick=r=>E.find(d=>d.role===r&&d.id!==e.def.id&&!d.heals);
+    const pref=[pick('spear'),pick('infantry'),pick('spear'),pick('ranged')].filter(Boolean);
+    const offs=[[-76,-56],[76,-56],[-76,56],[76,56]], defs=[];
+    for(let i=0;i<BOSS.escortCount;i++){ const d=pref[i%pref.length]||E.find(d=>d.id!==e.def.id&&!d.heals); if(d) defs.push(d); }
+    defs.forEach((d,i)=>{ const s=this.spawn({def:d,at:0,boss:false});
+      s.x=Math.max(30,Math.min(this.worldW-30,e.x+offs[i][0])); s.y=Math.max(50,Math.min(this.worldH-30,e.y+offs[i][1]));
+      if(s.spr.setPosition) s.spr.setPosition(s.x,s.y); this.spark(s.x,s.y,0xd9a441,4); }); }
+  // Engaged = a living defender within the 90px road-block, or the camp
+  // itself within striking distance — the same terms the march AI uses.
+  bossEngaged(e){ const h=this.hero;
+    if(h&&h.down<=0&&Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<=90) return true;
+    for(const s of this.squads){ if(!s.dead&&Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y)<=90) return true; }
+    return Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34; }
+  // The slam falls where the prey stands when the champion commits: the
+  // nearest defender within 150px, else the camp if the champion is on it.
+  bossSlamTarget(e){ let best=null,bd=150; const h=this.hero;
+    if(h&&h.down<=0){ const d=Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y); if(d<bd){ bd=d; best={x:h.x,y:h.y}; } }
+    for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; best={x:s.x,y:s.y}; } }
+    if(best) return best;
+    if(Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+74) return {x:this.campPos.x,y:this.campPos.y};
+    return null; }
+  // Telegraphs, redrawn from live state every tick: the wind-up ring closes
+  // around the champion as the blow gathers; the slam's circle fills toward
+  // full radius as impact nears. Nothing damages before its mark completes.
+  bossDrawFx(e){ if(!this.bossFx) return; const g=this.bossFx; g.clear();
+    if(e.heavyWind>0){ const hr=e.range+BOSS.heavyRangePad, p=1-Math.max(0,e.heavyWind)/BOSS.heavyWindup;
+      g.fillStyle(0xff5a3a,0.08+0.12*p); g.fillCircle(e.x,e.y,hr);
+      g.lineStyle(3,0xff5a3a,0.95); g.strokeCircle(e.x,e.y,hr*(0.6+0.4*p)); }
+    if(e.slam){ const p=1-Math.max(0,e.slam.t)/BOSS.slamDelay;
+      g.fillStyle(0xff8a3a,0.10+0.20*p); g.fillCircle(e.slam.x,e.slam.y,BOSS.slamRadius*Math.max(0.15,p));
+      g.lineStyle(3,0xff8a3a,1); g.strokeCircle(e.slam.x,e.slam.y,BOSS.slamRadius); } }
+  // The heavy blow itself: a cleave — every defender still inside the ring
+  // takes heavyMul x a normal blow (the camp takes it through hitCamp, whose
+  // own boss x3 keeps the camp blow at the same 3x-a-normal-blow weight).
+  // Whoever stepped out takes nothing: the dodge is the skill.
+  bossHeavyStrike(e){ const hr=e.range+BOSS.heavyRangePad, dmg=e.dmg*this.bossHeavyMul(e); let hit=false;
+    const h=this.hero;
+    if(h&&h.down<=0&&Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<=hr){ this.hurtHero(dmg); hit=true; }
+    this.squads.slice().forEach(s=>{ if(!s.dead&&Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y)<=hr){ this.hurtSquad(s,dmg); hit=true; } });
+    if(!hit&&Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34) this.hitCamp(dmg,e);
+    SFX.stomp(); this.cameras.main.shake(160,0.006); this.spark(e.x,e.y,0xff8a6a,8); }
+  // The slam lands: slamMul x damage to everyone still inside the marked
+  // circle; the camp, if the circle covers it, takes one normal camp blow.
+  bossSlamImpact(e,s){ const dmg=e.dmg*BOSS.slamMul, h=this.hero;
+    if(h&&h.down<=0&&Phaser.Math.Distance.Between(s.x,s.y,h.x,h.y)<=BOSS.slamRadius) this.hurtHero(dmg);
+    this.squads.slice().forEach(q=>{ if(!q.dead&&Phaser.Math.Distance.Between(s.x,s.y,q.x,q.y)<=BOSS.slamRadius) this.hurtSquad(q,dmg); });
+    if(Phaser.Math.Distance.Between(s.x,s.y,this.campPos.x,this.campPos.y)<=BOSS.slamRadius) this.hitCamp(e.dmg,e);
+    SFX.stomp(); this.cameras.main.shake(220,0.008);
+    const c=this.add.circle(s.x,s.y,BOSS.slamRadius,0xff8a3a,0.3).setDepth(6); this.tweens.add({targets:c,alpha:0,scale:1.15,duration:320,onComplete:()=>c.destroy()}); }
   // --- combat core ---
   damage(e,amt,type,opt){ if(e.dead) return; opt=opt||{};
     let m=(DATA.armorTable[e.armorType]||{})[type]||1; if(opt.crit&&Math.random()<opt.crit){ m*=e.boss?2.5:2; this.floatText(e.x,e.y-20,'CRIT','#f2c14e'); }
     e.hp-=amt*m; SFX.enemyHit();
+    if(e.boss&&e.hp>0) this.bossPhaseSync(e); // Upgrade 7: crossing a phase line changes the champion NOW, once
     if(opt.slow){ e.slow=Math.max(e.slow||0,opt.slow); e.slowT=Math.max(e.slowT||0,1.2); }
     if(opt.stun){ e.stun=Math.max(e.stun||0,opt.stun*(e.boss?0.3:1)); }
     if(opt.burn){ e.burn=Math.max(e.burn||0,opt.burn[0]); e.burnT=Math.max(e.burnT||0,opt.burn[1]); }
@@ -658,6 +792,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(e.slowT>0) e.slowT-=dt; else e.slow=0;
       if(e.stun>0){ e.stun-=dt; }
       else if(e.confuse>0){ e.confuse-=dt; e.x+=e.speed*0.6*dt; }
+      else if(e.boss&&e.heavyWind>0){ /* Upgrade 7: winding up a heavy blow — the champion stands committed while the ring closes; step out or take it. */ }
       else { // Upgrade 3: the camp is the prize. A defender within 90px blocks
         // the road and the enemy stops to fight it; otherwise it marches on
         // the camp and, on arrival, stays and attacks it. It never vanishes,
@@ -667,19 +802,19 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; def={x:s.x,y:s.y,kind:'squad',s}; } }
         const dc=Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y);
         if(def){ const dx=def.x-e.x, dy=def.y-e.y, dl=Math.hypot(dx,dy)||1;
-          if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0)); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
-          else { e.cd-=dt; if(e.cd<=0){ e.cd=e.rate;
+          if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0))*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
+          else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate;
             if(def.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(def.s,e.dmg);
             SFX.enemyAttack(); this.spark(def.x,def.y,0xc0392b,2); } }
         } else if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
-          const sp=e.speed*(1-(e.slow||0)); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
-        } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } }
+          const sp=e.speed*(1-(e.slow||0))*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
+        } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } }
       }
       const p={x:e.x,y:e.y}; e.spr.setOrigin(0.5,0.9).setPosition(p.x,p.y+(e.def.size||18)).setDepth((e.boss?9:7)+p.y/1000);
       e.bar.clear(); if(e.hp<e.max){ e.bar.fillStyle(0x000000,0.7); e.bar.fillRect(e.x-16,e.y-36,32,4); e.bar.fillStyle(0xa33b20,1); e.bar.fillRect(e.x-16,e.y-36,32*Math.max(0,e.hp)/e.max,4); }
     }
     this.enemies=this.enemies.filter(e=>!e.dead);
-    this.bossTick();
+    this.bossTick(dt);
     // shots
     for(const s of this.shots){ const tg=s.target; if(tg&&!tg.dead&&tg.x!==undefined){ s.lx=tg.x; s.ly=tg.y; }
       const a=Phaser.Math.Angle.Between(s.s.x,s.s.y,s.lx,s.ly), step=s.speed*dt;
