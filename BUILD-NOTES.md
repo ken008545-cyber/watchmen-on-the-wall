@@ -755,3 +755,271 @@ for the kill — the fight is short, violent and losable, not a sponge.
   its own champions is kennin's call, not made here.
 - The escort is Bible-shaped by role, so other eras inherit it when
   they unlock — untested there, like the rest of those eras.
+
+## Upgrade 8 — attack buttons + Held-Power mastery: patience is power (2026-10-30)
+Kennin's direction, from play and from the 2026-10-30 call: upgrade the
+buttons "to attack and do different things," a brawler-like fighting feel,
+and a signature mechanic of his own that players get addicted to mastering.
+The seed is his own play story: power moves are saved tools with time
+limits — cornered by five hard trolls, he held his power moves until the
+moment was forced, then spent them and lived. The mechanic built from it
+is named plainly in-game: **Held Power**. js/gxhub.js and js/tokens.js
+untouched again (zero diff); the 60s intermission, command bar, orbs and
+boss phases are untouched except where noted. Code is in js/main.js only,
+plus this note and the new harness.
+
+### 1. Held-Power mastery (constant table HELD in js/main.js)
+- Every hero power move (both skills and the ult, every hero), while OFF
+  cooldown and unspent, accrues charge — in battle time only. It does not
+  accrue while the move is on cooldown, and it cannot accrue in the shop:
+  update()'s accrual lives in the battle loop, which never runs while a
+  shop is open, so patience cannot be farmed in the 60s intermission.
+- Tiers: **Ready** at once, **Tempered** after 20s held, **Perfect** after
+  45s held. Spending multiplies the move's effect: x1 / **x1.5** / **x2.25**.
+  "The move's effect" is everything the cast does, routed through four
+  helpers inside useSkill (dmgS / shootS / buffS / ctrlS): damage numbers,
+  stun/slow/confuse durations, burn dps, squad-buff durations, heal and
+  camp-mend amounts, Manna yield, Union Shield's duration, and Royal
+  Banquet's bonus (which now stores its multiplier: 1.5 at Ready, 1.75
+  Tempered, 2.125 Perfect). Delayed effects (Five Stones' staggered
+  stones, Three Hundred, Almanac Storm, Wild West Show) are closures over
+  the cast's tier, so a Perfect ult stays Perfect stone by stone.
+- **Perfect flourish:** a Perfect cast adds a 0.6s stun rider to every
+  enemy the move touches. On David's sling moves it stacks with the
+  stone's own (scaled) stun; on a move that never stunned — Samson's
+  Jawbone Cleave — the flourish is the stun itself.
+- **Perfect can be knocked out of your hands:** hurtHero gained a heavy
+  flag, passed ONLY by the champion's heavy strike and ground slam (the
+  two boss call sites — harness-counted at exactly 2). A heavy hit drops
+  every Perfect charge to Tempered (held := 20s), floated as "Perfect
+  lost!". Ordinary enemy blows, however frequent, never touch charge.
+  Dropping one tier rather than to zero is a deliberate call: one eaten
+  slam costs the flourish, not the whole patience — the tension is real
+  but the lesson isn't cruelty.
+- **At a glance:** the skill button itself is the readout. A charge bar
+  along its bottom fills toward the next tier (dim at Ready, gold at
+  Tempered), the label gains the tier name and warms in colour, Tempered
+  gets a gold border, Perfect a bright pulsing one — and crossing a tier
+  floats "<move> — Tempered!" / "— Perfect!" over the hero.
+- **Tally:** every successful cast increments heldSpent[tier] ('No target'
+  casts consume nothing — no cooldown, no charge, no tally, exactly as
+  before). Nothing persists beyond the run.
+
+### 2. Button weight
+- The shared button() helper now presses with mass: pointerdown dips the
+  button to 0.93 scale and lights it; release springs it back. Every
+  button in the game — skills, ult, command bar, Volley, shop, menus —
+  inherits the feel from the one helper.
+- **Cooldown sweep:** skill buttons and Volley carry a graphics overlay
+  (drawSkillSweep, drawn from live state each frame) — a dark veil whose
+  height is the cooldown fraction remaining, draining as the move
+  returns; the Held charge bar takes over the same face off cooldown.
+- **Input buffer (150ms):** skill and Volley presses route through
+  pressSkill/pressVolley. A press landing within 150ms before the
+  cooldown ends is remembered and fired by update() the moment the move
+  is ready; a press earlier than the window is forgotten, as before.
+- **Order echo:** every command-bar order now also floats its name above
+  the hero ("Charge!", "Fall Back!") in the world, beside the existing
+  toast — the player sees the army heard it.
+- Plainly: the hero has no basic-attack button — he auto-attacks, as he
+  always has. Button weight was applied to the whole kit that exists.
+
+### 3. Mastery readout
+The End screen gains one line under the Grokonians tally, shown whenever
+at least one power move was cast: "Held Power: 3 Perfect, 2 Tempered,
+1 Ready" (nonzero tiers only, Perfect first). The skill is now visible
+and chaseable run over run.
+
+### Tuning rationale
+- 20s to Tempered is roughly a wave's mid-fight: one deliberate hold
+  inside a single wave. 45s to Perfect is a wave-scale decision — across
+  a wave boundary or deep into a hard one — which is the shape of
+  kennin's corner story: the save is the strategy, not a reflex.
+- x1.5 / x2.25: a Perfect regular move lands between a Tempered cast and
+  ult-class weight without reaching ult numbers (Perfect Smooth Stone =
+  270 vs one Five Stones boss-stone at 750). Mastery deepens the kit; it
+  does not replace it.
+- Multipliers are read ONLY from the cast's tier and applied ONLY to the
+  move's own numbers. No enemy stat, spawn, or curve value is read from
+  HELD anywhere (the harness's Ready-only proof below stands on this).
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all JS files; all data JSONs parse; served
+  locally: 200 for /, index.html, js/main.js, data/units.json,
+  data/game.json.
+- tools/verify_upgrade8.js (stubbed Phaser, REAL main.js, Math.random
+  pinned so measured hits are exact): **54/54 checks pass**, identical
+  across 3 repeated runs — HELD/INPUT_BUFFER tables; accrual crossing
+  Tempered at 20s and Perfect at 45s of battle time; zero accrual on
+  cooldown and zero in the shop; Psalm haste 6s / 9s / 13.5s across the
+  tiers through the real cast; Smooth Stone 120 (Ready, stun 1.5) vs 270
+  (Perfect, stun 3.375) through the real shot path; Jawbone 90 with no
+  stun (Ready) vs 202.5 + the 0.6s flourish stun (Perfect); 'No target'
+  consuming nothing; chip damage leaving Perfect untouched while a heavy
+  hit drops two Perfect charges to Tempered and spares a Tempered one;
+  the same loss through the REAL bossHeavyStrike (hero takes exactly x3
+  and loses Perfect); the input buffer through the REAL HUD buttons
+  (100ms-early skill press fires on cooldown end, Volley likewise, a
+  300ms-early press forgotten, no phantom casts); the order echo through
+  the real Charge button; drawSkillSweep clean at every state; and the
+  End screen rendering "Held Power: 3 Perfect, 2 Tempered, 1 Ready".
+- **The scaling-law proof — two competent-play simulations** of the
+  wave-10 champion fight through the real update() loop (U7's army and
+  telegraph-dodging script; the two regular moves only — the ult is
+  excluded from BOTH styles because Five Stones against a lone champion
+  is a one-button delete at any tier, 5 stones with the boss stone at
+  250x3: a pre-existing ult truth, not a mastery question):
+  - **Ready-only** (spend each move the frame it is ready; 6 casts, all
+    Ready): champion killed in **33.4s**, camp untouched at 500/500.
+    A no-mastery player finds the fight exactly as reachable as
+    Upgrade 7 left it.
+  - **Perfect-saved** (both moves held to Perfect entering the fight —
+    kennin's corner story — then spent only at Perfect again; 2 Perfect
+    casts): champion killed in **35.7s**, camp 500/500.
+  - Honest read: in the isolated champion duel the saved-Perfect style
+    was ~2s SLOWER, not faster — after the opening Perfect volley, its
+    refusal to spend at Tempered idles the kit while Ready keeps firing.
+    Mastery is not a blanket speed-up and does not trivialize anything;
+    its value is the forced moment — the Perfect that lands when the
+    fight is actually decided — which a duel against one champion
+    cannot price. What the pair of sims does prove is the law in both
+    directions: neither style breaks the fight's reachability.
+- No regressions: tools/verify_upgrade3.js (47/47), verify_upgrade4.js
+  (32/32), verify_upgrade5.js (40/40), verify_upgrade6.js (34/34),
+  verify_upgrade7.js (44/44) all still pass.
+- NOT verified (no live browser in this environment — needs kennin's
+  hands): whether the charge bar, tier label and Perfect pulse read at
+  phone size on a 175x44 button mid-fight; whether the press dip feels
+  like weight or like lag on a real touchscreen; whether the tier-cross
+  float is noticeable without being noise; and the feel of the 20s/45s
+  thresholds in real waves (both are one-line constants in HELD if a
+  playtest says they should move).
+
+### What remains
+- Thresholds and multipliers are first-pass tuning, set to be moved by
+  kennin's playtest, not defended against it.
+- The mastery readout is per-run by design; a lifetime Held record
+  (across runs, in Profile) would be a Progress change, not made here.
+- Endless waves 20/30 still field no flagged champion (Upgrade 7's open
+  question) — Held Power's heavy-loss rule therefore bites only where a
+  champion stands, for now.
+
+### Upgrade 8, second half — kennin's combat controls: two hands, one marches, one fights
+
+Kennin's addition, by voice minutes after the Held-Power brief
+(2026-10-30): a DODGE button, a BLOCK button, and a SPRINT; all attack
+buttons ON SCREEN on the right side, laid out like Minecraft /
+Brawlhalla; timing mechanics FROM THE START — the hero must NOT
+auto-fire when an enemy enters the range circle (the circle is a
+warning/range indicator only); the PLAYER presses to strike, aiming at
+the tapped area/enemy in range; and the two hands kept separate — one
+hand taps the map to move, the other works the fight buttons, attacks
+woven WITH tap-to-move, never merged into the same input. This is the
+signature control scheme of the game, in his design: **one hand marches,
+one hand fights.**
+
+**Scope call, stated openly:** the HERO went manual. Squads keep their
+existing behavior — they are the army the command bar directs, and the
+hero is the fighting-game character. Widening manual control to squads
+was not done and is not assumed; it is kennin's call if he wants it.
+
+**What was built** (all in `js/main.js`; the `FIGHT` table beside `HELD`):
+
+- **The auto-fire block is deleted.** The hero's old automatic attack
+  (nearest enemy in range, on his rate clock) is gone; the range ring
+  remains as indicator only. Harness-proven: 3 s with an enemy standing
+  inside the circle, zero strikes.
+- **The fight cluster** — five screen-fixed buttons on the right side:
+  HEAVY (1184,296) over LIGHT (1184,384), SPRINT (1076,340), DODGE
+  (1076,428), BLOCK (1184,472), with a STAMINA bar over the cluster.
+  `onTap` refuses any tap landing on the cluster (`overFight`), so a
+  fight press is never also a march order — the separation is enforced
+  in code, not just in layout, and harness-proven.
+- **Aiming:** a press strikes the enemy standing at the marching hand's
+  tap point first (within 85 px of it), else the nearest enemy inside
+  the range circle. A press with nothing in range is free — no recovery
+  is spent on air.
+- **LIGHT:** ×0.75 of the hero's basic damage, ready again after
+  ×0.55 of his basic rate — the quick hand. **HEAVY:** ×2.1 damage
+  after a real 0.28 s wind-up (the enemy owns that time; harness proves
+  nothing has landed at 0.20 s), ready after ×1.9 of rate; melee heavies
+  cleave (enemies within 46 px of the victim take half), ranged heavies
+  splash (38 px, full). One shared recovery clock for both hands — a
+  press during recovery buffers inside the same 150 ms window as
+  skills, and alternating buttons cannot machine-gun. The Strength
+  orb's damage multiplier rides both strikes, as it rode the old
+  auto-attack.
+- **DODGE:** a 150 px dash over 0.22 s in the march direction (or the
+  facing, if standing), with 0.30 s of true i-frames and a 1.6 s
+  cooldown, bufferable like the rest. Inside `hurtHero`, i-frames
+  return before ALL damage — a dodged champion heavy costs neither
+  blood nor a Perfect charge (harness-proven through the real
+  `bossHeavyStrike`).
+- **BLOCK (a hold, not a press):** pointerdown raises the guard,
+  release/outside drops it; a cyan arc shows on the hero's facing side.
+  Mitigation: 65% off ordinary blows, 45% off heavy-class blows — a
+  boss heavy lands through a guard at 55%, reduced, NEVER erased, and
+  it still knocks a Perfect charge down (harness-proven). Holding drains
+  12 stamina/s, impacts cost 8 (ordinary) / 18 (heavy) plus a fraction
+  of the damage stopped, and an emptied guard BREAKS for 1.2 s and
+  cannot be re-raised early. Blocking slows the hero to ×0.45 movement.
+- **SPRINT (a toggle):** ×1.45 hero movement, draining 8 stamina/s
+  while actually moving. Stamina is ONE pool (100, regen 16/s after a
+  0.6 s breath) shared by block and sprint, so the two postures argue —
+  that argument is the fighting game. Sprint is impossible behind a
+  raised guard and raising the guard cancels a sprint. Striking after
+  ≥0.2 s of sprinting movement earns the ×1.25 OPENER on that strike
+  and spends the built-up time.
+- **Faces:** the cluster buttons carry the same press weight as the rest
+  of Upgrade 8, live recovery veils on LIGHT/HEAVY/DODGE, and the
+  stamina pool drawn into the BLOCK base and the bar over the cluster.
+  Two new loading tips teach the scheme and the dodge/block split.
+
+**Tuning rationale:** light is deliberately a little hotter than the
+old auto-attack's DPS IF worked at full cadence (×0.75 per ×0.55 rate
+≈ ×1.36) — that surplus is the reward for hands, and the simulation
+below shows it does not break the law; heavy trades time (wind-up +
+long recovery all-in ≈ ×1.1 DPS) for burst, position, and cleave —
+burst is what kills escorts and finishes, not a faster clock. Block was
+tuned so the wave-10 champion's telegraphed heavy (≈77, ≈102 enraged)
+is survivable through a guard (≈42 / ≈56) but never ignorable, and the
+skilled answers remain dodge or repositioning, per Upgrade 7's intent.
+
+**Simulation, restated for manual combat** (same army, same kite
+script as Upgrade 7/8; the hero now fought BY HAND — scripted presses
+at a 0.3 s human cadence, LIGHT LIGHT HEAVY, dodging telegraphs when
+close; skills per style as before): **Ready-only: 29.8 s. Perfect-saved:
+34.5 s. Camp 500/500 in both.** Against the pre-controls numbers
+(33.4 s / 35.7 s with the old auto-fire), honest hands are slightly
+stronger than the machine was — a player working the buttons SHOULD
+out-fight an idle auto-attack — and Perfect remains no shortcut, for
+the same tempo reason recorded above. Reachability is intact and, if
+anything, a touch kinder to the player who plays.
+
+**Harness:** `tools/verify_upgrade8.js` now carries 100 checks: the
+Held-Power battery, the fight battery (no auto-fire, light/heavy
+numbers and timing, aim priority, attack buffer, dodge i-frames +
+champion-heavy save, block mitigation/break, sprint/opener/exclusions,
+the cluster itself through the real HUD build), the aftermath line, and
+both sims. One prior-suite touch: `verify_upgrade5.js`'s two static
+regexes asserted the OLD auto-attack call shapes (`hd.dmg*orbDmgMul()`
+at the auto-attack site); the multipliers still ride the real damage
+and movement paths, so those two assertions were re-pointed at the new
+strike/movement shapes and U5 passes whole (40). No regressions:
+U3 47/47, U4 32/32, U5 40/40, U6 34/34, U7 44/44, U8 100/100, all
+deterministic; `node --check` clean; `js/gxhub.js` and `js/tokens.js`
+zero diff. Local commit only, NOT pushed, pending kennin's word (same
+standing as the rest of Upgrade 8).
+
+**What remains, honestly:**
+- Phone feel, again kennin's hands: cluster size/placement under real
+  thumbs (the buttons are 92 px wide at 1280×720 logical — his call
+  whether the cluster should sit lower or larger), the block-hold on a
+  touchscreen while the other thumb marches, and whether the heavy
+  wind-up reads clearly at speed.
+- The heavy wind-up has no dedicated wind-up animation (the strike
+  simply lands late); a lean/flash telegraph of the hero's own would
+  help it read, if kennin wants it.
+- Enemy contact attacks still land on the hero mid-dodge only via
+  `hurtHero` (i-framed ✓); squadmates have no dodge/block — by design,
+  they are the army, not the fighter.

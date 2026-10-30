@@ -21,8 +21,8 @@ ok(main.includes('const ORBS=[') && main.includes("id:'strength'") && main.inclu
 ok(main.includes('this.buildOrbs();') && main.includes('buildOrbs(){'), 'orbs built in create()');
 ok(/find\(o=>Math\.hypot\(wx-o\.x,wy-o\.y\)<=42\)/.test(main) && main.includes('this.tryBuyOrb(orb)'), 'onTap routes orb taps (world coords) to tryBuyOrb');
 ok(main.includes("Tokens.spend('orb:'+o.def.id,o.def.cost)"), 'purchases spend through Tokens.spend');
-ok(/hd\.dmg\*this\.orbDmgMul\(\)/.test(main), 'hero damage (melee + projectile) passes through orbDmgMul()');
-ok(/hd\.speed\*this\.orbSpdMul\(\)\*dt/.test(main), 'hero movement passes through orbSpdMul()');
+ok(/dmg\*this\.orbDmgMul\(\)/.test(main), 'hero damage (melee + projectile) passes through orbDmgMul()'); // Upgrade 8: strikes are manual now — the multiplier rides lightStrike/heavyStrike's dmg
+ok(/hd\.speed\*this\.orbSpdMul\(\)/.test(main), 'hero movement passes through orbSpdMul()'); // Upgrade 8: movement speed is composed (orb x sprint x block) before *dt
 ok(/\(this\.order==='shieldwall'\?0\.6:1\)\*this\.orbSpdMul\(\)/.test(main), 'squad movement passes through orbSpdMul()');
 ok(main.includes('this.orbTick(dt)'), 'update() ticks orb buffs/cooldowns');
 ok(main.includes('this.buffTxt=') && main.includes("'STR '") && main.includes("'SPD '") && main.includes("'IRON '"), 'HUD buff-timer line (STR/SPD/IRON) wired');
