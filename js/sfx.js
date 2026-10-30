@@ -17,6 +17,13 @@ window.SFX = (function(){
     cloud(){ if(lim('cl',400)) nz(0.5,300,0.5,0.06,'lowpass'); },
     hit(){ if(lim('hit',40)) nz(0.05,2500,3,0.08); },
     die(){ if(lim('die',50)) tone('square',300,60,0.12,0.06); },
+    // Upgrade 3: enemy + camp + coin voices. Small random pitch so repeats never sound canned; all throttled.
+    enemyHit(){ if(lim('ehit',45)){ const v=0.92+Math.random()*0.16; nz(0.04,3000*v,3,0.055); tone('square',640*v,300*v,0.045,0.035); } },
+    enemyDie(){ if(lim('die',50)) tone('square',320*(0.9+Math.random()*0.2),55,0.14,0.06); },
+    enemyAttack(){ if(lim('eatk',130)){ const v=0.92+Math.random()*0.16; tone('sine',150*v,70*v,0.12,0.11); nz(0.08,300,1,0.09,'lowpass'); } },
+    campHit(){ if(lim('camp',260)){ tone('sine',92,44,0.3,0.3); nz(0.25,170,0.7,0.22,'lowpass'); } },
+    campWarning(){ if(lim('campw',900)){ tone('sine',120,58,0.25,0.3); setTimeout(()=>tone('sine',120,58,0.3,0.3),190); } },
+    coinPickup(grok){ if(lim('coin',70)){ const b=grok?1.25:1; tone('triangle',880*b,880*b,0.09,0.11); setTimeout(()=>tone('triangle',1318*b,1318*b,0.14,0.11),70); } },
     build(){ tone('triangle',440,660,0.12,0.15); setTimeout(()=>tone('triangle',660,880,0.12,0.12),90); },
     leak(){ tone('sine',200,80,0.4,0.25); },
     stomp(){ tone('sine',90,30,0.6,0.5); nz(0.4,150,0.5,0.4,'lowpass'); },

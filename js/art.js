@@ -24,6 +24,10 @@ window.makeArt = function(scene){
   tex('stone',16,16,(g)=>{ g.fillStyle(0x000000,0.35); g.fillCircle(9,10,5); g.fillStyle(0x8a8274,1); g.fillCircle(8,8,5); g.fillStyle(0xc8c0b0,1); g.fillCircle(6.5,6.5,2); g.lineStyle(2,INK); g.strokeCircle(8,8,5);});
   tex('ember',24,24,(g)=>{ g.fillStyle(0xd8572a,0.25); g.fillCircle(12,12,11); g.fillStyle(0xd8572a,0.6); g.fillCircle(12,12,7); g.fillStyle(0xf2c14e,1); g.fillCircle(12,12,4.5); g.fillStyle(0xfff3c0,1); g.fillCircle(11,11,2);});
   tex('spark',8,8,(g)=>{ g.fillStyle(0xffffff,1); g.fillCircle(4,4,3);});
+  // --- Field coins (Upgrade 3): gold disc with a darker rim, an inner ring and a star heart ---
+  tex('coin',26,26,(g)=>{ g.fillStyle(0xd9a441,1); g.fillCircle(13,13,11); g.lineStyle(2,0x8a6420,1); g.strokeCircle(13,13,11); g.lineStyle(1.5,0xa87a28,1); g.strokeCircle(13,13,7); g.fillStyle(0xf2c14e,1); g.fillTriangle(13,8.5,14.6,11.8,18,11.8,15.2,13.8,16.4,17.5,13,15.4,9.6,17.5,10.8,13.8,8,11.8,11.4,11.8); });
+  // Grokonian coin: same coin, struck brighter — pale gold with a white-hot ring.
+  tex('coing',26,26,(g)=>{ g.fillStyle(0xf2c14e,1); g.fillCircle(13,13,11); g.lineStyle(2,0xd9a441,1); g.strokeCircle(13,13,11); g.lineStyle(1.5,0xfff3c0,1); g.strokeCircle(13,13,7); g.fillStyle(0xfff8dd,1); g.fillTriangle(13,8.5,14.6,11.8,18,11.8,15.2,13.8,16.4,17.5,13,15.4,9.6,17.5,10.8,13.8,8,11.8,11.4,11.8); });
   tex('spear',40,8,(g)=>{ g.fillStyle(0x5a4020,1); g.fillRect(0,3,32,2); g.fillStyle(0x9c7a3c,1); g.fillTriangle(30,0,40,4,30,8);});
   // Ark of the covenant shown as a simple tent camp (no depiction of holy objects in combat)
   tex('camp',90,70,(g)=>{ g.fillStyle(0x8a6a3c,1); g.fillTriangle(5,65,45,8,85,65); g.lineStyle(3,INK); g.strokeTriangle(5,65,45,8,85,65); g.fillStyle(0x3a2412,1); g.fillTriangle(35,65,45,35,55,65); g.lineBetween(45,8,45,0);});

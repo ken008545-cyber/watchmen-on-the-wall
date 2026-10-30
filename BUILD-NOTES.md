@@ -250,3 +250,171 @@ covering its lower half.
   policy limit as before) — the balance change is harness-verified,
   not yet human-played; whether wave 5 now falls to a first-time
   player needs a real run at the playtest address.
+
+## Upgrade 3 — kennin's feature list (2026-10-30)
+
+Built from kennin's own list after playing Upgrade 2: loading screen + logo,
+fullscreen, his music, enemy sounds, camp/respawn redesign, a bigger
+explorable map with coins, and more soldiers + upgrades. The flattened
+scaling law, goal wave 10, heroes, battle pass and progression are untouched.
+`js/gxhub.js` and `js/tokens.js` untouched again.
+
+### Loading screen + logo
+- Boot now preloads ONLY the logo, then builds a real loading screen in
+  create(): logo large, "WATCHMEN ON THE WALL / Conquest", a progress bar
+  driven by the loader's progress event, a percent readout, and a rotating
+  tip line (7 tips, 2.4s apart). All remaining assets queue behind it.
+  A loaderror listener swallows failures of optional files so a missing
+  music track or unit PNG can never stall the load. After 'complete', the
+  screen holds for the remainder of a 900ms minimum so it never flashes past.
+- The Menu logo is slightly larger (232 -> 252px tall).
+
+### Fullscreen / full-screen fill
+- The Phaser config already used Scale.FIT + CENTER_BOTH at 1280x720;
+  index.html CSS now also zeroes body padding and caps the canvas at
+  100vw/100vh with display:block. A **Fullscreen** button sits on the Menu
+  (top right) and in the battle HUD (above the speed button); both call
+  `this.scale.startFullscreen()` in a try/catch.
+
+### Music — and kennin's first track HAS ARRIVED
+- New `js/music.js` (loaded in index.html before main.js). Slots:
+  `assets/music/menu.mp3` and `assets/music/battle.mp3`, queued in Boot.
+- **kennin's first track is in the build:** `assets/music/battle.mp3` —
+  his song "demon diss" (MP3, 2:38, 3.8 MB, converted from the .m4a he
+  sent; the original is preserved OUTSIDE the build at
+  ~/workspace/watchmen-conquest/music-inbox/demon-diss-original.m4a and is
+  not shipped). Boot loads it as a real file load — the loading screen's
+  progress now genuinely includes it. In the Game scene it plays looped
+  at volume 0.30, under the SFX. Menu track slot is still empty, so the
+  menu falls back to the pad until a menu.mp3 arrives.
+- Fallback (placeholder, clearly not a composition): a generative WebAudio
+  pad on the SFX context — two detuned oscillators (sine -4 cents,
+  triangle +5) per tone of a slow A-minor-family chord, lowpass 520Hz,
+  gain 0.04, chords drifting every 7s.
+- File tracks: menu 0.35 / battle 0.30 volume, looped. Scene hooks: Menu,
+  EraSelect, HeroSelect -> menu track; Game -> battle track; re-entering a
+  scene with the same track does not restart it. A **Music: on/off**
+  button sits next to Sound on the Menu (the Sound and Music buttons now
+  share the old Sound button's row at half width each), persisted in
+  localStorage key `gxhub_wotw_music`.
+- Autoplay: the pad shares the SFX AudioContext, which every button press
+  already resumes (SFX.unlock); file playback is attempted on scene entry
+  and retried on later scene entries if the context was still locked.
+
+### Enemy sounds (js/sfx.js)
+- New voices, all throttled and given small random pitch variation:
+  enemyHit (tick, on every damage()), enemyDie (descending blip, replaces
+  the generic die() in kill()), enemyAttack (low thud when an enemy hits a
+  defender), campHit (deep thud, 260ms throttle), campWarning (soft double
+  thud, first camp attack of a wave), coinPickup (two-note chime; the
+  Grokonian coin rings a fourth higher).
+
+### Camp + respawn redesign (replaces lives)
+- CAMP_MAX 500. The HUD stat line and a bar above the camp tent read
+  "Camp 500/500". The old leak path is gone entirely: enemies no longer
+  vanish at the camp line and lives/maxLives/leaked* no longer exist.
+- Enemy AI rewritten: the camp is the target. A defender (hero or squad)
+  within 90px blocks the road — the enemy closes and fights it; when the
+  defender dies or moves off, the march resumes. At camp range
+  (dist <= enemy range + 34) the enemy stops and attacks the camp for its
+  dmg per its rate; the goal-wave champion deals x3 camp damage.
+- Hero death: down 8s (was 10), respawns at the camp at full HP ONLY while
+  camp HP > 0 (factored into tickHeroDown). Camp HP 0 -> defeat,
+  "The Camp has Fallen", whatever else is true.
+- Camp feedback: camp sprite flashes on hit, campHit sound (throttled),
+  one "The camp is under attack!" toast + campWarning per wave.
+- Kept systems re-pointed: Union Shield now makes the CAMP take no damage
+  for 10s (hitCamp early-returns while shieldT > 0); the Ark mends the
+  camp +50 (capped) instead of +5 lives; a "perfect" wave/run now means
+  the camp took no damage; victory/end stars come from remaining camp HP
+  (>=85% 3 stars, >=45% 2, else 1); end score's old lives term became
+  round(campFrac*20)*50 so score scale is unchanged.
+- First-shop explainer line now reads: "If the camp falls, the run falls —
+  and the fallen hero only returns while it stands."
+
+### Bigger explorable map + coins
+- eras.json: worldW/worldH per era — bible 1920x1200, the six locked eras
+  1600/1000 placeholders. The Game world uses them: background stretched
+  to world size (v1: the Elah painting stretched, plus the same dim wash),
+  night overlay covers the whole world, camera bounds = world, camera
+  follows the hero sprite (lerp 0.08). There is no physics engine in this
+  game; "world bounds" = camera bounds + tap-target clamping.
+- Screen furniture pinned: HUD bar/stat/order text, command + skill +
+  speed + fullscreen buttons, boss bar/name, toasts, shop and victory
+  overlays all carry scrollFactor 0 — via direct calls (toast, boss) and a
+  fixUI() sweep (any child at depth >= 30) run after buildHUD, after every
+  shop render, and after the victory panel builds.
+- Taps convert with pointer.worldX/worldY (move + Volley); the HUD
+  exclusion still uses the screen-space p.y. Targets clamp to the world.
+- Camp at (150, 600); hero and new squads start beside it; enemies spawn
+  at x = worldW + 20, y spread 120..worldH-160.
+- Coins: during an active wave one spawns every ~6s (max 8 out), at least
+  220px right of the camp and 160px from the right edge. New textures in
+  makeArt: 'coin' (gold disc, darker rim, inner ring, star heart) and
+  'coing' (brighter strike for the Grokonian coin). Coins sparkle (scale/
+  alpha tween), persist between waves, and the hero collects within 28px:
+  +8 Manna; every 6th spawned coin is a Grokonian coin (+1 via earn()).
+
+### More soldiers + more upgrades (Bible; data-driven as before)
+- Levite Healer (support, 230, hp 90, dmg 4, range 110, rate 1.4, sprite
+  'priest', soft-green tint, healsSquads): in the squad loop it mends the
+  most-wounded squad within 120px for 6 HP/s with a green spark; its own
+  attacks ride the ranged projectile path like other ranged roles.
+- Armor Bearer (shield, 260, hp 380, dmg 6, sprite 'bearer') with
+  Bulwark 520 (+200 hp, +3 dmg, +0.3 armor) — mirrors Gate Shieldbearer.
+- Gate Spearman (spear, 210, hp 170, dmg 15, sprite 'spearman') with
+  Drill t1 230.
+- Slinger of Elah (ranged, 120, hp 70, dmg 7, rate 0.7 — the fastest
+  hands in the roster) with Swift Hands 200 (new rateMul mechanic: x0.7
+  rate). Sprite is the atlas sling frame 't_sling0' (see decisions).
+- Chained upgrades via a new "req" field, enforced in the shop render AND
+  in the purchase handler through Game.upgradeLocked(); a locked upgrade
+  renders disabled with a "🔒 Needs <name>" note. Shop upgrade rows now
+  stack vertically so chains fit the card.
+  - Swordsman of Gideon: Drill t2 420 (req drill1, +60 hp, +8 dmg)
+  - Benjamite Archer: Drill t2 380 (req drill1, +30 hp, +7 dmg)
+  - Shepherd Militia: Veteran 400 (req branch, +40 hp, +4 dmg)
+  - Shieldman of Judah: Bulwark t2 640 (req bulwark, +120 hp, +0.15 armor)
+- The Bible roster is now 16 player units, so the shop runs to 3 pages.
+
+### Design decisions kennin did not specify (made plainly, all reversible)
+1. Loading minimum hold is 900ms from Boot start — enough to read the
+   logo and one tip; the bar itself is file-count progress (Phaser's
+   loader), not bytes, so the 3.8MB battle track counts as one file
+   among ~45 even though it dominates the wait on a slow connection.
+2. Camp attack range = enemy range + 34px (the tent's visual radius);
+   blocking range is the specified 90px.
+3. "Perfect" (wave bonus + perfect-clear Grokonians) now means the camp
+   took no damage — the direct analog of the old no-leak rule.
+4. Slinger of Elah's sprite is the old tower sling frame 't_sling0': the
+   atlas holds no non-hero human figure with a sling, and hero frames
+   were off-limits. The Levite's green tint separates it from the enemy
+   Baal Priest, which shares the 'priest' frame.
+5. Bulwark t2's armorAdd is +0.15 (the spec said "+armor" without a
+   number); a fully-built Shieldman reaches 0.70 armor before the
+   Shield Wall order multiplier. Strong, priced like it (585 + 640).
+6. Score keeps its old scale by valuing camp fraction at the old 20-life
+   rate (round(frac*20)*50).
+7. Music file volumes: battle 0.30, menu 0.35 — under the SFX by ear.
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all JS files; all 5 data JSONs parse.
+- tools/verify_upgrade3.js (stubbed Phaser, real main.js): **47/47 checks
+  pass** — scale config + fullscreen calls, index CSS/music wiring, coin
+  textures, all six new SFX voices, music toggle persistence + pad,
+  battle.mp3 present (>3.7MB) while menu.mp3 absent (pad path), the
+  inbox .m4a NOT in the build, era world sizes, all four new units'
+  fields, all four req chains, live config FIT/CENTER_BOTH, CAMP_MAX 500,
+  hitCamp damage/defeat-at-0/Union-Shield/boss-x3, hero down=8s, respawn
+  at the camp at full HP, NO respawn with camp HP 0, coin +8 Manna in
+  28px, Grokonian coin through earn(), upgradeLocked open/shut cases.
+- Local server: 200 for /, js/main.js, js/music.js, data/units.json,
+  data/eras.json, a unit PNG, and assets/music/battle.mp3 (audio/mpeg).
+- NOT verified (no live browser in this environment — needs kennin's or a
+  playtest's hands): camera follow feel and HUD pinning while scrolled,
+  fullscreen behaviour on a phone (browser chrome, notch, resume),
+  whether the stretched Elah backdrop reads well at 1920x1200, the
+  loading screen's real duration on a phone connection with the 3.8MB
+  track, audio unlock timing on first tap, camp-defense balance (500 HP
+  against full waves designed for the lives system — first pass, expect
+  to tune), and whether 16 shop units across 3 pages stays readable.

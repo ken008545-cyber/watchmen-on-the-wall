@@ -8,6 +8,8 @@
    "id": "bible",
    "name": "Bible",
    "playable": true,
+   "worldW": 1920,
+   "worldH": 1200,
    "bg": "bg_elah",
    "verse": "\"The battle is the LORD's.\" 1 Samuel 17:47",
    "blurb": "Valley of Elah \u2014 shepherds and slingers against the idols."
@@ -16,6 +18,8 @@
    "id": "roman",
    "name": "Roman",
    "playable": false,
+   "worldW": 1600,
+   "worldH": 1000,
    "bg": null,
    "blurb": "Cohorts against the Brass Empire. Battlefield art coming."
   },
@@ -23,6 +27,8 @@
    "id": "medieval",
    "name": "Medieval",
    "playable": false,
+   "worldW": 1600,
+   "worldH": 1000,
    "bg": null,
    "blurb": "Men-at-arms against the Gloom Barons. Battlefield art coming."
   },
@@ -30,6 +36,8 @@
    "id": "colonial",
    "name": "Colonial",
    "playable": false,
+   "worldW": 1600,
+   "worldH": 1000,
    "bg": null,
    "blurb": "The Sabre Line against the Crown of Fog. Battlefield art coming."
   },
@@ -37,6 +45,8 @@
    "id": "civilwar",
    "name": "Civil War",
    "playable": false,
+   "worldW": 1600,
+   "worldH": 1000,
    "bg": null,
    "blurb": "Line Infantry against the Rust Raiders. Battlefield art coming."
   },
@@ -44,6 +54,8 @@
    "id": "wwiwwii",
    "name": "WWI / WWII",
    "playable": false,
+   "worldW": 1600,
+   "worldH": 1000,
    "bg": null,
    "blurb": "Troopers against the Clockwork Legion. Battlefield art coming."
   },
@@ -51,6 +63,8 @@
    "id": "modern",
    "name": "Modern",
    "playable": false,
+   "worldW": 1600,
+   "worldH": 1000,
    "bg": null,
    "blurb": "Peacekeepers against the Glitch Horde. Battlefield art coming."
   }

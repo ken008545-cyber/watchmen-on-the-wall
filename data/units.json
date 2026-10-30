@@ -36,6 +36,14 @@
         "speedAdd": 22
        }
       ]
+     },
+     {
+      "id": "veteran",
+      "name": "Veteran",
+      "cost": 400,
+      "req": "branch",
+      "hpAdd": 40,
+      "dmgAdd": 4
      }
     ]
    },
@@ -80,6 +88,14 @@
       "hpAdd": 220,
       "dmgAdd": 3,
       "armorAdd": 0.35
+     },
+     {
+      "id": "bulwark2",
+      "name": "Bulwark t2",
+      "cost": 640,
+      "req": "bulwark",
+      "hpAdd": 120,
+      "armorAdd": 0.15
      }
     ]
    },
@@ -114,6 +130,14 @@
       "cost": 255,
       "hpAdd": 40,
       "dmgAdd": 6
+     },
+     {
+      "id": "drill2",
+      "name": "Drill t2",
+      "cost": 420,
+      "req": "drill1",
+      "hpAdd": 60,
+      "dmgAdd": 8
      }
     ]
    },
@@ -136,6 +160,14 @@
       "cost": 210,
       "hpAdd": 20,
       "dmgAdd": 5
+     },
+     {
+      "id": "drill2",
+      "name": "Drill t2",
+      "cost": 380,
+      "req": "drill1",
+      "hpAdd": 30,
+      "dmgAdd": 7
      }
     ]
    },
@@ -265,6 +297,86 @@
       "cost": 290,
       "hpAdd": 60,
       "dmgAdd": 4
+     }
+    ]
+   },
+   {
+    "id": "levite_healer",
+    "name": "Levite Healer",
+    "role": "support",
+    "hp": 90,
+    "dmg": 4,
+    "range": 110,
+    "rate": 1.4,
+    "speed": 85,
+    "cost": 230,
+    "sprite": "priest",
+    "tint": "0xbfe3c8",
+    "healsSquads": true
+   },
+   {
+    "id": "armor_bearer",
+    "name": "Armor Bearer",
+    "role": "shield",
+    "hp": 380,
+    "dmg": 6,
+    "range": 36,
+    "rate": 1.1,
+    "speed": 75,
+    "cost": 260,
+    "sprite": "bearer",
+    "tint": "0xd8c9a3",
+    "upgrades": [
+     {
+      "id": "bulwark",
+      "name": "Bulwark",
+      "cost": 520,
+      "hpAdd": 200,
+      "dmgAdd": 3,
+      "armorAdd": 0.3
+     }
+    ]
+   },
+   {
+    "id": "gate_spearman",
+    "name": "Gate Spearman",
+    "role": "spear",
+    "hp": 170,
+    "dmg": 15,
+    "range": 58,
+    "rate": 1.0,
+    "speed": 88,
+    "cost": 210,
+    "sprite": "spearman",
+    "tint": "0xe8dcc0",
+    "upgrades": [
+     {
+      "id": "drill1",
+      "name": "Drill t1",
+      "cost": 230,
+      "hpAdd": 35,
+      "dmgAdd": 5
+     }
+    ]
+   },
+   {
+    "id": "slinger_elah",
+    "name": "Slinger of Elah",
+    "role": "ranged",
+    "hp": 70,
+    "dmg": 7,
+    "range": 150,
+    "rate": 0.7,
+    "speed": 95,
+    "cost": 120,
+    "sprite": "t_sling0",
+    "tint": "0xf0dfae",
+    "upgrades": [
+     {
+      "id": "swift",
+      "name": "Swift Hands",
+      "cost": 200,
+      "rateMul": 0.7
      }
     ]
    }
