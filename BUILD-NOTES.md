@@ -1484,3 +1484,167 @@ real game is untouched. All suites green: U3 47, U4 32, U5 40, U6 34,
 U7 44, U8 93, U9 61, U10 77, U11 81 — **509 checks**. `node --check`
 clean. `js/gxhub.js` and `js/tokens.js` zero diff. Local commit only,
 NOT pushed.
+
+## Upgrade 12 — Controls Are Yours: custom layout, keybinds, movement schemes (2026-10-30)
+
+Kennin's three rulings from the 2026-10-30 calls: players change their
+button layout "like people can do in their settings on Fortnite";
+players "change their key binds and stuff like that"; and "people
+should also be able to use a joystick, touch to move around and like a
+arrow like on slither.io." All three persist per player in one
+localStorage settings family — `gxhub_wotw_layout`,
+`gxhub_wotw_binds`, `gxhub_wotw_move`. `js/gxhub.js` and `js/tokens.js`
+untouched again (zero diff). Code is in `js/main.js` only, plus this
+note and the new harness.
+
+### Ruling 1 — the custom button layout
+- Every movable battle control (the right-thumb stack: AUTO-FIRE,
+  DODGE, BLOCK, SPRINT, the three power buttons; the whole command
+  row: the six orders, Volley, CAMP, Rally — 16 in all) registers
+  itself as it is built, in a `LAYOUT_DEFS` table whose defaults ARE
+  the Upgrade-10 geometry. Construction is unchanged — buttons are
+  born at the approved sketch — and `applyLayout()` then moves any
+  button the player's save names, syncing every coordinate the game
+  keeps beside it: sweep origins (`sx`/`sy`), the `fightRects` onTap
+  wall, the CAMP/RALLY tap walls, the stamina bar (now drawn under
+  the toggle wherever the toggle lives) and the tutorial's rings.
+  One position per button, never two. With no save, geometry is
+  byte-for-byte U10 (harness-asserted).
+- **Two doors, one editor.** The menu gains a **Controls** button →
+  a new `Settings` scene, where the layout is edited on GHOST buttons
+  (the game's own button face) standing at the layout's real positions
+  over the battlefield art; and the battle HUD gains a small **⚙**
+  (top right, above the stack, walled in onTap like CAMP) opening a
+  **pause overlay** — the fight genuinely holds (`update()` returns
+  while paused) — whose Edit Layout mode drags the REAL buttons, so
+  the layout applies the moment DONE is pressed. Both editors are the
+  one `layoutEditor()` helper; both carry RESET LAYOUT, which clears
+  the save and puts every button back at the exact default.
+- **Editing cannot misfire.** While editing, the items are
+  non-interactive (a drag can never fire a button), the banner reads
+  EDITING LAYOUT in gold, field taps are walled in `onTap` (a dragging
+  tap never becomes a march/selection order — the U8/U9 separation
+  law), and drags clamp so a button always stays fully on screen.
+  Positions save as each drag ends.
+
+### Ruling 2 — keybinds
+- The Settings scene lists all 16 battle actions → key. Click a key,
+  press the new one ("press a key…"); **Escape cancels**; clicking
+  elsewhere cancels too. **Conflict law (chosen, recorded): a SWAP** —
+  the action that held the captured key receives the key being given
+  up, so no action is ever left keyless.
+- **Defaults (chosen, recorded):** Space = Dodge, Shift (left, hold) =
+  Block, V = Sprint, 1/2/3 = the three powers in stack order, T =
+  Auto-fire toggle, B = Camp panel, Q = Volley, E = Rally, and the
+  orders on the home row — Z Charge, X Hold, F Follow Me, G Flank,
+  H Fall Back, J Shield Wall.
+- `Game.keyAction` routes every key to the SAME function its button
+  calls (`pressDodge`, `setBlock`, `toggleSprint`, `pressSkill`,
+  `pressVolley`, `pressRally`, `toggleCampPanel`, `toggleAutoFire`,
+  `giveOrder`) behind the same gates the buttons live behind (shop
+  open, victory choice, pause, layout editing, run over). Block is
+  the one hold: keydown raises the guard, keyup drops it, and a
+  release is honored even if the world changed mid-hold. Because the
+  paths are shared, the tutorial credits a dodge KEY exactly as it
+  credits the button (harness-proven).
+
+### Ruling 3 — movement schemes (the hero only)
+- **TAP** (default): unchanged — onTap resolves on pointerdown, the
+  hero marches where tapped.
+- **STICK**: a floating-base virtual joystick. A field press is held
+  (`pendTap`); drag it past 16px and the stick is born where the
+  thumb landed — base ring and knob drawn on the screen layer, hero
+  running continuously in the stick's direction at his normal speed
+  (sprint and the guard's drag still apply in the one movement
+  block). Release collapses his target to where he stands: a full
+  stop, not a glide.
+- **FOLLOW** (Slither-style): hold a field press for 280ms (or drag
+  it) and the hero runs to your finger while it stays down; a gold
+  arrow from the hero shows the heading (`moveHeading`). Release
+  stops him.
+- **The disambiguation law, whole:** under STICK/FOLLOW a quick,
+  still release resolves as a tap through the very same `onTap` path —
+  selection, squad posting, orb taps, Volley and Rally spots all keep
+  working — while a steering drag is cancelled as a tap and can never
+  post or select. Posting is an ORDER and works under every scheme;
+  the hero's own march-by-tap exists under TAP only (off TAP, a
+  ground tap never sends him — he is steered, not sent). Squad
+  tap-to-order (U9) and the command bar are untouched. The scheme
+  switches any time — Controls at the menu, or the pause overlay
+  mid-battle — and persists.
+- **Tutorial interplay (chosen, recorded):** the tutorial forces TAP
+  for its own scene (init), and when the player's saved scheme is not
+  TAP its first line says so — "The tutorial teaches tap-to-move;
+  your own scheme waits outside." The tutorial never writes the
+  scheme, so the player's choice is exactly where they left it
+  afterwards (harness-proven).
+
+### Scope calls (the scribe's, stated plainly)
+1. **Positions only — no button scaling.** The brief allowed a
+   uniform scale if trivially safe; a Phaser container's hit area
+   does not scale as simply as its face, and an honest hit area
+   matters more than the knob. Sizes stay the approved family.
+2. **The stick is direction-only past a 10px deadzone** — the hero
+   runs at his normal speed, per the ruling's own words; deflection
+   depth does not throttle speed in this pass.
+3. **Keybind capture lives in the menu's Controls scene**, not the
+   battle pause (which carries movement + layout + resume + quit) —
+   a mid-fight rebind is a rare errand, and the pause stays small.
+4. **The ⚙ refuses to open during the tutorial** (with a toast saying
+   why): the lesson's Exit already stands at the top, and the pause's
+   scheme buttons must never quietly un-force the tutorial's TAP.
+5. The pause is a true pause of the battle loop; the shop's wall-clock
+   intermission is upstream of it and unreachable while it stands
+   (the ⚙ sits under the shop panel, and openShop's branch runs
+   first), so no timer can be gamed through it.
+
+### Verification (2026-10-30, this machine)
+- `node --check` clean on every JS file; all data JSONs parse;
+  `js/gxhub.js` / `js/tokens.js` zero diff; local server serves the
+  new main.js (200, U12 markers present).
+- tools/verify_upgrade12.js (stubbed Phaser, REAL main.js): **66/66
+  checks pass** — the settings family and both doors; defaults
+  byte-equal to U10 with no save (all 16 controls + both tap walls);
+  the save → rebuild round-trip (container, sweep origin, fightRects
+  and CAMP wall move together; unnamed buttons keep defaults); RESET
+  restoring defaults; a real in-battle editor drag (buttons disabled,
+  DODGE moved but never fired, field tap walled, layout saved at drag
+  end, next battle opens with it); the bind defaults (all distinct),
+  capture + persistence, the swap in both directions, Escape; the
+  keyboard driving dodge/block/sprint/Psalm/auto-fire/Charge through
+  the real functions, walled behind the shop, and earning tutorial
+  credit; scheme persistence; the tutorial forcing TAP, saying so,
+  and leaving the saved scheme untouched; STICK steering east at the
+  hero's speed (210px in 1.5s of harness time) with release-stop;
+  the disambiguation battery (quick taps select and post under STICK,
+  a steering drag never posts, no march-tap off TAP); FOLLOW arming
+  on a hold, bearing −0.80 rad to a north-east finger and −π/2 due
+  north, closing distance while held, ending on release; TAP
+  byte-unchanged behavior; and the competent-play sim at **32.5 s,
+  camp 500/500** — the standing benchmark, so default controls play
+  the identical game.
+- No regressions: U3 47/47, U4 32/32, U5 40/40, U6 34/34, U7 44/44,
+  U8 93/93, U9 61/61, U10 77/77, U11 81/81 — **575 checks** in all.
+  (One build-time correction, kept honest: the first cut rebuilt the
+  CAMP wall from the container's raw position inside syncLayoutMeta
+  and added size literals at registry call sites; U10's geometry
+  counts caught both. The registry now takes sizes from LAYOUT_DEFS
+  and the CAMP/RALLY walls follow only their sync callbacks — the
+  suites as they stand assert the corrected shape.)
+- NOT verified (no live browser in this environment — needs kennin's
+  hands): the drag FEEL (does a button track the thumb cleanly, does
+  the 16px tap/drag threshold read as intent), the stick's size and
+  where its floating base wants to live, whether the follow arrow
+  reads at phone zoom mid-fight, the ⚙'s reachability above the
+  stack, and whether the Settings ghost editor's flat field teaches
+  positions as honestly as the live one. Local commit only, NOT
+  pushed (the parent sequences pushes).
+
+**What remains for kennin's hands (Upgrade 12):**
+- Drag feel and the tap/drag threshold (16px, 500ms quick-tap window,
+  280ms follow hold) — all one-line constants of feel, his to move.
+- Stick size/placement: base radius 52, knob 23, born where the thumb
+  lands — whether it wants to be bigger, or fixed instead of floating.
+- Follow-arrow readability at battle zoom, and whether FOLLOW should
+  also steer while the finger DRAGS only (today a held still press
+  arms it too, the slither way).

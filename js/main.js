@@ -118,6 +118,77 @@ const FIGHT={ dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6,
 const AUTOFIRE_KEY='gxhub_wotw_autofire';
 function loadAutoFire(){ try{ const v=localStorage.getItem(AUTOFIRE_KEY); return v===null?true:v==='1'; }catch(e){ return true; } }
 function saveAutoFire(on){ try{ localStorage.setItem(AUTOFIRE_KEY,on?'1':'0'); }catch(e){} }
+// Upgrade 12 — CONTROLS ARE YOURS (kennin, three rulings, 2026-10-30):
+// (1) a custom BUTTON LAYOUT, changed "like people can do in their
+// settings on Fortnite" — drag the battle controls where your thumbs
+// want them; (2) KEYBINDS — the battle actions rebindable from a
+// Settings list, click-to-capture; (3) MOVEMENT SCHEMES — the hero walks
+// by TAP (the original), by a virtual JOYSTICK, or Slither-style FOLLOW
+// (hold on the field and he runs to your finger, arrow showing the way).
+// All three persist per player in localStorage, in one settings family:
+// gxhub_wotw_layout / gxhub_wotw_binds / gxhub_wotw_move. The battle
+// builds every control at its Upgrade-10 default FIRST and applies a
+// saved layout afterwards, so with no save the geometry is byte-for-byte
+// the approved sketch. Scope call, stated plainly: positions only — no
+// button scaling in this upgrade (a container's hit area does not scale
+// as simply as its face, and an honest hit area matters more than the
+// extra knob; size stays the approved 110x56 / 196x56 family).
+const LAYOUT_KEY='gxhub_wotw_layout', BINDS_KEY='gxhub_wotw_binds', MOVE_KEY='gxhub_wotw_move';
+// The movable battle controls: [id, editor label, w, h, default x, default y].
+// The defaults ARE the Upgrade-10 geometry (stack x 1178; row from x 130,
+// pitch 117, y HUD_Y+55=665).
+const LAYOUT_DEFS=[
+  ['autofire','AUTO-FIRE',196,56,1178,70],['dodge','DODGE',196,56,1178,176],['block','BLOCK',196,56,1178,240],['sprint','SPRINT',196,56,1178,304],
+  ['skill0','Power 1',196,56,1178,368],['skill1','Power 2',196,56,1178,432],['skill2','Power 3',196,56,1178,496],
+  ['cmd_charge','Charge',110,56,130,665],['cmd_hold','Hold',110,56,247,665],['cmd_follow','Follow Me',110,56,364,665],['cmd_flank','Flank',110,56,481,665],
+  ['cmd_fallback','Fall Back',110,56,598,665],['cmd_shieldwall','Shield Wall',110,56,715,665],['cmd_volley','Volley',110,56,832,665],
+  ['cmd_camp','CAMP',110,56,949,665],['cmd_rally','Rally',110,56,1066,665]];
+function defaultLayoutPos(){ const o={}; LAYOUT_DEFS.forEach(d=>{ o[d[0]]={x:d[4],y:d[5]}; }); return o; }
+function loadLayout(){ try{ const v=JSON.parse(localStorage.getItem(LAYOUT_KEY)||'null'); if(v&&v.pos&&typeof v.pos==='object') return v; }catch(e){} return null; }
+function saveLayout(pos){ try{ localStorage.setItem(LAYOUT_KEY,JSON.stringify({pos})); }catch(e){} }
+function resetLayout(){ try{ localStorage.removeItem(LAYOUT_KEY); }catch(e){} }
+function layoutPositions(){ return Object.assign(defaultLayoutPos(),(loadLayout()||{pos:{}}).pos||{}); }
+// Keybinds: [action id, Settings label]. The keyboard drives the SAME
+// action functions the buttons drive (Game.keyAction) — no parallel
+// logic. Defaults, chosen and recorded: Space dodges (the panic key
+// under the thumb), Shift holds the guard, 1/2/3 are the powers in
+// stack order, Q/E are the two targeting modes, B opens the camp, T
+// flips auto-fire, and the orders sit on the Z X F G H J home row.
+const BIND_ACTIONS=[
+  ['dodge','Dodge'],['block','Block (hold)'],['sprint','Sprint'],['skill0','Power 1 (top)'],['skill1','Power 2'],['skill2','Power 3 (ult)'],['autofire','Auto-fire toggle'],['camp','Camp panel'],
+  ['volley','Volley'],['rally','Rally'],['charge','Order: Charge'],['hold','Order: Hold'],['follow','Order: Follow Me'],['flank','Order: Flank'],['fallback','Order: Fall Back'],['shieldwall','Order: Shield Wall']];
+const DEFAULT_BINDS={ dodge:'Space', block:'ShiftLeft', sprint:'KeyV', skill0:'Digit1', skill1:'Digit2', skill2:'Digit3', autofire:'KeyT', camp:'KeyB',
+  volley:'KeyQ', rally:'KeyE', charge:'KeyZ', hold:'KeyX', follow:'KeyF', flank:'KeyG', fallback:'KeyH', shieldwall:'KeyJ' };
+function loadBinds(){ const b=Object.assign({},DEFAULT_BINDS);
+  try{ const v=JSON.parse(localStorage.getItem(BINDS_KEY)||'null'); if(v&&typeof v==='object') BIND_ACTIONS.forEach(([id])=>{ if(typeof v[id]==='string'&&v[id]) b[id]=v[id]; }); }catch(e){}
+  return b; }
+function saveBinds(b){ try{ localStorage.setItem(BINDS_KEY,JSON.stringify(b)); }catch(e){} }
+function bindLabel(id){ const f=BIND_ACTIONS.find(a=>a[0]===id); return f?f[1]:id; }
+function keyName(code){ if(!code) return '—';
+  const map={Space:'Space',ShiftLeft:'Shift (left)',ShiftRight:'Shift (right)',ControlLeft:'Ctrl (left)',ControlRight:'Ctrl (right)',AltLeft:'Alt (left)',AltRight:'Alt (right)',Escape:'Esc',Enter:'Enter',Tab:'Tab',Backspace:'Backspace',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→'};
+  if(map[code]) return map[code];
+  if(code.indexOf('Key')===0) return code.slice(3); if(code.indexOf('Digit')===0) return code.slice(5); return code; }
+function loadMoveScheme(){ try{ const v=localStorage.getItem(MOVE_KEY); return (v==='stick'||v==='follow')?v:'tap'; }catch(e){ return 'tap'; } }
+function saveMoveScheme(s){ try{ localStorage.setItem(MOVE_KEY,s); }catch(e){} }
+// The drag editor, shared by the battle pause and the menu's Controls
+// scene (which edits ghost buttons at the same real positions). While
+// it is active the items are NOT interactive — a drag can never fire a
+// button's action — and positions clamp so a button always stays fully
+// on screen. onSave fires when a drag ends.
+function layoutEditor(scene,onSave){ const ed={ active:false, drag:null, items:[],
+  setItems(items){ ed.items=items||[]; },
+  enter(){ ed.active=true; ed.items.forEach(it=>{ if(it.obj.disableInteractive) it.obj.disableInteractive(); }); },
+  exit(){ ed.active=false; ed.drag=null; ed.items.forEach(it=>{ if(it.obj.setInteractive) it.obj.setInteractive({useHandCursor:true}); }); },
+  down(p){ if(!ed.active||!p) return false;
+    for(let i=ed.items.length-1;i>=0;i--){ const it=ed.items[i];
+      if(Math.abs(p.x-it.obj.x)<=it.w/2&&Math.abs(p.y-it.obj.y)<=it.h/2){ ed.drag={it,dx:p.x-it.obj.x,dy:p.y-it.obj.y}; return true; } }
+    return false; },
+  move(p){ if(!ed.active||!ed.drag||!p) return; const it=ed.drag.it;
+    const nx=Math.max(it.w/2,Math.min(W-it.w/2,p.x-ed.drag.dx)), ny=Math.max(it.h/2,Math.min(H-it.h/2,p.y-ed.drag.dy));
+    it.obj.setPosition(nx,ny); if(it.sync) it.sync(nx,ny); },
+  up(){ if(ed.drag){ ed.drag=null; if(onSave) onSave(); } } };
+  if(scene.input&&scene.input.on){ scene.input.on('pointerdown',p=>ed.down(p)); scene.input.on('pointermove',p=>ed.move(p)); scene.input.on('pointerup',()=>ed.up()); }
+  return ed; }
 // Upgrade 11 — TUTORIAL MODE (kennin, voice 2026-10-30: "I like tutorial
 // mode more... All right, I approve that. You can work on the tutorial
 // mode.") A guided layer over the REAL battle scene and the REAL controls
@@ -232,6 +303,9 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     button(this,W/2-160,510,300,50,'Unlocks',()=>this.scene.start('Unlocks'),{size:22});
     const m=button(this,725,510,140,50,'Sound: on',()=>{ m.label.setText('Sound: '+(SFX.toggle()?'off':'on')); },{size:16});
     const mu=button(this,875,510,140,50,'Music: '+(Music.enabled()?'on':'off'),()=>{ mu.label.setText('Music: '+(Music.toggle()?'on':'off')); },{size:16});
+    // Upgrade 12: the Controls door — movement scheme, keybinds and the
+    // button-layout editor live in the Settings scene.
+    button(this,1112,510,300,50,'Controls',()=>this.scene.start('Settings'),{size:20});
     button(this,1150,42,220,46,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:17});
     // Upgrade 11: the tutorial's front door — always here, never locked,
     // replayable any time. It runs the Bible era with David, the hero the
@@ -363,7 +437,15 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // same scene (see startTutorial). tutCred records the real actions the
     // player has actually done, whenever they did them, so an action taken
     // early is credited silently when its step arrives.
-    this.tutorial=!!(d&&d.tutorial); this.tutStep=-1; this.tutPhase=0; this.tutCred={}; this.tutFinished=false; this.tutDummy=null; this.tutDefs=null; }
+    this.tutorial=!!(d&&d.tutorial); this.tutStep=-1; this.tutPhase=0; this.tutCred={}; this.tutFinished=false; this.tutDummy=null; this.tutDefs=null;
+    // Upgrade 12: the player's controls — movement scheme, keybinds,
+    // pause and layout-edit state. The tutorial always teaches TAP: the
+    // saved scheme is never written by a tutorial run, so the player's
+    // own scheme simply waits outside and is still there after.
+    this.moveScheme=this.tutorial?'tap':loadMoveScheme();
+    this.binds=loadBinds();
+    this.stick=null; this.followOn=false; this.followPt=null; this.pendTap=null;
+    this.paused=false; this.layoutEdit=false; this.layoutReg=[]; this.pauseItems=[]; this.editItems=[]; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -388,6 +470,16 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.cameras.main.startFollow(this.hero.spr,true,0.08,0.08);
     this.fixUI();
     this.input.on('pointerdown',p=>this.onTap(p));
+    // Upgrade 12: the rest of the pointer's life — STICK/FOLLOW track the
+    // press through move and release, and a deferred field tap (below)
+    // resolves on release. The keyboard drives the same actions the
+    // buttons drive, through keyAction.
+    this.input.on('pointermove',p=>this.onPointerMove(p));
+    this.input.on('pointerup',p=>this.onPointerUp(p));
+    if(this.input.keyboard){ this.input.keyboard.on('keydown',e=>{ if(e&&e.code){ if(this.binds&&Object.values(this.binds).indexOf(e.code)>=0&&e.preventDefault) e.preventDefault(); this.keyAction(e.code,true); } });
+      this.input.keyboard.on('keyup',e=>{ if(e&&e.code) this.keyAction(e.code,false); }); }
+    this.moveFx=this.add.graphics().setDepth(17); // Upgrade 12: the FOLLOW heading arrow (world layer)
+    this.stickFx=this.add.graphics().setDepth(47).setScrollFactor(0); // Upgrade 12: the joystick (screen layer)
     // Upgrade 11: a tutorial run opens on its first lesson instead of the
     // shop — no wave ever starts here (waveActive never turns on), so no
     // shop, no victory screen and no end() can ever fire in the tutorial.
@@ -411,8 +503,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Fullscreen keep the far right.
     const cmds=[['charge','Charge'],['hold','Hold'],['follow','Follow Me'],['flank','Flank'],['fallback','Fall Back'],['shieldwall','Shield Wall']];
     this.cmdBtns={};
-    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,label,()=>this.giveOrder(id),{size:16}); b.setDepth(31); this.cmdBtns[id]=b; });
-    const vb=button(this,130+6*117,HUD_Y+55,110,56,'Volley',()=>this.pressVolley(),{size:16}); vb.setDepth(31); this.cmdBtns.volley=vb;
+    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,label,()=>this.giveOrder(id),{size:16}); b.setDepth(31); this.cmdBtns[id]=b; this.regLayout('cmd_'+id,b,null); });
+    const vb=button(this,130+6*117,HUD_Y+55,110,56,'Volley',()=>this.pressVolley(),{size:16}); vb.setDepth(31); this.cmdBtns.volley=vb; this.regLayout('cmd_volley',vb,(x,y)=>{ vb.sx=x; vb.sy=y; });
     // Upgrade 8: Volley carries a cooldown sweep like the skill buttons.
     vb.sx=130+6*117; vb.sy=HUD_Y+55; vb.sw=110; vb.sh=56; vb.sweep=this.add.graphics().setDepth(32);
     // Upgrade 9: the active-buff chips — each live orb power wears a labeled
@@ -426,6 +518,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // CAMP_UPGRADES / CAMP_REPAIR state and prices behind it.
     this.campBtn=button(this,130+7*117,HUD_Y+55,110,56,'CAMP',()=>this.toggleCampPanel(),{size:16}); this.campBtn.setDepth(31);
     this.campBtnRect={x:130+7*117,y:HUD_Y+55,w:110,h:56};
+    this.regLayout('cmd_camp',this.campBtn,(x,y)=>{ this.campBtnRect={x,y,w:110,h:56}; });
     // Upgrade 10 (approved addition): RALLY — the ninth seat on the row.
     // The whole row shifted left (start x 130) so Rally sits at the same
     // 110x56 as every other seat instead of shrinking any button. Tap
@@ -434,11 +527,18 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // and holds (plantRally).
     this.rallyBtn=button(this,130+8*117,HUD_Y+55,110,56,'Rally',()=>this.pressRally(),{size:16}); this.rallyBtn.setDepth(31);
     this.rallyBtnRect={x:130+8*117,y:HUD_Y+55,w:110,h:56}; // Upgrade 11: where the tutorial's ring finds Rally
+    this.regLayout('cmd_rally',this.rallyBtn,(x,y)=>{ this.rallyBtnRect={x,y,w:110,h:56}; });
     // Upgrade 10: the hero's power buttons are built in
     // buildFightControls() now — they ride the right-thumb stack under
     // the AUTO-FIRE toggle, as the approved sketch draws them.
     this.spdBtn=button(this,1221,HUD_Y+80,110,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:18}).setDepth(31);
     const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:13}); fsb.setDepth(31);
+    // Upgrade 12: the pause/settings entry — a small ⚙ above the fight
+    // stack. It opens the pause overlay (movement scheme, the layout
+    // editor, resume, quit), and its rect is walled in onTap like the
+    // CAMP button's: a tap on it is a button press, never a march order.
+    this.pauseBtn=button(this,1246,20,56,34,'⚙',()=>this.openPause(),{size:16}); this.pauseBtn.setDepth(31);
+    this.pauseBtnRect={x:1246,y:20,w:56,h:34};
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave%2===0&&this.wave>0?'Night':'Day'; }
@@ -470,6 +570,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       x+=w+8; }); }
   toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40).setScrollFactor(0); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
   onTap(p){ if(this.over||this.shopOpen||this.victoryOpen||p.y>=HUD_Y) return;
+    // Upgrade 12: while paused or editing the layout, field taps belong
+    // to those overlays — never to the marching hand behind them.
+    if(this.paused||this.layoutEdit) return;
     // Upgrade 9: while the camp panel is open, field taps belong to the
     // panel's own buttons — never to the marching hand behind it.
     if(this.campPanelOpen) return;
@@ -479,6 +582,19 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 9: the same wall for the CAMP button — its tap is a button
     // press, not a march order at whatever world point lies beneath it.
     if(this.campBtnRect&&Math.abs(p.x-this.campBtnRect.x)<=this.campBtnRect.w/2+4&&Math.abs(p.y-this.campBtnRect.y)<=this.campBtnRect.h/2+4) return;
+    // Upgrade 12: the same wall for the ⚙ pause button.
+    if(this.pauseBtnRect&&Math.abs(p.x-this.pauseBtnRect.x)<=this.pauseBtnRect.w/2+4&&Math.abs(p.y-this.pauseBtnRect.y)<=this.pauseBtnRect.h/2+4) return;
+    // Upgrade 12: under STICK or FOLLOW, a field press is not yet a tap —
+    // it may become a drag (the stick) or a hold (follow). The press is
+    // held as pendTap and only a quick, still release resolves it as a
+    // tap, through this same path with _deferred set (onPointerUp). A
+    // drag therefore can never become a selection or an order.
+    if(this.moveScheme!=='tap'&&!p._deferred){ this.pendTap={x:p.x,y:p.y,worldX:p.worldX,worldY:p.worldY,id:p.id,t:performance.now()}; return; }
+    this.fieldTap(p); }
+  // The field tap itself: targeting modes, orbs, the camp, selection,
+  // posting, and — under TAP only — the hero's march. Reached on
+  // pointerdown under TAP, and on a quick release under STICK/FOLLOW.
+  fieldTap(p){
     // p.y is a screen coordinate (the HUD check); the tap itself lands in the world.
     const wx=(p.worldX!==undefined?p.worldX:p.x), wy=(p.worldY!==undefined?p.worldY:p.y);
     if(this.volleyMode){ this.doVolley(wx,wy); return; }
@@ -503,14 +619,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(cand.length>1){ const ci=cand.findIndex(c=>c.who===cur); if(ci>=0) pick=cand[(ci+1)%cand.length]; }
       if(pick.who==='hero') this.selectHero(); else this.selectSquad(pick.who);
       return; }
-    // Ground: the selected squad posts where tapped and holds; the hero
-    // marches as he always has.
+    // Ground: the selected squad posts where tapped and holds — an
+    // ORDER, so it stands under every movement scheme. The hero's own
+    // march is TAP's alone: under STICK/FOLLOW a ground tap never
+    // march-orders him (that is the point of those schemes — he is
+    // steered, not sent).
     if(this.selSquad&&!this.selSquad.dead){ const s=this.selSquad;
       s.ord='post'; s.post={x:Math.max(20,Math.min(this.worldW-20,wx)),y:Math.max(40,Math.min(this.worldH-20,wy))};
       this.floatText(s.post.x,s.post.y-16,'Hold here','#f2c14e'); this.refreshHUD();
       if(this.tutorial) this.tutEvent('posted'); // Upgrade 11: the army step watches the real post
       return; }
-    this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); }
+    if(this.moveScheme==='tap'){ this.hero.tx=Math.max(20,Math.min(this.worldW-20,wx)); this.hero.ty=Math.max(40,Math.min(this.worldH-20,wy)); } }
   doVolley(x,y){ this.volleyMode=false; this._volleyBuf=false; this.volleyCd=12; let n=0;
     this.squads.filter(s=>s.def.role==='ranged'&&!s.dead).forEach((s,i)=>{ n++; this.time.delayedCall(i*90,()=>{ this.shoot(s.x,s.y-20,{x,y,dead:false},'stone',{dmg:s.dmg*3,type:'physical',splash:90,splashAt:{x,y}},800); }); });
     if(!n){ this.toast('No ranged squads for a volley'); this.volleyCd=0; } else { SFX.sling(); this.toast('Volley away!'); }
@@ -669,6 +788,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       { id:'camp', line:'The camp is cared for while the fight goes on. Tap CAMP — or the camp itself — and look inside: Fortify makes it stronger, Repair mends it.' },
       { id:'orbs', line:'The glowing orbs sell powers for Grokonians. Walk David to the shining orb and tap it — this first buy is on the house, this once.' },
     ];
+    // Upgrade 12: the tutorial teaches TAP (init forced the scheme for
+    // this scene). If the player's own scheme is something else, the
+    // first line says so plainly — their scheme is untouched and waits
+    // outside; nothing here writes it.
+    if(loadMoveScheme()!=='tap') this.tutDefs[0].line='The tutorial teaches tap-to-move; your own scheme waits outside. '+this.tutDefs[0].line;
     // The instruction furniture: a quiet panel across the top centre —
     // clear of the stats at the left and the fight stack at the right;
     // depth 44 sits under the camp panel (50/51), whose Close button
@@ -798,7 +922,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.autoFire===undefined) this.autoFire=loadAutoFire();
     const mk=(id,x,y,w,h,label,cb,size)=>{ const b=button(this,x,y,w,h,label,cb,{size:size||15}); b.setDepth(31);
       b.sx=x; b.sy=y; b.sw=w; b.sh=h; b.sweep=this.add.graphics().setDepth(32);
-      this.fightBtns[id]=b; this.fightRects.push({x,y,w,h}); return b; };
+      this.fightBtns[id]=b; this.fightRects.push({x,y,w,h}); this.regLayout(id,b,(nx,ny)=>{ b.sx=nx; b.sy=ny; }); return b; };
     const SX=1178, SW=196;
     this.autoBtn=mk('autofire',SX,70,SW,56,this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF',()=>this.toggleAutoFire(),17);
     mk('dodge',SX,176,SW,56,'DODGE',()=>this.pressDodge(),16);
@@ -819,7 +943,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       b.cd=0; b.cdMax=k.cd; b.def=k; b.held=0; b.buffered=false; b._tierShown=0;
       this.skillBtns.push(b); });
     this.fightBar=this.add.graphics().setDepth(32);
-    this.fightStat=txt(this,SX,112,'',13,'#f2c14e').setOrigin(0.5).setDepth(31); }
+    this.fightStat=txt(this,SX,112,'',13,'#f2c14e').setOrigin(0.5).setDepth(31);
+    // Upgrade 12: every battle control now exists at its default — a
+    // saved layout, if the player has one, is applied over the top.
+    this.applyLayout(); }
   // The AUTO-FIRE toggle: the choice is the player's and it persists.
   toggleAutoFire(){ this.autoFire=!this.autoFire; saveAutoFire(this.autoFire);
     if(this.autoBtn) this.autoBtn.label.setText(this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF');
@@ -827,6 +954,138 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.tutorial) this.tutEvent('autotoggled'); } // Upgrade 11: the auto-fire step listens for this flip, either way
   overFight(p){ if(!this.fightRects) return false;
     return this.fightRects.some(r=>Math.abs(p.x-r.x)<=r.w/2+6&&Math.abs(p.y-r.y)<=r.h/2+6); }
+  // --- Upgrade 12: layout — the registry, applying, the editor ---
+  // Every movable battle control registers itself as it is built (the
+  // command row in buildHUD, the stack in buildFightControls). A saved
+  // layout moves the container AND syncs every coordinate the game
+  // keeps beside it (sweep origins, the onTap walls, the fight rects,
+  // the tutorial's rings) — there is one position per button, never two.
+  regLayout(id,obj,sync){ if(!this.layoutReg) this.layoutReg=[]; const def=LAYOUT_DEFS.find(d=>d[0]===id); this.layoutReg.push({id,obj,w:def?def[2]:110,h:def?def[3]:56,sync}); }
+  applyLayout(){ const pos=(loadLayout()||{pos:{}}).pos||{};
+    (this.layoutReg||[]).forEach(en=>{ const p=pos[en.id]; if(!p) return;
+      const nx=Math.max(en.w/2,Math.min(W-en.w/2,+p.x||0)), ny=Math.max(en.h/2,Math.min(H-en.h/2,+p.y||0));
+      if(!isFinite(nx)||!isFinite(ny)) return;
+      en.obj.setPosition(nx,ny); if(en.sync) en.sync(nx,ny); });
+    this.syncLayoutMeta(); }
+  syncLayoutMeta(){ const fb=this.fightBtns?Object.values(this.fightBtns):[];
+    if(fb.length) this.fightRects=fb.map(b=>({x:b.sx,y:b.sy,w:b.sw,h:b.sh}));
+    // The CAMP / RALLY onTap walls follow their buttons through the
+    // registry sync callbacks (applyLayout / the editor), not from here.
+    if(this.fightStat&&this.autoBtn) this.fightStat.setPosition(this.autoBtn.sx,this.autoBtn.sy+42); }
+  saveLayoutFromScene(){ const pos={}; (this.layoutReg||[]).forEach(en=>{ pos[en.id]={x:Math.round(en.obj.x),y:Math.round(en.obj.y)}; }); saveLayout(pos); }
+  // --- Upgrade 12: movement schemes ---
+  // Switchable any time (pause overlay in battle, Controls at the menu);
+  // the choice persists, and a switch clears any half-finished press.
+  setMoveScheme(id){ if(id!=='tap'&&id!=='stick'&&id!=='follow') return;
+    saveMoveScheme(id);
+    // In the tutorial the lesson stays TAP whatever is chosen — the
+    // choice is saved for outside, the scene keeps its scheme.
+    if(!this.tutorial) this.moveScheme=id;
+    this.stick=null; this.followOn=false; this.followPt=null; this.pendTap=null;
+    this.toast(id==='tap'?'Movement: tap to move':id==='stick'?'Movement: joystick — drag on the field':'Movement: follow — hold on the field, he runs to your finger'); }
+  // The press's life under STICK/FOLLOW (under TAP nothing here ever
+  // runs — onTap resolves field taps on pointerdown, as always).
+  // Disambiguation, the whole law: a press that MOVES more than 16px
+  // becomes the scheme's steering and the tap is cancelled; a press
+  // that is simply HELD arms FOLLOW after 280ms (update); a quick,
+  // still release is a tap, resolved through onTap exactly as TAP
+  // resolves it — selection, posting, orbs, volley and rally spots all
+  // keep working, and a steering drag can never post or select.
+  onPointerMove(p){ if(!p) return;
+    if(this.pendTap&&p.id===this.pendTap.id){ const d=Math.hypot(p.x-this.pendTap.x,p.y-this.pendTap.y);
+      if(d>16){ const down=this.pendTap; this.pendTap=null;
+        if(this.moveScheme==='stick') this.stick={id:down.id,bx:down.x,by:down.y,dx:p.x-down.x,dy:p.y-down.y};
+        else if(this.moveScheme==='follow'){ this.followOn=true; this.followPt={id:down.id,wx:(p.worldX!==undefined?p.worldX:p.x),wy:(p.worldY!==undefined?p.worldY:p.y)}; } } }
+    if(this.stick&&p.id===this.stick.id){ this.stick.dx=p.x-this.stick.bx; this.stick.dy=p.y-this.stick.by; }
+    if(this.followOn&&this.followPt&&p.id===this.followPt.id){ this.followPt.wx=(p.worldX!==undefined?p.worldX:p.x); this.followPt.wy=(p.worldY!==undefined?p.worldY:p.y); } }
+  onPointerUp(p){ if(!p) return;
+    // Release stops him: the steering target collapses to where he
+    // stands, so letting go is a full stop, not a glide to the last point.
+    if(this.stick&&p.id===this.stick.id){ this.stick=null; if(this.hero){ this.hero.tx=this.hero.x; this.hero.ty=this.hero.y; } }
+    if(this.followOn&&this.followPt&&p.id===this.followPt.id){ this.followOn=false; this.followPt=null; if(this.hero){ this.hero.tx=this.hero.x; this.hero.ty=this.hero.y; } }
+    if(this.pendTap&&p.id===this.pendTap.id){ const d=this.pendTap; this.pendTap=null;
+      if(performance.now()-d.t<500) this.onTap({x:d.x,y:d.y,worldX:d.worldX,worldY:d.worldY,id:d.id,_deferred:true}); } }
+  // The heading the indicators draw and the hero steers by: the stick's
+  // vector past its deadzone, or the bearing to the held finger.
+  moveHeading(){ const h=this.hero; if(!h) return null;
+    if(this.stick){ const m=Math.hypot(this.stick.dx,this.stick.dy); return m>10?Math.atan2(this.stick.dy,this.stick.dx):null; }
+    if(this.followOn&&this.followPt){ const dx=this.followPt.wx-h.x, dy=this.followPt.wy-h.y; return Math.hypot(dx,dy)>16?Math.atan2(dy,dx):null; }
+    return null; }
+  drawMoveFx(){ if(this.moveFx){ const g=this.moveFx; g.clear();
+      const a=this.moveHeading();
+      if(a!==null&&this.hero){ const h=this.hero, ex=h.x+Math.cos(a)*58, ey=h.y+Math.sin(a)*58;
+        g.lineStyle(3,0xf2c14e,0.9); g.lineBetween(h.x,h.y,ex,ey);
+        g.lineBetween(ex,ey,ex+Math.cos(a+2.5)*16,ey+Math.sin(a+2.5)*16);
+        g.lineBetween(ex,ey,ex+Math.cos(a-2.5)*16,ey+Math.sin(a-2.5)*16); } }
+    if(this.stickFx){ const g=this.stickFx; g.clear();
+      if(this.stick){ const m=Math.hypot(this.stick.dx,this.stick.dy), cl=Math.min(m,52), a=Math.atan2(this.stick.dy,this.stick.dx);
+        g.fillStyle(0x140c07,0.35); g.fillCircle(this.stick.bx,this.stick.by,52);
+        g.lineStyle(2,0xd9a441,0.7); g.strokeCircle(this.stick.bx,this.stick.by,52);
+        g.fillStyle(0xd9a441,0.55); g.fillCircle(this.stick.bx+Math.cos(a)*cl,this.stick.by+Math.sin(a)*cl,23); } } }
+  // --- Upgrade 12: keybinds — the keyboard works the same hands ---
+  // Every key routes to the very function its button calls, behind the
+  // same gates the buttons live behind (the shop, the victory choice,
+  // the pause, the layout editor, the run being over). BLOCK is the one
+  // hold: keydown raises the guard, keyup drops it — and a release is
+  // honored even if the world changed while the key was down.
+  keyAction(code,down){ if(!code) return;
+    const binds=this.binds||loadBinds();
+    const act=Object.keys(binds).find(a=>binds[a]===code); if(!act) return;
+    if(act==='block'){ if(down){ if(!this.over&&!this.shopOpen&&!this.victoryOpen&&!this.paused&&!this.layoutEdit) this.setBlock(true); }
+      else this.setBlock(false); return; }
+    if(!down) return;
+    if(this.over||this.shopOpen||this.victoryOpen||this.paused||this.layoutEdit) return;
+    switch(act){
+      case 'dodge': this.pressDodge(); break;
+      case 'sprint': this.toggleSprint(); break;
+      case 'autofire': this.toggleAutoFire(); break;
+      case 'skill0': this.pressSkill(0); break;
+      case 'skill1': this.pressSkill(1); break;
+      case 'skill2': this.pressSkill(2); break;
+      case 'volley': this.pressVolley(); break;
+      case 'rally': this.pressRally(); break;
+      case 'camp': this.toggleCampPanel(); break;
+      default: if(ORDER_NAMES[act]) this.giveOrder(act); } }
+  // --- Upgrade 12: the pause overlay + the in-battle layout editor ---
+  openPause(){ if(this.over||this.shopOpen||this.victoryOpen||this.paused||this.layoutEdit) return;
+    if(this.tutorial){ this.toast('The lesson runs its own course — Exit at the top leaves it. Controls wait outside.'); return; }
+    this.paused=true; this.renderPause(); }
+  closePause(){ this.paused=false; this.clearPause(); }
+  clearPause(){ (this.pauseItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.pauseItems=[]; }
+  renderPause(){ this.clearPause(); const items=[]; this.pauseItems=items;
+    const g=this.add.graphics().setDepth(58); g.fillStyle(0x140c07,0.96); g.fillRoundedRect(W/2-260,110,520,480,12); g.lineStyle(3,0xd9a441,1); g.strokeRoundedRect(W/2-260,110,520,480,12); items.push(g);
+    items.push(txt(this,W/2,144,'Paused',30,GOLD).setOrigin(0.5).setDepth(59));
+    items.push(txt(this,W/2,190,'Hero movement',17,PARCH).setOrigin(0.5).setDepth(59));
+    const mv=(id,label,x)=>{ const b=button(this,x,228,150,44,label+(this.moveScheme===id?' ✓':''),()=>{ this.setMoveScheme(id); this.renderPause(); },{size:15}); b.setDepth(59); items.push(b); };
+    mv('tap','Tap',W/2-170); mv('stick','Joystick',W/2); mv('follow','Follow',W/2+170);
+    items.push(txt(this,W/2,272,'Tap: tap the ground to march. Joystick: drag on the field.\nFollow: hold on the field — he runs to your finger.',13,'#cdbd95',{align:'center'}).setOrigin(0.5).setDepth(59));
+    const eb=button(this,W/2,330,300,48,'Edit button layout',()=>this.enterLayoutEdit(),{size:17}); eb.setDepth(59); items.push(eb);
+    items.push(txt(this,W/2,376,'Keybinds live in Controls, on the main menu.',13,'#cdbd95').setOrigin(0.5).setDepth(59));
+    const rb=button(this,W/2,434,300,52,'Resume',()=>this.closePause(),{size:19}); rb.setDepth(59); items.push(rb);
+    const qb=button(this,W/2,508,300,48,'Quit run',()=>{ this.closePause(); this.end(false); },{size:16}); qb.setDepth(59); items.push(qb);
+    items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); }); }
+  // Editing in battle: the pause holds the fight while the REAL buttons
+  // are dragged. They are disabled for the duration (layoutEditor), so
+  // no drag can fire an action, and field taps are walled by onTap's
+  // layoutEdit guard — a dragging tap never becomes an order. DONE
+  // returns to the pause; the layout is saved as each drag ends and
+  // applies at once, because the buttons being dragged ARE the battle's.
+  enterLayoutEdit(){ if(this.layoutEdit) return; this.clearPause(); this.layoutEdit=true;
+    if(!this.layoutEd) this.layoutEd=layoutEditor(this,()=>this.saveLayoutFromScene());
+    this.layoutEd.setItems(this.layoutReg||[]); this.layoutEd.enter();
+    const items=[]; this.editItems=items;
+    const g=this.add.graphics().setDepth(60); g.fillStyle(0x140c07,0.92); g.fillRoundedRect(W/2-330,10,660,44,10); g.lineStyle(2,0xf2c14e,1); g.strokeRoundedRect(W/2-330,10,660,44,10); items.push(g);
+    items.push(txt(this,W/2,32,'EDITING LAYOUT — drag any button into place',17,'#f2c14e').setOrigin(0.5).setDepth(61));
+    const dn=button(this,W/2-100,580,170,44,'Done',()=>this.exitLayoutEdit(),{size:16}); dn.setDepth(61); items.push(dn);
+    const rs=button(this,W/2+100,580,190,44,'Reset layout',()=>{ resetLayout(); const dp=defaultLayoutPos();
+      (this.layoutReg||[]).forEach(en=>{ const p=dp[en.id]; if(p){ en.obj.setPosition(p.x,p.y); if(en.sync) en.sync(p.x,p.y); } });
+      this.syncLayoutMeta(); this.toast('Layout reset to the standard'); },{size:15}); rs.setDepth(61); items.push(rs);
+    items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); }); }
+  exitLayoutEdit(){ if(!this.layoutEdit) return; this.layoutEdit=false;
+    if(this.layoutEd) this.layoutEd.exit();
+    (this.editItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.editItems=[];
+    this.saveLayoutFromScene();
+    if(this.paused) this.renderPause(); }
   // Upgrade 10: AUTO-FIRE — the hero's basic attack, restored. When the
   // toggle is ON the hero strikes the nearest enemy inside his range
   // circle on his own attack clock (h.cd against hd.rate): melee damage
@@ -891,9 +1150,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(B.block&&B.block.sweep){ const g=B.block.sweep; g.clear();
       g.fillStyle(h.guardBreakT>0?0xa33b20:0x5aa33b,0.9); g.fillRect(B.block.sx-B.block.sw/2,B.block.sy+B.block.sh/2-5,B.block.sw*Math.max(0,h.stamina)/FIGHT.stamMax,5); }
     if(this.fightBar){ const g=this.fightBar; g.clear();
-      g.fillStyle(0x000000,0.7); g.fillRect(1080,122,196,10);
-      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(1080,122,196*Math.max(0,h.stamina)/FIGHT.stamMax,10);
-      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(1080,122,196,10); }
+      // Upgrade 12: the bar rides under the AUTO-FIRE toggle wherever
+      // the player's layout puts it (at the default: 1080,122, as ever).
+      const bx=this.autoBtn?this.autoBtn.sx-98:1080, by=this.autoBtn?this.autoBtn.sy+52:122;
+      g.fillStyle(0x000000,0.7); g.fillRect(bx,by,196,10);
+      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(bx,by,196*Math.max(0,h.stamina)/FIGHT.stamMax,10);
+      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(bx,by,196,10); }
     const st=Math.ceil(h.stamina);
     if(this.fightStat&&this._stamShown!==st){ this._stamShown=st; this.fightStat.setText('STAMINA '+st); } }
   // Upgrade 3: the hero returns only while the camp stands. If the camp has
@@ -1423,6 +1685,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(this.shopT<=0) this.closeShop();
       return; }
     if(this.victoryOpen) return;
+    // Upgrade 12: the pause (and the layout editing inside it) holds the
+    // whole battle — no timer, no timer's cousin, runs behind it.
+    if(this.paused||this.layoutEdit) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
     this._pulse=(this._pulse||0)+dt; // Upgrade 8: drives the Perfect glow pulse in drawSkillSweep
     if(this.tutorial) this.tutTick(); // Upgrade 11: the highlight ring breathes here
@@ -1442,6 +1707,18 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const night=this.wave%2===0;
     // hero movement + combat
     const h=this.hero, hd=h.def;
+    // Upgrade 12: FOLLOW arms itself when a press is simply HELD (the
+    // slither way) — a quick tap stays a tap (onPointerUp resolves it).
+    if(this.moveScheme==='follow'&&this.pendTap&&performance.now()-this.pendTap.t>280){ const pd=this.pendTap; this.pendTap=null;
+      this.followOn=true; this.followPt={id:pd.id,wx:(pd.worldX!==undefined?pd.worldX:pd.x),wy:(pd.worldY!==undefined?pd.worldY:pd.y)}; }
+    // Upgrade 12: STICK / FOLLOW steering — while a scheme is steering,
+    // it owns the hero's march target; the one movement block below
+    // still applies his speed, the orb multiplier, sprint and the
+    // guard's drag, exactly as for a tapped target. TAP never enters.
+    if(h.down<=0&&h.dodgeT<=0){
+      if(this.stick){ const m=Math.hypot(this.stick.dx,this.stick.dy);
+        if(m>10){ h.tx=h.x+this.stick.dx/m*130; h.ty=h.y+this.stick.dy/m*130; } else { h.tx=h.x; h.ty=h.y; } }
+      else if(this.followOn&&this.followPt){ h.tx=this.followPt.wx; h.ty=this.followPt.wy; } }
     if(h.down>0){ this.tickHeroDown(dt); }
     else if(h.dodgeT>0){ // Upgrade 8: the dodge dash owns the body until it ends
       const dst=FIGHT.dodgeDist/FIGHT.dodgeTime*dt; h.x+=h.dodgeDx*dst; h.y+=h.dodgeDy*dst; h.dodgeT-=dt;
@@ -1464,6 +1741,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(h.guardFx){ const g=h.guardFx; g.clear();
       if(h.blocking&&h.down<=0&&g.arc){ const a=Math.atan2(h.faceY,h.faceX); g.lineStyle(4,0x9ae8f2,0.9); g.beginPath(); g.arc(h.x,h.y,30,a-1.1,a+1.1,false); g.strokePath(); } }
     this.drawCampBar();
+    this.drawMoveFx(); // Upgrade 12: the stick and the follow arrow, drawn from live state
     this.campFireTick(dt);
     // Upgrade 9: the selection ring — a breathing gold circle under whoever
     // the marching hand currently directs: the selected squad, or the hero
@@ -1647,6 +1925,73 @@ class Profile extends Phaser.Scene{ constructor(){super('Profile');}
     button(this,90,680,140,46,'Back',()=>this.scene.start('Menu')); } }
 
 
+// ---------- Controls (Upgrade 12): the player's own settings ----------
+// One scene for the three rulings' home settings: the movement scheme,
+// the keybind list (click a key, press the new one), and the button
+// layout — edited here on ghost buttons standing at the layout's REAL
+// positions over the battlefield art, and in battle from the ⚙ pause,
+// where the real buttons themselves are dragged. Both editors write
+// the one saved layout (gxhub_wotw_layout); the battle applies it.
+class Settings extends Phaser.Scene{ constructor(){super('Settings');}
+  create(){ backdrop(this,0.78);
+    this.binds=loadBinds(); this.moveScheme=loadMoveScheme(); this._cap=null;
+    this.setItems=[]; this.bindItems=[]; this.ghostObjs=[]; this.ghostItems=[]; this._ghostEd=null;
+    const keep=o=>{ this.setItems.push(o); return o; };
+    keep(txt(this,W/2,38,'Controls',38,GOLD).setOrigin(0.5));
+    keep(txt(this,90,92,'Hero movement',22,GOLD));
+    this.moveBtns={};
+    [['tap','Tap to move',300],['stick','Joystick',560],['follow','Follow (hold)',820]].forEach(([id,label,x])=>{ const b=button(this,x,132,240,46,label,()=>{ this.moveScheme=id; saveMoveScheme(id); this.markMove(); this.bindStatus.setText('Movement: '+label+'. It applies to the next battle — and at once, from the ⚙ pause in battle.'); },{size:16}); keep(b); this.moveBtns[id]=b; });
+    keep(txt(this,90,196,'Keybinds',22,GOLD));
+    keep(txt(this,90,222,'Click a key, then press the new one. Escape cancels. A key already in use trades places — a swap, so no action is ever left keyless.',14,'#cdbd95'));
+    this.renderBinds();
+    this.bindStatus=keep(txt(this,W/2,540,'',16,'#f2c14e').setOrigin(0.5));
+    keep(button(this,300,592,260,46,'Reset keybinds',()=>{ this.binds=Object.assign({},DEFAULT_BINDS); saveBinds(this.binds); this._cap=null; this.renderBinds(); this.bindStatus.setText('Keybinds reset to the standard set.'); },{size:16}));
+    keep(button(this,640,592,260,46,'Reset button layout',()=>{ resetLayout(); this.bindStatus.setText('Button layout reset to the standard.'); },{size:16}));
+    keep(button(this,980,592,300,46,'Edit button layout',()=>this.enterGhostEdit(),{size:16}));
+    keep(txt(this,W/2,648,'In battle, the ⚙ pause edits the real buttons in place — and holds the fight while you do.',13,'#a08a6a').setOrigin(0.5));
+    button(this,90,680,140,46,'Back',()=>{ if(this._ghostEd) this.exitGhostEdit(); this.scene.start('Menu'); });
+    if(this.input.keyboard) this.input.keyboard.on('keydown',e=>this.bindKeyEvent(e));
+    // A click anywhere else gives up a capture in progress.
+    this.input.on('pointerdown',()=>{ if(this._cap){ this._cap=null; this.renderBinds(); this.bindStatus.setText('Rebind cancelled.'); } });
+    this.markMove(); }
+  markMove(){ if(!this.moveBtns) return;
+    Object.entries(this.moveBtns).forEach(([id,b])=>{ b.label.setText((id==='tap'?'Tap to move':id==='stick'?'Joystick':'Follow (hold)')+(this.moveScheme===id?' ✓':'')); }); }
+  renderBinds(){ (this.bindItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.bindItems=[];
+    BIND_ACTIONS.forEach(([id,label],i)=>{ const col=i<8?0:1, row=i%8, x=col===0?120:700, y=252+row*30;
+      const t=txt(this,x,y,label,15,PARCH); this.bindItems.push(t);
+      const kb=button(this,x+330,y+13,190,26,this._cap===id?'press a key…':keyName(this.binds[id]),()=>this.beginBindCapture(id),{size:13}); this.bindItems.push(kb); }); }
+  beginBindCapture(id){ this._cap=id; this.renderBinds(); this.bindStatus.setText('Press a key for '+bindLabel(id)+' — Escape cancels.'); }
+  // Conflict law: a SWAP. The action that held the captured key receives
+  // the key this action is giving up, so a rebind can never strand an
+  // action with no key at all.
+  bindKeyEvent(e){ if(!this._cap||!e||!e.code) return; const code=e.code;
+    if(e.preventDefault) e.preventDefault();
+    if(code==='Escape'){ this._cap=null; this.renderBinds(); this.bindStatus.setText('Rebind cancelled.'); return; }
+    const act=this._cap, binds=Object.assign({},this.binds);
+    const other=Object.keys(binds).find(a=>a!==act&&binds[a]===code);
+    if(other) binds[other]=binds[act];
+    binds[act]=code; this.binds=binds; saveBinds(binds); this._cap=null; this.renderBinds();
+    this.bindStatus.setText(bindLabel(act)+' is now on '+keyName(code)+(other?(' — swapped with '+bindLabel(other)+'.'):'.')); }
+  setSectionVisible(v){ (this.setItems||[]).concat(this.bindItems||[]).forEach(o=>{ try{ o.setVisible(v); }catch(e){} }); }
+  // The layout editor, menu side: ghost buttons (the game's own button
+  // face) standing at the layout's real positions over the field. What
+  // transfers is the position — the battle's real buttons land exactly
+  // where these ghosts are left.
+  enterGhostEdit(){ if(this._ghostEd) return; this._cap=null; this.setSectionVisible(false);
+    const pos=layoutPositions(), items=[];
+    LAYOUT_DEFS.forEach(d=>{ const p=pos[d[0]];
+      const b=button(this,p.x,p.y,d[2],d[3],d[1],()=>{},{size:d[2]>150?15:13}); b.setDepth(40);
+      this.ghostObjs.push(b); items.push({id:d[0],obj:b,w:d[2],h:d[3],sync:null}); });
+    const g=this.add.graphics().setDepth(41); g.fillStyle(0x140c07,0.92); g.fillRoundedRect(W/2-330,10,660,44,10); g.lineStyle(2,0xf2c14e,1); g.strokeRoundedRect(W/2-330,10,660,44,10); this.ghostItems.push(g);
+    this.ghostItems.push(txt(this,W/2,32,'EDITING LAYOUT — drag any button into place',17,'#f2c14e').setOrigin(0.5).setDepth(42));
+    const dn=button(this,W/2-100,580,170,44,'Done',()=>this.exitGhostEdit(),{size:16}); dn.setDepth(42); this.ghostItems.push(dn);
+    const rs=button(this,W/2+100,580,190,44,'Reset layout',()=>{ resetLayout(); const dp=defaultLayoutPos(); items.forEach(it=>{ it.obj.setPosition(dp[it.id].x,dp[it.id].y); }); },{size:15}); rs.setDepth(42); this.ghostItems.push(rs);
+    this._ghostEd=layoutEditor(this,()=>{ const out={}; items.forEach(it=>{ out[it.id]={x:Math.round(it.obj.x),y:Math.round(it.obj.y)}; }); saveLayout(out); });
+    this._ghostEd.setItems(items); this._ghostEd.enter(); }
+  exitGhostEdit(){ if(!this._ghostEd) return; this._ghostEd.exit(); this._ghostEd=null;
+    (this.ghostObjs||[]).concat(this.ghostItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} });
+    this.ghostObjs=[]; this.ghostItems=[]; this.setSectionVisible(true); } }
+
 window.__game=new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#0d0906',
   scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{activePointers:3},
-  scene:[Boot,Menu,EraSelect,HeroSelect,Unlocks,BattlePass,Profile,Game,End]});
+  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,BattlePass,Profile,Game,End]});
