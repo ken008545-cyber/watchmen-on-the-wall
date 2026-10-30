@@ -650,3 +650,108 @@ This supersedes two earlier behaviors recorded above: the slice's 20s auto-start
 - tools/verify_upgrade6.js (stubbed Phaser, REAL main.js, `Date.now` patched inside the vm to a controllable clock): **34/34 checks pass** — label formatting (1:00 / ceil / 0:00 / 2:05); the first shop arms exactly 60,000ms, shows 1:00 -> 0:30 -> 0:01 and starts wave 1 by itself with startWave called exactly once and no click handler fired, and cannot double-start; a later shop behaves identically and is still open at the old 20s mark (0:40 left); "Next Wave Now" starts the wave immediately with the full minute left; a real Shepherd Militia purchase at 35s remaining charges Manna, re-renders the shop and leaves the deadline and the displayed 0:35 untouched, as does a page flip, and the wave still auto-starts at the original deadline; goal-wave `waveClear()` opens the victory choice with no timer (two simulated minutes pass, nothing starts), Continue Endless arms a fresh 60s and wave 11 auto-starts.
 - No regressions: tools/verify_upgrade3.js (47/47), tools/verify_upgrade4.js (32/32), tools/verify_upgrade5.js (40/40) all still pass as they stand after the music ruling.
 - NOT verified (no live browser in this environment — needs kennin's or a playtest's hands): countdown legibility at phone size in the shop footer; whether a full minute feels right in a real run (long enough to shop, short enough to keep momentum); behavior across an actual device sleep/wake during a shop.
+
+## Upgrade 7 — boss phases for the goal-wave champion (2026-10-30)
+kennin's priority (voice, 2026-10-30): upgrade the game, make it better,
+then it goes on the GX Hub. This closes the oldest open debt in this file
+— Upgrade 1 shipped the champion's name plate and gold bar but recorded
+"boss PHASES remain a debt", and the original slice notes listed "boss
+phases for the goal-wave champion" under What remains. The champion (the
+wave-10 Idol Golem, boss-scaled at spawn) no longer fights like a large
+ordinary enemy. js/gxhub.js and js/tokens.js untouched again (zero diff);
+the flattened scaling curve is untouched — phases add mechanics and
+tempo, never stats.
+
+### The three phases (constant table BOSS in js/main.js; state on the champion)
+Keyed to the champion's HP fraction, checked in damage() the instant a
+threshold is crossed (and defensively in bossTick):
+- **Phase I (100–66%) — the heavy strike.** Every 6s, if the champion is
+  engaged (a living defender within the 90px road-block, or the camp
+  within striking distance — the march AI's own terms), it winds up for
+  1.1s: sprite flushed red and swelling, a red ring drawn at cleave
+  radius (range+26 = 64px), a "!" floated overhead — and the champion
+  STANDS COMMITTED (the enemy loop skips its movement/attacks while
+  heavyWind runs). At completion the cleave lands for 3x a normal blow
+  on every defender still inside the ring; the camp, if it is the target,
+  takes it through hitCamp (whose boss x3 keeps the camp blow at the
+  same 3x-a-normal-blow weight, 230 of 500 — a real threat, answered by
+  Fortify/Repair/Iron). Whoever stepped out takes nothing.
+- **Phase II (66–33%) — the call and the slam.** On entry: a roar (new
+  SFX.bossRoar), the name plate pulses, a banner toast names the shift,
+  and the champion CALLS AN ESCORT — exactly 4 of the era's own soldiers
+  (spear, infantry, spear, ranged by role from the roster; never its own
+  kind, never a healer), spawned at its side on the wave's scales. Once
+  per entry, hard-capped by the escorted flag. It also gains the GROUND
+  SLAM, every 7s: a circle (radius 110) is marked at its prey's position
+  — the nearest defender within 150px, else the camp if the champion is
+  on it — and fills over a 1.2s telegraph; at impact everyone still
+  inside takes 2x damage, and a camp inside the circle takes one normal
+  camp blow.
+- **Phase III (below 33%) — enrage.** Movement x1.35, attack period
+  x0.7, heavy strikes at 4x on a 4.5s cadence. No new summons. The name
+  plate reads "— ENRAGED" in red; roar + banner again. The multipliers
+  live ONLY in bossAtkRate/bossMoveMul/bossHeavyMul/bossHeavyEvery and
+  are applied at the movement/attack sites — the champion's stored hp,
+  max, dmg, rate and speed are byte-identical to their spawn values
+  (harness-asserted). Pressure through tempo, not inflated numbers.
+
+### Transitions are clean state changes
+bossPhaseSync is monotonic: phases never step back (a champion healed
+by a Baal Priest above a threshold stays enraged and never re-calls its
+escort), each crossed phase's entry fires exactly once, in order — a
+single hit from 100% to 20% enters Phase II (escort called once) and
+then Phase III, landing in the correct phase with no double-trigger.
+A stunned champion's telegraph timers hold, so a telegraph can never
+shrink under a stun. Telegraphs live on a new world-space graphics
+layer (bossFx, depth 6) redrawn from live state every bossTick: the
+wind-up ring closes as the blow gathers, the slam circle fills toward
+full radius as impact nears — nothing damages before its mark completes.
+
+### Numbers and tuning rationale (wave 10, the real champion)
+Champion: 380 HP x curve 1.305 x5 = 2,479 HP; dmg 14 x 1.143 x1.6 =
+25.6 per normal blow (0.9s). Heavy: 76.8 (Phase I/II), enraged 102.5 —
+against David's 200 HP, no telegraphed blow one-shots a full hero at
+waves 10, 20 or 30 (harness checks all three on the real curve: 102 /
+119 / 138, all < 200): dodge it, or eat it and live — that is the whole
+design. Slam: 51.2 in the circle. A plausible wave-10 army (8 upgraded
+squads + David) fields ~171 DPS of full contact, ~15s of focused fire
+for the kill — the fight is short, violent and losable, not a sponge.
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all JS files; all 5 data JSONs parse.
+- tools/verify_upgrade7.js (stubbed Phaser, REAL main.js): **44/44
+  checks pass**, stable across 10 repeated runs — BOSS table and wiring;
+  spawn stats exactly curve x5 / x1.6; thresholds (67% still Phase I,
+  66% Phase II once, 33% Phase III once); escort cap 4, era defs, spawns
+  at the champion's side, never re-called, monotonic under healing; the
+  one-hit double-crossing; enrage tempo with zero stat inflation;
+  telegraph-before-damage for BOTH attacks, with the dodge dealing zero
+  and standing still paying exactly x3 / x2; the champion still marches
+  on the camp undefended, damages it, and freezes mid wind-up; the
+  no-one-shot bound at waves 10/20/30; and a **competent-play
+  simulation through the real update() loop**: scripted player (CHARGE
+  between telegraphs, FALL BACK the moment a wind-up or slam mark
+  appears, hero kiting at sling range; NO skills, NO orbs, NO camp
+  upgrades) kills the wave-10 champion in ~31s of fighting with the
+  camp untouched at 500/500, passing through all three phases. (Two
+  early harness flakes were the harness's own observation windows —
+  the freeze invariant and the camp-watch loop — not game defects;
+  both were corrected to state the real invariant and the suite then
+  ran 10/10 clean.)
+- No regressions: tools/verify_upgrade3.js (47/47), verify_upgrade4.js
+  (32/32), verify_upgrade5.js (40/40), verify_upgrade6.js (34/34).
+- Local server: 200 for /, js/main.js, js/sfx.js, data/units.json.
+- NOT verified (no live browser in this environment — needs kennin's or
+  a playtest's hands): whether the red ring and filling slam circle
+  read clearly on the busy Elah field at phone zoom; whether the name
+  plate pulse and PHASE float are noticeable mid-fight; the roar's
+  volume against the pad; and the fight's feel at waves 20/30 in real
+  endless runs (the harness proves the numbers stay survivable there,
+  not that they feel fair).
+
+### What remains for the champion
+- Endless waves 20/30 field no flagged champion under the current
+  spawn rule (boss flag is goal-wave-only); whether endless deserves
+  its own champions is kennin's call, not made here.
+- The escort is Bible-shaped by role, so other eras inherit it when
+  they unlock — untested there, like the rest of those eras.
