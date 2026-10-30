@@ -9,13 +9,21 @@ window.GXHub=(function(){
   const inHub=(()=>{ try{ return window.parent!==window; }catch(e){ return true; } })();
   const sdk=window.Grokonians&&window.Grokonians.earn?window.Grokonians:null; // hub-served SDK, if the page included it
   const q=[]; let timer=null, hubBalance=null; const listeners=[];
+  let welcomed=false, helloTries=0, helloTimer=null;
   function post(msg){ try{ window.parent.postMessage(msg,'*'); }catch(e){} }
+  // The hub's bridge (hub.js) waits for the game to say hello: it answers {type:'grokonians:welcome'},
+  // runs its session handshake, and only then is the Grokonian connection live. Retry until welcomed.
+  function hello(){ if(!inHub||welcomed) return; helloTries++; post({type:'grokonians:hello'});
+    if(helloTries<10) helloTimer=setTimeout(hello,1500); }
   function pump(){ if(!q.length){ timer=null; return; } const it=q.shift();
     if(sdk) sdk.earn(it.amount,it.reason); else post({type:'grokonians:earn',amount:it.amount,reason:it.reason});
     timer=setTimeout(pump,1100); }
-  window.addEventListener('message',e=>{ if(e.source===window.parent&&e.data&&e.data.type==='grokonians:balance'){ hubBalance=e.data.balance; listeners.forEach(f=>f(hubBalance)); } });
+  window.addEventListener('message',e=>{ if(e.source!==window.parent||!e.data) return;
+    if(e.data.type==='grokonians:welcome'){ welcomed=true; if(helloTimer){ clearTimeout(helloTimer); helloTimer=null; } }
+    if(e.data.type==='grokonians:balance'){ hubBalance=e.data.balance; listeners.forEach(f=>f(hubBalance)); } });
+  if(inHub) hello();
   return {
-    mode: inHub?'hub':'local', pending:()=>q.length, get hubBalance(){ return hubBalance; },
+    mode: inHub?'hub':'local', pending:()=>q.length, get hubBalance(){ return hubBalance; }, get connected(){ return welcomed; },
     earn(amount,reason){ if(!inHub) return; amount=Math.floor(amount); while(amount>0){ const n=Math.min(10,amount); q.push({amount:n,reason:String(reason||'play')}); amount-=n; } if(!timer) pump(); },
     spend(item,cost){ if(inHub) post({type:'grokonians:spend',item:String(item),amount:Math.floor(cost)}); },
     onBalance(f){ listeners.push(f); }
