@@ -26,6 +26,8 @@ window.GXHub=(function(){
     mode: inHub?'hub':'local', pending:()=>q.length, get hubBalance(){ return hubBalance; }, get connected(){ return welcomed; },
     earn(amount,reason){ if(!inHub) return; amount=Math.floor(amount); while(amount>0){ const n=Math.min(10,amount); q.push({amount:n,reason:String(reason||'play')}); amount-=n; } if(!timer) pump(); },
     spend(item,cost){ if(inHub) post({type:'grokonians:spend',item:String(item),amount:Math.floor(cost)}); },
+    // Hub leaderboard: the hub page relays this to POST /api/scores under the same signed session as earn.
+    submitScore(score,waves){ if(!inHub) return; score=Math.floor(Number(score)||0); waves=Math.floor(Number(waves)||0); if(score<0||waves<0) return; post({type:'scores:submit',score:score,waves:waves}); },
     onBalance(f){ listeners.push(f); }
   };
 })();

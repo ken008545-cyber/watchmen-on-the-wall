@@ -689,6 +689,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(win) cqRecordStars(this.eraId,stars);
     this.flush(); const ev=Progress.takeEvents();
     const rec={score:this.kills*10+Math.round(campFrac*20)*50+this.wavesCleared*100+stars*500};
+    if(window.GXHub&&GXHub.submitScore) GXHub.submitScore(rec.score,this.wavesCleared); // GX Hub leaderboard (no-op standalone)
     this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless})); } }
 
 class End extends Phaser.Scene{ constructor(){super('End');}
