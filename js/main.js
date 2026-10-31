@@ -91,6 +91,65 @@ const TWISTS=[
 function weekIndex(d){ d=d||new Date(); const days=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return Math.floor((days+3)/7); }
 function twistForWeek(w){ const n=TWISTS.length; return TWISTS[((w%n)+n)%n]; }
 function currentTwist(){ return twistForWeek(weekIndex()); }
+// Upgrade 15 — GATHER & BUILD (kennin, voice 2026-10-30: gather by mining
+// — wood from trees, stone from rocks — then build defenses around the
+// camp, "like fences, like in Fortnite Save the World where you have to
+// protect the core. We could do that for the camp." His warmly-received
+// addition: pieces wear with use and are mended between waves.)
+//  RESOURCES: trees and rock outcrops stand at fixed fractions of the
+//  world (NODE_SPOTS — the orb-station pattern, so every era inherits
+//  the same posts; in the Bible world, 1920x1200, the trees land at
+//  (480,240) (768,420) (979,180) (1171,756) (1421,300) (1680,876) and
+//  the rocks at (518,1020) (883,1020) (1114,420) (1517,1020) (1766,516)
+//  — all clear of the camp, every orb station, and each other). The
+//  hero gathers by STANDING at a node: every GATHER.tick seconds of
+//  standing still within GATHER.range, one swing lands (tree: the melee
+//  swish; rock: the blunt knock — the SFX families the field already
+//  speaks) and GATHER.yield of its resource joins the run's purse. A
+//  node holds GATHER.gathers swings, then stands gathered-out and
+//  REGROWS after GATHER.regrow seconds — the slow timer, not a
+//  between-wave gift, so a long defense can be re-timbered mid-run but
+//  never strip-mined in one breath. Wood and stone are RUN purse only —
+//  never Manna, never Grokonians, never saved.
+//  BUILDING: the BUILD button opens a build bar — Wooden Fence (wood)
+//  and Stone Wall (stone), Mend for a worn piece, Demolish to take one
+//  down. Placement snaps to the BUILD.grid and obeys ONE passability
+//  law, stated plainly: pieces may stand anywhere EXCEPT inside the
+//  camp's own ground (campClear), across a resource node or an orb
+//  station (nodeClear / orbClear), or in the spawn mouth band at the
+//  world's east edge (spawnBand) — the road in can be FUNNELED but
+//  never SEALED. The law needs no pathfinding to keep: there is none in
+//  this game. An enemy marches on the camp and stops for the nearest
+//  blocker in its 90px scan; a piece joins that scan as a blocker with
+//  HP, so a full ring is only ever a DELAY — the ring is chewed through
+//  piece by piece and the camp is reached the moment a gap opens.
+//  Nothing a player builds can make the camp unreachable, and nothing
+//  here touches an enemy stat or the wave curve: building is a
+//  player-side tool, and kennin's scaling law stands untouched.
+//  PIECES IN COMBAT: a piece blocks only when it truly stands between
+//  the enemy and the camp — it joins the blocker scan when its
+//  effective distance (center distance minus bodyR) beats the nearest
+//  defender's AND its own distance to the camp is no more than the
+//  enemy's plus behindPad. An enemy that reaches it attacks it at its
+//  own rate and damage, through damageBuild; wear shows as tint stages
+//  and an HP bar, and at zero the piece falls and the road reopens.
+//  The champion chews pieces with his ordinary blows through the same
+//  loop; his telegraphed specials stay aimed at the living — a fence
+//  delays his march and eats his plain attacks, it does not eat a
+//  heavy strike meant for men. The hero and his squads pass through
+//  pieces freely (no friendly collision exists anywhere in this game).
+//  MEND restores mendHealFrac of a piece's max HP for a mendCostDiv-th
+//  of its build cost (rounded up — 2 of its resource for either piece),
+//  and refuses a whole piece. DEMOLISH refunds demolishRefund of the
+//  build cost (rounded down — 3 of 6): taking a wall down is a real
+//  decision, not a free re-deal. First-pass numbers, kennin's to tune.
+const GATHER={ range:80, tick:0.55, woodYield:2, stoneYield:2, gathers:5, regrow:45 };
+const BUILD={ grid:64, campClear:118, spawnBand:150, nodeClear:64, orbClear:76, bodyR:30, behindPad:30,
+  mendHealFrac:0.5, mendCostDiv:3, demolishRefund:0.5,
+  pieces:{ fence:{id:'fence',name:'Wooden Fence',res:'wood',cost:6,hp:120,tex:'fence'},
+           wall:{id:'wall',name:'Stone Wall',res:'stone',cost:6,hp:320,tex:'stonewall'} } };
+const NODE_SPOTS={ trees:[[0.25,0.20],[0.40,0.35],[0.51,0.15],[0.61,0.63],[0.74,0.25],[0.875,0.73]],
+                   rocks:[[0.27,0.85],[0.46,0.85],[0.58,0.35],[0.79,0.85],[0.92,0.43]] };
 // Upgrade 9: COMMAND & CARE — kennin's three rulings from the 2026-10-30
 // call. (1) The army no longer trails the hero by default: squads post where
 // they stand until directed (tap-to-order, below); the command bar speaks
@@ -179,7 +238,11 @@ const LAYOUT_DEFS=[
   ['skill0','Power 1',196,56,1178,368],['skill1','Power 2',196,56,1178,432],['skill2','Power 3',196,56,1178,496],
   ['cmd_charge','Charge',110,56,130,665],['cmd_hold','Hold',110,56,247,665],['cmd_follow','Follow Me',110,56,364,665],['cmd_flank','Flank',110,56,481,665],
   ['cmd_fallback','Fall Back',110,56,598,665],['cmd_shieldwall','Shield Wall',110,56,715,665],['cmd_volley','Volley',110,56,832,665],
-  ['cmd_camp','CAMP',110,56,949,665],['cmd_rally','Rally',110,56,1066,665]];
+  ['cmd_camp','CAMP',110,56,949,665],['cmd_rally','Rally',110,56,1066,665],
+  // Upgrade 15: BUILD takes the seat directly under the power stack
+  // (y 568, its bottom edge at 596 — still clear of the command bar at
+  // HUD_Y=610, the margin the Upgrade-10 stack law keeps).
+  ['build','BUILD',196,56,1178,568]];
 function defaultLayoutPos(){ const o={}; LAYOUT_DEFS.forEach(d=>{ o[d[0]]={x:d[4],y:d[5]}; }); return o; }
 function loadLayout(){ try{ const v=JSON.parse(localStorage.getItem(LAYOUT_KEY)||'null'); if(v&&v.pos&&typeof v.pos==='object') return v; }catch(e){} return null; }
 function saveLayout(pos){ try{ localStorage.setItem(LAYOUT_KEY,JSON.stringify({pos})); }catch(e){} }
@@ -193,9 +256,10 @@ function layoutPositions(){ return Object.assign(defaultLayoutPos(),(loadLayout(
 // flips auto-fire, and the orders sit on the Z X F G H J home row.
 const BIND_ACTIONS=[
   ['dodge','Dodge'],['block','Block (hold)'],['sprint','Sprint'],['skill0','Power 1 (top)'],['skill1','Power 2'],['skill2','Power 3 (ult)'],['autofire','Auto-fire toggle'],['camp','Camp panel'],
-  ['volley','Volley'],['rally','Rally'],['charge','Order: Charge'],['hold','Order: Hold'],['follow','Order: Follow Me'],['flank','Order: Flank'],['fallback','Order: Fall Back'],['shieldwall','Order: Shield Wall']];
+  ['volley','Volley'],['rally','Rally'],['charge','Order: Charge'],['hold','Order: Hold'],['follow','Order: Follow Me'],['flank','Order: Flank'],['fallback','Order: Fall Back'],['shieldwall','Order: Shield Wall'],
+  ['build','Build mode']]; // Upgrade 15: C for construction — free among the defaults
 const DEFAULT_BINDS={ dodge:'Space', block:'ShiftLeft', sprint:'KeyV', skill0:'Digit1', skill1:'Digit2', skill2:'Digit3', autofire:'KeyT', camp:'KeyB',
-  volley:'KeyQ', rally:'KeyE', charge:'KeyZ', hold:'KeyX', follow:'KeyF', flank:'KeyG', fallback:'KeyH', shieldwall:'KeyJ' };
+  volley:'KeyQ', rally:'KeyE', charge:'KeyZ', hold:'KeyX', follow:'KeyF', flank:'KeyG', fallback:'KeyH', shieldwall:'KeyJ', build:'KeyC' };
 function loadBinds(){ const b=Object.assign({},DEFAULT_BINDS);
   try{ const v=JSON.parse(localStorage.getItem(BINDS_KEY)||'null'); if(v&&typeof v==='object') BIND_ACTIONS.forEach(([id])=>{ if(typeof v[id]==='string'&&v[id]) b[id]=v[id]; }); }catch(e){}
   return b; }
@@ -299,7 +363,8 @@ const LOAD_TIPS=[
   'Tip: DODGE makes you untouchable for a blink; BLOCK softens a blow but a boss heavy still lands through it. Sprint in, strike the opener, get out.',
   'Tip: Your squads hold their ground until you direct them — tap a squad, then tap where it should post up. Orders from the command bar go to the selected squad, or to the whole army when your hero is selected.',
   'Tip: The camp can be cared for mid-wave — tap the camp or the CAMP button to Fortify, Repair, and light the Watch Fire without leaving the fight.',
-  'Tip: Tap an orb once and your hero will walk up and buy it — watch for the banner: it names the power and what it does.'
+  'Tip: Tap an orb once and your hero will walk up and buy it — watch for the banner: it names the power and what it does.',
+  'Tip: Between waves, step out of the shop: gather wood from trees and stone from rocks, and BUILD fences and walls around the camp. Worn pieces can be mended; the enemy road can be funneled, never sealed.'
 ];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
   preload(){ this.load.image('logo','assets/logo.png'); }
@@ -493,7 +558,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // and null in the tutorial, whose economy firewall stays sealed).
     // seventhT/seventhAcc are the Seventh Day's rest clock and its manna
     // drip accumulator, driven by update() while the held-back wave waits.
-    this.twist=(!this.tutorial&&this.eraId==='bible')?currentTwist().id:null; this.seventhT=0; this.seventhAcc=0; }
+    this.twist=(!this.tutorial&&this.eraId==='bible')?currentTwist().id:null; this.seventhT=0; this.seventhAcc=0;
+    // Upgrade 15: gather & build state — the run's wood/stone purse, the
+    // field's resource nodes, the pieces built from them, build mode and
+    // its bar, and the intermission spent on the field (the shop's other
+    // room, on the shop's own deadline).
+    this.wood=0; this.stone=0; this.builds=[]; this.nodes=[]; this.buildMode=false; this.buildTool='fence'; this.gatherT=0;
+    this.interField=false; this.buildItems=[]; this.interItems=[]; this.buildBarRect=null; this.interBtnRects=[]; this.buildBtnRect=null; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -513,7 +584,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.fx=this.add.graphics().setDepth(20);
     this.selFx=this.add.graphics().setDepth(6); // Upgrade 9: the selection ring (world layer, under the fight furniture)
     this.rallyFx=this.add.graphics().setDepth(5); // Upgrade 10: rally banners (world layer, under the selection ring)
-    this.buildHero(); this.buildOrbs(); this.buildHUD();
+    this.buildGhost=this.add.graphics().setDepth(19); // Upgrade 15: the build-mode placement ghost (world layer)
+    this.buildHero(); this.buildOrbs(); this.buildNodes(); this.buildHUD();
     this.cameras.main.setBounds(0,0,this.worldW,this.worldH);
     this.cameras.main.startFollow(this.hero.spr,true,0.08,0.08);
     this.fixUI();
@@ -587,11 +659,21 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // CAMP button's: a tap on it is a button press, never a march order.
     this.pauseBtn=button(this,1246,20,56,34,'⚙',()=>this.openPause(),{size:16}); this.pauseBtn.setDepth(31);
     this.pauseBtnRect={x:1246,y:20,w:56,h:34};
+    // Upgrade 15: the BUILD button — the right column's eighth seat,
+    // directly under the power stack in the same 196x56 family (its
+    // bottom edge, 596, still clears the command bar). It is command
+    // furniture, not a fight input: it does NOT join fightRects (the
+    // Upgrade-10 stack wall stays exactly seven), it keeps its own
+    // onTap wall like CAMP and ⚙, and it registers in the layout
+    // system like every other battle control.
+    this.buildBtn=button(this,1178,568,196,56,'BUILD',()=>this.toggleBuildMode(),{size:16}); this.buildBtn.setDepth(31);
+    this.buildBtnRect={x:1178,y:568,w:196,h:56};
+    this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:196,h:56}; });
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave>0&&this.isNightWave(this.wave)?'Night':'Day'; }
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
-    this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
+    this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap+'   Wood '+Math.floor(this.wood||0)+' · Stone '+Math.floor(this.stone||0));
     // Upgrade 9: the order line names WHO the command bar speaks to — the
     // selected squad and its own order, or the army order when the hero is
     // selected.
@@ -632,6 +714,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.campBtnRect&&Math.abs(p.x-this.campBtnRect.x)<=this.campBtnRect.w/2+4&&Math.abs(p.y-this.campBtnRect.y)<=this.campBtnRect.h/2+4) return;
     // Upgrade 12: the same wall for the ⚙ pause button.
     if(this.pauseBtnRect&&Math.abs(p.x-this.pauseBtnRect.x)<=this.pauseBtnRect.w/2+4&&Math.abs(p.y-this.pauseBtnRect.y)<=this.pauseBtnRect.h/2+4) return;
+    // Upgrade 15: the same wall for the BUILD button — and while build
+    // mode stands open, the build bar's own ground belongs to its tools;
+    // while the intermission field bar stands, its buttons own their taps.
+    if(this.buildBtnRect&&Math.abs(p.x-this.buildBtnRect.x)<=this.buildBtnRect.w/2+4&&Math.abs(p.y-this.buildBtnRect.y)<=this.buildBtnRect.h/2+4) return;
+    if(this.buildMode&&this.buildBarRect&&Math.abs(p.x-this.buildBarRect.x)<=this.buildBarRect.w/2&&Math.abs(p.y-this.buildBarRect.y)<=this.buildBarRect.h/2) return;
+    if(this.interField&&(this.interBtnRects||[]).some(r=>Math.abs(p.x-r.x)<=r.w/2+4&&Math.abs(p.y-r.y)<=r.h/2+4)) return;
     // Upgrade 12: under STICK or FOLLOW, a field press is not yet a tap —
     // it may become a drag (the stick) or a hold (follow). The press is
     // held as pendTap and only a quick, still release resolves it as a
@@ -645,6 +733,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   fieldTap(p){
     // p.y is a screen coordinate (the HUD check); the tap itself lands in the world.
     const wx=(p.worldX!==undefined?p.worldX:p.x), wy=(p.worldY!==undefined?p.worldY:p.y);
+    // Upgrade 15: in build mode a field tap is a build act — place,
+    // mend, demolish — never a march, a selection, or a targeting tap.
+    if(this.buildMode){ this.buildTap(wx,wy); return; }
     if(this.volleyMode){ this.doVolley(wx,wy); return; }
     // Upgrade 10: a tap while Rally is armed plants the banner there —
     // it is a planting, never a march or selection tap.
@@ -773,12 +864,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.useSkill(i); }
   pressVolley(){ if(this.over||this.shopOpen) return;
     if(this.volleyCd>0){ if(this.volleyCd<=INPUT_BUFFER) this._volleyBuf=true; else this.toast('Volley ready in '+Math.ceil(this.volleyCd)+'s'); return; }
-    this.volleyMode=true; this.rallyMode=false; this.toast('Volley: tap a target spot'); }
+    this.exitBuildMode(); this.volleyMode=true; this.rallyMode=false; this.toast('Volley: tap a target spot'); }
   // Upgrade 10 (approved addition): RALLY — tap the button, then tap the
   // ground to plant the banner. A targeting mode like Volley's, and the
   // two modes cancel each other.
   pressRally(){ if(this.over||this.shopOpen) return;
-    this.volleyMode=false; this.rallyMode=true; this.toast('Rally: tap where the banner goes'); }
+    this.volleyMode=false; this.exitBuildMode(); this.rallyMode=true; this.toast('Rally: tap where the banner goes'); }
   // Planting the banner follows Upgrade 9's scoping law: the selected
   // squad answers alone (its own order becomes 'rally', the point its
   // own), or — with the hero selected — the whole army answers (army
@@ -1040,6 +1131,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // resolves it — selection, posting, orbs, volley and rally spots all
   // keep working, and a steering drag can never post or select.
   onPointerMove(p){ if(!p) return;
+    if(p.worldX!==undefined) this._ptrW={x:p.worldX,y:p.worldY}; // Upgrade 15: the build ghost follows the pointer's world point
     if(this.pendTap&&p.id===this.pendTap.id){ const d=Math.hypot(p.x-this.pendTap.x,p.y-this.pendTap.y);
       if(d>16){ const down=this.pendTap; this.pendTap=null;
         if(this.moveScheme==='stick') this.stick={id:down.id,bx:down.x,by:down.y,dx:p.x-down.x,dy:p.y-down.y};
@@ -1093,6 +1185,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'volley': this.pressVolley(); break;
       case 'rally': this.pressRally(); break;
       case 'camp': this.toggleCampPanel(); break;
+      case 'build': this.toggleBuildMode(); break;
       default: if(ORDER_NAMES[act]) this.giveOrder(act); } }
   // --- Upgrade 12: the pause overlay + the in-battle layout editor ---
   openPause(){ if(this.over||this.shopOpen||this.victoryOpen||this.paused||this.layoutEdit) return;
@@ -1282,6 +1375,166 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.campFireCd=CAMP_FIRE.rate;
     this.shoot(this.campPos.x,this.campPos.y-40,t,'ember',{dmg:CAMP_FIRE.dmg,type:'fire',crit:0},700);
     this.spark(this.campPos.x,this.campPos.y-46,0xd9a441,2); }
+  // --- Upgrade 15: gather & build — nodes, the purse, pieces, build mode ---
+  // Resource nodes stand at fixed fractions of the world (NODE_SPOTS),
+  // the orb-station pattern: every era inherits the same posts, clear of
+  // the camp, the orb stations and each other.
+  buildNodes(){ this.nodes=[];
+    const add=(kind,fx,fy)=>{ const x=Math.round(fx*this.worldW), y=Math.round(fy*this.worldH);
+      const spr=this.add.image(x,y,kind==='tree'?'tree':'rock').setDepth(4);
+      const n={kind,x,y,hp:GATHER.gathers,max:GATHER.gathers,regrowT:0,spr}; this.nodes.push(n); this.nodeVisual(n); };
+    NODE_SPOTS.trees.forEach(([fx,fy])=>add('tree',fx,fy));
+    NODE_SPOTS.rocks.forEach(([fx,fy])=>add('rock',fx,fy)); }
+  // A gathered-out node stands dimmed, greyed and shrunk until it regrows.
+  nodeVisual(n){ if(!n.spr) return; const gone=n.hp<=0;
+    if(n.spr.setAlpha) n.spr.setAlpha(gone?0.5:1);
+    if(n.spr.setTint){ if(gone) n.spr.setTint(0x8a7a68); else n.spr.clearTint(); }
+    if(n.spr.setScale) n.spr.setScale(gone?0.8:1); }
+  // Gathering: the hero gathers by STANDING at a node — still (his feet
+  // settled, under every movement scheme: a target reached, a stick
+  // released, a finger lifted) and within GATHER.range. Every
+  // GATHER.tick of standing, one swing lands and the yield joins the
+  // purse. Walking through a grove gathers nothing; a dodge or a march
+  // breaks the rhythm and the channel restarts.
+  gatherTick(dt){ if(!this.nodes||!this.hero) return; const h=this.hero;
+    for(const n of this.nodes){ if(n.hp<=0&&n.regrowT>0){ n.regrowT-=dt;
+      if(n.regrowT<=0){ n.hp=n.max; this.nodeVisual(n); } } }
+    if(h.down>0){ this.gatherT=0; this._ghx=h.x; this._ghy=h.y; return; }
+    const still=this._ghx!==undefined&&Math.hypot(h.x-this._ghx,h.y-this._ghy)<2.5;
+    this._ghx=h.x; this._ghy=h.y;
+    if(!still){ this.gatherT=0; return; }
+    const n=this.nodes.find(n=>n.hp>0&&Math.hypot(n.x-h.x,n.y-h.y)<=GATHER.range);
+    if(!n){ this.gatherT=0; return; }
+    this.gatherT=(this.gatherT||0)+dt;
+    if(this.gatherT<GATHER.tick) return;
+    this.gatherT=0; n.hp--;
+    const isTree=n.kind==='tree', gain=isTree?GATHER.woodYield:GATHER.stoneYield;
+    if(isTree){ this.wood=(this.wood||0)+gain; SFX.atkMelee(false); } else { this.stone=(this.stone||0)+gain; SFX.atkBlunt(false); }
+    this.floatText(n.x,n.y-56,'+'+gain+' '+(isTree?'Wood':'Stone'),isTree?'#c9a46a':'#c8ccd4');
+    this.spark(n.x,n.y-8,isTree?0x6a8a3a:0x9aa0a8,3);
+    if(this.tweens) this.tweens.add({targets:n.spr,x:n.x+3,duration:45,yoyo:true,repeat:1});
+    if(n.hp<=0){ n.regrowT=GATHER.regrow; this.nodeVisual(n); this.floatText(n.x,n.y-76,'Gathered out — it will regrow','#a08a6a'); }
+    this.refreshHUD(); this.refreshBuildBar(); }
+  // --- build mode: the bar, the tools, placement, pieces ---
+  // Build mode and the targeting modes are exclusive meanings for a
+  // field tap: entering one cancels the others. The camp panel and the
+  // build bar likewise close each other — one overlay at a time.
+  toggleBuildMode(){ if(this.over||this.shopOpen||this.victoryOpen||this.paused||this.layoutEdit) return;
+    // The tutorial's seven steps stand unchanged; building waits for
+    // the real wall, the same refusal the ⚙ gives there.
+    if(this.tutorial){ this.toast('Building waits for the real wall — the lesson stays as it is.'); return; }
+    if(this.buildMode){ this.exitBuildMode(); return; }
+    this.buildMode=true; this.volleyMode=false; this.rallyMode=false;
+    if(this.campPanelOpen) this.closeCampPanel();
+    this.renderBuildBar(); this.refreshHUD(); }
+  exitBuildMode(){ this.buildMode=false; this.clearBuildBar(); }
+  clearBuildBar(){ (this.buildItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.buildItems=[]; this.buildBarRect=null; }
+  refreshBuildBar(){ if(this.buildMode) this.renderBuildBar(); }
+  renderBuildBar(){ this.clearBuildBar(); if(!this.buildMode) return; const items=[]; this.buildItems=items;
+    const cy=HUD_Y-72;
+    const g=this.add.graphics().setDepth(55); g.fillStyle(0x140c07,0.94); g.fillRoundedRect(W/2-430,cy-40,860,80,10); g.lineStyle(2,0xd9a441,1); g.strokeRoundedRect(W/2-430,cy-40,860,80,10); items.push(g);
+    items.push(txt(this,W/2,cy-24,'Wood '+Math.floor(this.wood||0)+'  ·  Stone '+Math.floor(this.stone||0)+'  —  tap the field to use the tool in hand',13,'#cdbd95').setOrigin(0.5).setDepth(56));
+    const mendCost=Math.max(1,Math.ceil(BUILD.pieces.fence.cost/BUILD.mendCostDiv));
+    const tool=(id,label,x,w,afford)=>{ const b=button(this,x,cy+14,w,40,label,()=>{ this.buildTool=id; this.renderBuildBar(); },{size:14,disabled:!afford}); b.setDepth(56); if(this.buildTool===id) b.redraw(true); items.push(b); };
+    tool('fence','Fence · '+BUILD.pieces.fence.cost+' wood',W/2-330,180,(this.wood||0)>=BUILD.pieces.fence.cost);
+    tool('wall','Wall · '+BUILD.pieces.wall.cost+' stone',W/2-140,180,(this.stone||0)>=BUILD.pieces.wall.cost);
+    tool('mend','Mend · '+mendCost,W/2+40,140,true);
+    tool('demolish','Demolish',W/2+190,170,true);
+    const dn=button(this,W/2+360,cy+14,110,40,'Done',()=>this.exitBuildMode(),{size:14}); dn.setDepth(56); items.push(dn);
+    this.buildBarRect={x:W/2,y:cy,w:860,h:80};
+    this.fixUI(); }
+  buildCell(wx,wy){ return {cx:Math.floor(wx/BUILD.grid)*BUILD.grid+BUILD.grid/2, cy:Math.floor(wy/BUILD.grid)*BUILD.grid+BUILD.grid/2}; }
+  // The placement law (see BUILD at the top of the file): a cell is
+  // refused for exactly one named reason, or it is buildable. Occupancy
+  // is the caller's check — it depends on the tool in hand.
+  canPlace(cx,cy){ if(cx<BUILD.grid||cx>this.worldW-BUILD.grid||cy<BUILD.grid||cy>this.worldH-BUILD.grid/2) return 'bounds';
+    if(Math.hypot(cx-this.campPos.x,cy-this.campPos.y)<BUILD.campClear) return 'camp';
+    if(cx>this.worldW-BUILD.spawnBand) return 'spawn';
+    for(const n of (this.nodes||[])) if(Math.hypot(cx-n.x,cy-n.y)<BUILD.nodeClear) return 'node';
+    for(const o of (this.orbs||[])) if(Math.hypot(cx-o.x,cy-o.y)<BUILD.orbClear) return 'orb';
+    return null; }
+  buildTap(wx,wy){ const cell=this.buildCell(wx,wy);
+    const pc=(this.builds||[]).find(b=>b.cx===cell.cx&&b.cy===cell.cy);
+    if(pc){ if(this.buildTool==='mend') return this.mendBuild(pc);
+      if(this.buildTool==='demolish') return this.demolishBuild(pc);
+      this.toast('Already built there — Mend it, Demolish it, or pick another spot'); return 'occupied'; }
+    if(this.buildTool==='mend'||this.buildTool==='demolish'){ this.toast('Nothing built there'); return 'empty'; }
+    return this.tryPlace(this.buildTool,wx,wy); }
+  tryPlace(kind,wx,wy){ const def=BUILD.pieces[kind]; if(!def) return 'nodef';
+    const cell=this.buildCell(wx,wy), cx=cell.cx, cy=cell.cy;
+    if((this.builds||[]).some(b=>b.cx===cx&&b.cy===cy)) return 'occupied';
+    const bad=this.canPlace(cx,cy);
+    if(bad){ this.toast({bounds:'Off the field',camp:'Too close to the camp — the tent needs its ground',spawn:'The enemy road stays open — nothing seals the spawn mouth',node:'A tree or rock stands there',orb:'Too close to an orb station'}[bad]||'Cannot build there'); return bad; }
+    if((this[def.res]||0)<def.cost){ this.toast('Not enough '+def.res+' — gather more from '+(def.res==='wood'?'trees':'rocks')); return 'funds'; }
+    this[def.res]-=def.cost;
+    const pc={def,x:cx,y:cy,cx,cy,hp:def.hp,max:def.hp};
+    pc.spr=this.add.image(cx,cy,def.tex).setDepth(6);
+    pc.bar=this.add.graphics().setDepth(12);
+    this.builds.push(pc); this.drawBuildBar(pc);
+    this.spark(cx,cy-8,def.res==='wood'?0xb08d4a:0xc8ccd4,5); SFX.build();
+    this.refreshBuildBar(); this.refreshHUD();
+    return 'placed'; }
+  // A piece under attack: wear shows in tint stages over its HP bar, and
+  // at zero the piece falls — sprite, bar and registry entry together —
+  // and the road it held reopens.
+  damageBuild(pc,amt){ if(!pc||pc.hp<=0) return; pc.hp-=amt;
+    if(pc.hp<=0){ this.teardownBuild(pc);
+      this.floatText(pc.x,pc.y-34,(pc.def.id==='fence'?'Fence':'Wall')+' down!','#ff8a6a');
+      this.spark(pc.x,pc.y,pc.def.res==='wood'?0xb08d4a:0xc8ccd4,8); SFX.atkBlunt(false); return; }
+    this.buildWear(pc); this.drawBuildBar(pc); }
+  buildWear(pc){ if(!pc.spr) return; const f=pc.hp/pc.max;
+    if(f>2/3) pc.spr.clearTint(); else pc.spr.setTint(f>1/3?0xcfc0a8:0x9a8874); }
+  drawBuildBar(pc){ const g=pc.bar; if(!g) return; g.clear();
+    if(pc.hp<pc.max){ g.fillStyle(0x000000,0.7); g.fillRect(pc.x-28,pc.y-30,56,5);
+      g.fillStyle(pc.hp/pc.max>0.35?0x5aa33b:0xa33b20,1); g.fillRect(pc.x-28,pc.y-30,56*Math.max(0,pc.hp)/pc.max,5); } }
+  teardownBuild(pc){ pc.hp=0; if(pc.spr) pc.spr.destroy(); if(pc.bar) pc.bar.destroy();
+    this.builds=(this.builds||[]).filter(b=>b!==pc); }
+  // Mend: half the piece's strength back for a third of its cost. A
+  // whole piece refuses — mending is care, not a purse leak.
+  mendBuild(pc){ if(pc.hp>=pc.max){ this.toast('That piece is already whole'); return 'full'; }
+    const cost=Math.max(1,Math.ceil(pc.def.cost/BUILD.mendCostDiv)), purse=pc.def.res;
+    if((this[purse]||0)<cost){ this.toast('Mending needs '+cost+' '+purse); return 'funds'; }
+    this[purse]-=cost; pc.hp=Math.min(pc.max,pc.hp+pc.max*BUILD.mendHealFrac);
+    this.buildWear(pc); this.drawBuildBar(pc); SFX.build(); this.spark(pc.x,pc.y-8,0x8fd06a,3);
+    this.refreshBuildBar(); this.refreshHUD(); return 'mended'; }
+  // Demolish: half the cost back (rounded down). Rebuilding elsewhere
+  // is a plan; demolishing is never a free re-deal of the full price.
+  demolishBuild(pc){ const refund=Math.floor(pc.def.cost*BUILD.demolishRefund), purse=pc.def.res;
+    this[purse]=(this[purse]||0)+refund;
+    this.teardownBuild(pc); this.floatText(pc.x,pc.y-30,'+'+refund+' '+purse+' back',GOLD); SFX.atkBlunt(false);
+    this.refreshBuildBar(); this.refreshHUD(); return 'demolished'; }
+  // The placement ghost: the cell under the pointer, green when the
+  // tool in hand may land there, gold over a piece it can work on, red
+  // when it may not. A guide drawn from live state — never a promise
+  // the tap itself doesn't re-check.
+  drawBuildGhost(){ const g=this.buildGhost; if(!g) return; g.clear();
+    if(!this.buildMode||!this._ptrW) return;
+    const cell=this.buildCell(this._ptrW.x,this._ptrW.y);
+    const pc=(this.builds||[]).find(b=>b.cx===cell.cx&&b.cy===cell.cy);
+    let ok=false;
+    if(pc) ok=(this.buildTool==='mend'&&pc.hp<pc.max)||this.buildTool==='demolish';
+    else if(this.buildTool==='fence'||this.buildTool==='wall'){ const def=BUILD.pieces[this.buildTool]; ok=!this.canPlace(cell.cx,cell.cy)&&(this[def.res]||0)>=def.cost; }
+    const col=ok?(pc?0xf2c14e:0x5aa33b):0xa33b20;
+    g.fillStyle(col,0.10); g.fillRect(cell.cx-BUILD.grid/2,cell.cy-BUILD.grid/2,BUILD.grid,BUILD.grid);
+    g.lineStyle(2,col,0.9); g.strokeRect(cell.cx-BUILD.grid/2,cell.cy-BUILD.grid/2,BUILD.grid,BUILD.grid); }
+  // --- Upgrade 15: the intermission's other room — the field ---
+  // Stepping out of the shop does not close the intermission: the same
+  // shopEndsAt deadline keeps running in update(), the field bar below
+  // carries the same countdown, and the wave starts from the field at
+  // zero exactly once (beginInterWave), or early by its button.
+  leaveShopToField(){ if(!this.shopOpen) return; this.shopOpen=false; this.shopFirst=false; this.clearShop();
+    this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
+    this.interField=true; this.renderInterBar(); }
+  renderInterBar(){ this.clearInterBar(); const items=[]; this.interItems=items;
+    const g=this.add.graphics().setDepth(55); g.fillStyle(0x140c07,0.94); g.fillRoundedRect(W/2-340,76,680,56,10); g.lineStyle(2,0xd9a441,1); g.strokeRoundedRect(W/2-340,76,680,56,10); items.push(g);
+    this.interTxt=txt(this,478,104,this.shopTimerLabel(),16,GOLD).setOrigin(0.5).setDepth(56); items.push(this.interTxt);
+    const sb=button(this,740,104,120,40,'Shop',()=>this.openShop(false,true),{size:15}); sb.setDepth(56); items.push(sb);
+    const nb=button(this,890,104,150,40,'Next Wave ▶',()=>this.beginInterWave(),{size:15}); nb.setDepth(56); items.push(nb);
+    items.push(txt(this,W/2,152,'Between waves: gather wood and stone — BUILD fences and walls around the camp.',13,'#cdbd95').setOrigin(0.5).setDepth(56));
+    this.interBtnRects=[{x:740,y:104,w:120,h:40},{x:890,y:104,w:150,h:40}];
+    this.fixUI(); }
+  clearInterBar(){ (this.interItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.interItems=[]; this.interTxt=null; this.interBtnRects=[]; }
+  beginInterWave(){ if(!this.interField) return; this.interField=false; this.clearInterBar(); this.startWave(); }
   // --- field coins (Upgrade 3): the bigger map pays those who explore it ---
   spawnCoin(){ this.coinSeq=(this.coinSeq||0)+1; const grok=this.coinSeq%6===0;
     const x=Phaser.Math.Between(this.campPos.x+220,this.worldW-160), y=Phaser.Math.Between(90,this.worldH-90);
@@ -1537,6 +1790,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   bossEngaged(e){ const h=this.hero;
     if(h&&h.down<=0&&Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y)<=90) return true;
     for(const s of this.squads){ if(!s.dead&&Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y)<=90) return true; }
+    // Upgrade 15: a piece he is chewing also engages him — the wind-up
+    // gathers while he is held at a fence, as it does at a defender.
+    for(const pc of (this.builds||[])){ if(pc.hp>0&&Phaser.Math.Distance.Between(e.x,e.y,pc.x,pc.y)-BUILD.bodyR<=90) return true; }
     return Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34; }
   // The slam falls where the prey stands when the champion commits: the
   // nearest defender within 150px, else the camp if the champion is on it.
@@ -1662,7 +1918,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // here. It lives on the scene, not on any shop widget, so buying, paging
   // and the re-renders they cause never reset or pause it. shopT is the
   // remaining-seconds mirror update() maintains from that deadline.
-  openShop(first){ if(this.campPanelOpen) this.closeCampPanel(); this.shopOpen=true; this.shopFirst=!!first; this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; this.shopPage=0;
+  // Upgrade 15: openShop takes an optional second word — keepT. From the
+  // field bar's Shop button, the intermission's deadline is KEPT, not
+  // re-armed: the minute belongs to the intermission, not to whichever
+  // room the player is standing in, so stepping in and out of the shop
+  // can never farm time. Every other caller arms the full minute, as ever.
+  openShop(first,keepT){ if(this.campPanelOpen) this.closeCampPanel(); this.exitBuildMode(); this.interField=false; this.clearInterBar(); this.shopOpen=true; this.shopFirst=!!first; this.shopPage=0;
+    if(keepT&&this.shopEndsAt>Date.now()) this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
+    else { this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; }
     // squads and hero mend between waves
     this.squads.forEach(s=>{ s.hp=s.max; }); this.hero.hp=this.heroDef.hp;
     this.renderShop(first); }
@@ -1692,6 +1955,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const bg=this.add.graphics().setDepth(50); bg.fillStyle(0x140c07,0.92); bg.fillRect(24,38,W-48,H-62); bg.lineStyle(3,0xd9a441); bg.strokeRect(24,38,W-48,H-62); this.shopAdd(bg);
     const head=first?'Prepare your squads':('Wave '+this.wavesCleared+' survived!  +'+(this.lastBonus||0)+' manna');
     this.shopAdd(txt(this,W/2,50,head,26,GOLD).setOrigin(0.5).setDepth(51));
+    // Upgrade 15: the field door — step out of the shop and spend the
+    // rest of the intermission gathering and building. The deadline
+    // keeps running out there (update's interField branch); the bar
+    // that appears carries the same countdown and the way back in.
+    const fb=button(this,1085,50,170,42,'To the Field ▶',()=>this.leaveShopToField(),{size:15}); fb.setDepth(52); this.shopAdd(fb);
     this.shopHead2=this.shopAdd(txt(this,W/2,76,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
     // Upgrade 4: the camp strip lives on page 1 only, and pushes that page's
     // unit grid down by 24px; pages 2+ keep the original geometry untouched.
@@ -1774,6 +2042,16 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // whole battle — no timer, no timer's cousin, runs behind it.
     if(this.paused||this.layoutEdit) return;
     const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
+    // Upgrade 15: the intermission can also be spent ON THE FIELD — the
+    // shop's "To the Field" door steps out with the shop's OWN deadline
+    // still running. One clock, two rooms: leaving and returning never
+    // move it, reopening the shop (openShop's keep-deadline path) never
+    // resets it, and at zero the wave starts exactly once from here,
+    // the same way closeShop starts it from the shop. The pause above
+    // holds this clock too, as it holds everything.
+    if(this.interField){ this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
+      if(this.interTxt) this.interTxt.setText(this.shopTimerLabel());
+      if(this.shopT<=0) this.beginInterWave(); }
     this._pulse=(this._pulse||0)+dt; // Upgrade 8: drives the Perfect glow pulse in drawSkillSweep
     if(this.tutorial) this.tutTick(); // Upgrade 11: the highlight ring breathes here
     if(this.volleyCd>0){ this.volleyCd-=dt;
@@ -1831,6 +2109,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // of Upgrade 8's manual scheme; OFF means no basic attacks at all).
     if(h.cd>0) h.cd-=dt;
     this.heroAutoFire();
+    this.gatherTick(dt); // Upgrade 15: standing at a tree or rock gathers — mid-wave and in the field intermission alike
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
     // Upgrade 8: a raised guard shows as an arc on the hero's facing side.
@@ -1846,6 +2125,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       const st=this.selSquad&&!this.selSquad.dead?this.selSquad:(h.down<=0?h:null);
       if(st){ const sr=(this.selSquad?27:31)*(1+0.07*Math.sin((this._pulse||0)*5)); sg.lineStyle(2,0xf2c14e,0.95); sg.strokeCircle(st.x,st.y+8,sr); } }
     this.drawRallyBanners(); // Upgrade 10: a banner flies only while someone holds it
+    this.drawBuildGhost(); // Upgrade 15: the placement ghost, green where the tool in hand may land
     // squads
     this.squads=this.squads.filter(s=>!s.dead);
     if(this.selSquad&&this.selSquad.dead) this.selSquad=null;
@@ -1902,10 +2182,20 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         if(h.down<=0){ const d=Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y); if(d<bd){ bd=d; def={x:h.x,y:h.y,kind:'hero'}; } }
         for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; def={x:s.x,y:s.y,kind:'squad',s}; } }
         const dc=Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y);
+        // Upgrade 15: a built piece standing on the road is a blocker
+        // like any defender — it joins this same scan, measured to its
+        // body (center distance minus BUILD.bodyR), and only when it
+        // truly stands between the enemy and the camp: its own distance
+        // to the camp no greater than the enemy's, plus a shoulder's
+        // width. A fence behind the enemy's line blocks nothing, and a
+        // defender standing closer is still fought first.
+        for(const pc of (this.builds||[])){ if(pc.hp<=0) continue;
+          const dp=Phaser.Math.Distance.Between(e.x,e.y,pc.x,pc.y)-BUILD.bodyR;
+          if(dp<bd&&Phaser.Math.Distance.Between(pc.x,pc.y,this.campPos.x,this.campPos.y)<dc+BUILD.behindPad){ bd=dp; def={x:pc.x,y:pc.y,kind:'build',pc}; } }
         if(def){ const dx=def.x-e.x, dy=def.y-e.y, dl=Math.hypot(dx,dy)||1;
           if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0))*this.enemySpdMul()*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
           else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate;
-            if(def.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(def.s,e.dmg);
+            if(def.kind==='hero') this.hurtHero(e.dmg); else if(def.kind==='build') this.damageBuild(def.pc,e.dmg); else this.hurtSquad(def.s,e.dmg);
             SFX.enemyAttack(e); this.spark(def.x,def.y,0xc0392b,2); } }
         } else if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
           const sp=e.speed*(1-(e.slow||0))*this.enemySpdMul()*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
@@ -1934,7 +2224,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.skillBtns.forEach((b,bi)=>{ const wasCd=b.cd>0; if(b.cd>0){ b.cd-=dt;
         if(b.cd<=0){ b.cd=0; if(b.buffered){ b.buffered=false; this.useSkill(bi); } } }
       if(b.cd>0){ b.label.setText(b.def.name+'\n'+Math.ceil(b.cd)+'s'); b.alpha=0.5; }
-      else { b.held=(b.held||0)+dt; const t=this.heldTierOf(b);
+      else { // Upgrade 15: patience is earned in the fight — the field
+        // intermission is the shop's time wherever the player stands, so
+        // Held charge does not accrue while it runs.
+        if(!this.interField) b.held=(b.held||0)+dt; const t=this.heldTierOf(b);
         if(t>(b._tierShown||0)){ b._tierShown=t; this.floatText(h.x,h.y-72,b.def.name+' — '+HELD.names[t]+'!','#ffe98a'); }
         b.label.setText(b.def.name+(t>0?'\n'+HELD.names[t]:'')); if(b.label.setColor) b.label.setColor(t===2?'#ffe98a':(t===1?'#f2c14e':'#e8d9b0')); b.alpha=1; }
       // Upgrade 10: the power-ready whisper — the crossing tick only,
@@ -1947,6 +2240,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.refreshHUD();
   }
   end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.closeCampPanel();
+    this.interField=false; this.clearInterBar(); this.exitBuildMode(); // Upgrade 15: the field furniture leaves with the run
     const XP=DATA_P().xp;
     if(win){ this.tr('clears'); this.gx(XP.clear); this.earn('clear',DATA.grokonians.clear);
       if(!this.campHurtTotal){ this.earn('perfectClear',DATA.grokonians.perfectClear); this.tr('perfectClears'); this.gx(XP.perfectClear); }
@@ -2067,9 +2361,11 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
   markMove(){ if(!this.moveBtns) return;
     Object.entries(this.moveBtns).forEach(([id,b])=>{ b.label.setText((id==='tap'?'Tap to move':id==='stick'?'Joystick':'Follow (hold)')+(this.moveScheme===id?' ✓':'')); }); }
   renderBinds(){ (this.bindItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.bindItems=[];
-    BIND_ACTIONS.forEach(([id,label],i)=>{ const col=i<8?0:1, row=i%8, x=col===0?120:700, y=252+row*30;
+    // Upgrade 15: seventeen actions no longer fit two columns of eight —
+    // the list now runs three columns of six, same rows, same capture.
+    BIND_ACTIONS.forEach(([id,label],i)=>{ const col=i%3, row=Math.floor(i/3), x=90+col*390, y=252+row*30;
       const t=txt(this,x,y,label,15,PARCH); this.bindItems.push(t);
-      const kb=button(this,x+330,y+13,190,26,this._cap===id?'press a key…':keyName(this.binds[id]),()=>this.beginBindCapture(id),{size:13}); this.bindItems.push(kb); }); }
+      const kb=button(this,x+272,y+13,170,26,this._cap===id?'press a key…':keyName(this.binds[id]),()=>this.beginBindCapture(id),{size:13}); this.bindItems.push(kb); }); }
   beginBindCapture(id){ this._cap=id; this.renderBinds(); this.bindStatus.setText('Press a key for '+bindLabel(id)+' — Escape cancels.'); }
   // Conflict law: a SWAP. The action that held the captured key receives
   // the key this action is giving up, so a rebind can never strand an

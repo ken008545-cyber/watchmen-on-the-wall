@@ -34,6 +34,19 @@ window.makeArt = function(scene){
   function orbTex(key,core){ tex(key,64,76,(g)=>{ g.fillStyle(0x5a5148,1); g.fillPoints([new Phaser.Geom.Point(14,74),new Phaser.Geom.Point(50,74),new Phaser.Geom.Point(42,56),new Phaser.Geom.Point(22,56)],true); g.lineStyle(3,INK,1); g.strokePoints([new Phaser.Geom.Point(14,74),new Phaser.Geom.Point(50,74),new Phaser.Geom.Point(42,56),new Phaser.Geom.Point(22,56)],true,true); g.fillStyle(0x6e6455,1); g.fillEllipse(32,56,26,8); g.lineStyle(2,INK,1); g.strokeEllipse(32,56,26,8);
     g.fillStyle(core,0.16); g.fillCircle(32,30,27); g.fillStyle(core,0.45); g.fillCircle(32,30,19); g.fillStyle(core,1); g.fillCircle(32,30,13); g.lineStyle(2,INK,0.65); g.strokeCircle(32,30,13); g.fillStyle(0xffffff,0.9); g.fillCircle(27,24,4.5); }); }
   orbTex('orb_strength',0xd83a2a); orbTex('orb_swiftness',0x3ac8d8); orbTex('orb_mending',0x63c74d); orbTex('orb_iron',0xc8ccd4); orbTex('orb_thunder',0xf2c14e);
+  // --- Upgrade 15: the gather & build set — trees, rock outcrops, and the
+  // two buildable defenses, drawn in the same ink-and-parchment hand. ---
+  tex('tree',76,100,(g)=>{ g.fillStyle(0x5a4020,1); g.fillRect(33,58,10,38); g.lineStyle(3,INK); g.strokeRect(33,58,10,38);
+    blob(g,38,34,26,0x4d6b2e); blob(g,22,46,16,0x5e7d38); blob(g,55,46,16,0x55702f); blob(g,38,20,15,0x67863a);
+    g.fillStyle(0xd8572a,1); g.fillCircle(28,30,2.6); g.fillCircle(48,40,2.6); g.fillCircle(38,48,2.6); });
+  tex('rock',76,54,(g)=>{ blob(g,26,36,17,0x7a7468); blob(g,52,34,20,0x8a8478); blob(g,38,24,13,0x9a948a);
+    g.lineStyle(2,INK); g.lineBetween(44,22,52,34); g.lineBetween(20,30,30,40); g.fillStyle(0xc8ccd4,0.8); g.fillCircle(34,18,2.2); });
+  tex('fence',72,44,(g)=>{ g.fillStyle(0x8a6a3c,1); [6,34,62].forEach(x=>{ g.fillRect(x-4,6,8,36); g.lineStyle(2.5,INK); g.strokeRect(x-4,6,8,36); });
+    g.fillStyle(0x9c7a3c,1); g.fillRect(0,13,72,8); g.fillRect(0,27,72,8); g.lineStyle(2.5,INK); g.strokeRect(0,13,72,8); g.strokeRect(0,27,72,8);
+    g.fillStyle(0x5a4020,1); [10,38,66].forEach(x=>{ g.fillCircle(x,17,1.6); g.fillCircle(x,31,1.6); }); });
+  tex('stonewall',72,48,(g)=>{ g.fillStyle(0x8a8478,1); g.fillRect(2,6,68,38); g.lineStyle(3,INK); g.strokeRect(2,6,68,38);
+    g.lineStyle(2,INK); g.lineBetween(2,19,70,19); g.lineBetween(2,32,70,32); g.lineBetween(24,6,24,19); g.lineBetween(48,6,48,19); g.lineBetween(36,19,36,32); g.lineBetween(18,32,18,44); g.lineBetween(54,32,54,44);
+    g.fillStyle(0x6a6458,0.6); g.fillRect(6,36,14,5); g.fillRect(46,9,16,5); });
   tex('spear',40,8,(g)=>{ g.fillStyle(0x5a4020,1); g.fillRect(0,3,32,2); g.fillStyle(0x9c7a3c,1); g.fillTriangle(30,0,40,4,30,8);});
   // Ark of the covenant shown as a simple tent camp (no depiction of holy objects in combat)
   tex('camp',90,70,(g)=>{ g.fillStyle(0x8a6a3c,1); g.fillTriangle(5,65,45,8,85,65); g.lineStyle(3,INK); g.strokeTriangle(5,65,45,8,85,65); g.fillStyle(0x3a2412,1); g.fillTriangle(35,65,45,35,55,65); g.lineBetween(45,8,45,0);});

@@ -135,8 +135,10 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
 { cleanSettings();
   const g = hudBattle();
   const reg = {}; g.layoutReg.forEach(en => { reg[en.id] = en; });
-  ok(LAYOUT_DEFS.length === 16 && LAYOUT_DEFS.every(d => reg[d[0]] && reg[d[0]].obj.x === d[4] && reg[d[0]].obj.y === d[5]),
-    'no saved layout: all 16 controls stand at the table\'s defaults');
+  // Re-pointed by Upgrade 15 (documented, the house custom): BUILD is
+  // the 17th control in the table — the count moves with the table.
+  ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.every(d => reg[d[0]] && reg[d[0]].obj.x === d[4] && reg[d[0]].obj.y === d[5]),
+    'no saved layout: all 17 controls stand at the table\'s defaults');
   ok(reg.autofire.obj.x === 1178 && reg.autofire.obj.y === 70 && reg.skill2.obj.y === 496 && reg.cmd_charge.obj.x === 130 && reg.cmd_rally.obj.x === 1066 && reg.cmd_rally.obj.y === 665,
     '…and those defaults ARE Upgrade 10: stack x 1178 (toggle y 70, powers to y 496), row from x 130 at y 665');
   ok(g.fightRects.length === 7 && g.fightRects.every(r => r.x === 1178 && r.h === 56), 'the onTap wall (fightRects) matches the default stack');
