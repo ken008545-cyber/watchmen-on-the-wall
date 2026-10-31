@@ -3097,6 +3097,14 @@ against the live response headers before touching anything).
 - Hub: settings snapshotted before deploy; bindings identical
   after (hub 12/12, play 9/9); AUTH_GATE untouched; live source
   re-downloaded and diffed against the tree.
+- Proxy note for the next push: both game Workers read GitHub raw
+  through a 120-second edge cache (the watchmen-proxy module's
+  cacheTtl) — after this push the playtest proxy served the new
+  main.js at once while the durable Worker held the old copy inside
+  its window, then converged. Byte parity on both proxies was
+  confirmed once the window passed (main.js 8b175f…, net.js e1dee7…,
+  local == playtest == durable). A stale proxy copy in the first
+  two minutes after a push is the cache, not a failed push.
 - NOT verified from this desk (no live browser here): the press
   itself under a real thumb. On kennin's Samsung, in an ordinary
   browser tab — direct game address, playtest address, or the hub
