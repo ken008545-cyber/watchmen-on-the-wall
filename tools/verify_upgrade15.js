@@ -107,9 +107,9 @@ ok(GATHER.range === 80 && GATHER.tick === 0.55 && GATHER.woodYield === 2 && GATH
 ok(BUILD.pieces.fence.cost === 6 && BUILD.pieces.fence.hp === 120 && BUILD.pieces.wall.cost === 6 && BUILD.pieces.wall.hp === 320,
   'BUILD pieces: Wooden Fence 6 wood / 120 HP, Stone Wall 6 stone / 320 HP');
 ok(BUILD.grid === 64 && BUILD.campClear === 118 && BUILD.spawnBand === 150, 'BUILD placement: 64px grid, 118 camp clearance, 150 spawn-mouth band');
-ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.some(d => d[0] === 'build'), 'LAYOUT_DEFS carries 17 controls, BUILD among them'); // Upgrade 17 re-point: 18 — ORDERS joins the table
-ok(BIND_ACTIONS.length === 17 && DEFAULT_BINDS.build === 'KeyC' && new Set(Object.values(DEFAULT_BINDS)).size === Object.keys(DEFAULT_BINDS).length,
-  '17 bindable actions; KeyC is build\'s default and no two defaults collide');
+ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.some(d => d[0] === 'build'), 'LAYOUT_DEFS carries 17 controls, BUILD among them'); // Upgrade 17 re-point: 18 — ORDERS joins the table. Upgrade 20 re-point: 17 — Dodge and Block merge into GUARD
+ok(BIND_ACTIONS.length === 16 && DEFAULT_BINDS.build === 'KeyC' && new Set(Object.values(DEFAULT_BINDS)).size === Object.keys(DEFAULT_BINDS).length,
+  '16 bindable actions; KeyC is build\'s default and no two defaults collide'); // Upgrade 20 re-point: 16 — the dodge/block binds merge into the Guard key
 
 // ---------- the node field ----------
 {

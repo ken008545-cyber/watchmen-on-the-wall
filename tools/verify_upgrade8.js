@@ -55,11 +55,11 @@ ok(main.includes("c.on('pointerdown'"), 'the shared button helper presses with w
 ok(!/lightDmg|heavyDmg|lightCd|heavyCd|heavyCleave|heavySplash|openerMul/.test(main), 'Upgrade 10: the manual-strike numbers are GONE from the FIGHT table — auto-fire reads the hero data directly'); // (heavyWindup is not in this list on purpose: BOSS.heavyWindup is the champion's own telegraph and stays)
 ok(main.includes('blockMit:0.65, blockHeavyMit:0.45') && main.includes('sprintMul:1.45'), 'FIGHT table: block 65% / heavy-block 45% mitigation, sprint x1.45 (the surviving kit, unchanged)');
 ok(main.includes('dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6'), 'FIGHT table: dodge 150px in 0.22s, 0.30s i-frames, 1.6s cooldown');
-ok(main.includes('buildFightControls()') && main.includes("mk('autofire',SX,76,64") && main.includes("mk('dodge',SX,166,64") && main.includes("mk('block',SX,234,64") && main.includes("mk('sprint',SX,302,64"), 'Upgrade 10: the right-thumb stack — AUTO-FIRE toggle over DODGE, BLOCK, SPRINT, top right of the screen'); // Upgrade 17 re-point: the stack is circles now (thumb cluster 64 across, wider pitch) — same order, same seats' column
+ok(main.includes('buildFightControls()') && main.includes("mk('autofire',1178,76,64") && main.includes("mk('guard',102,448,64") && main.includes("mk('sprint',102,548,64"), 'Upgrade 10: the fight stack — AUTO-FIRE, the kit, the powers'); // Upgrade 17 re-point: circles (thumb cluster 64 across). Upgrade 20 re-point: the stack is a THUMB ARC now — AUTO-FIRE top-right, GUARD+SPRINT on the bottom-left rail, Dodge/Block merged into GUARD
 ok(main.includes('if(this.overFight(p)) return;'), 'onTap refuses taps on the fight stack — the hands stay separate');
 ok(main.includes('heroAutoFire(){') && main.includes('this.heroAutoFire();') && !main.includes('pressAttack') && !main.includes('lightStrike') && !main.includes('heavyStrike'), 'Upgrade 10: auto-fire is RESTORED through heroAutoFire(); the manual press path (pressAttack/lightStrike/heavyStrike) is removed entirely');
 ok(main.includes('if(h.iframes>0) return;'), 'hurtHero honors dodge i-frames before all damage');
-ok(main.includes("this.setBlock(true)") && main.includes("bb.on('pointerdown'"), 'BLOCK is a hold (pointerdown raises, release drops)');
+ok(main.includes("wirePress(gb,'guard')") && main.includes("cross(this.guardPress,()=>this.setBlock(true))") && main.includes("if(rec.held) this.setBlock(false)"), 'BLOCK is a hold (Upgrade 20: GUARD held past the threshold raises it, the release drops it — the pointer-level proof lives in verify_upgrade20)');
 
 // ---------- runtime: stubbed Phaser, real main.js ----------
 const store = {};
@@ -213,7 +213,7 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
   charge._handlers.pointerdown(); fireUp(charge);
   ok(g.order === 'charge' && floats.includes('Charge!'), 'pressing Charge sets the order and echoes "Charge!" above the hero');
   const sb = g.skillBtns[0]; sb.cd = 0.1;
-  fireUp(sb);
+  sb._handlers.pointerdown({ id: 1 }, 0, 0); // Upgrade 20 re-point: a press on a COOLING power routes through the press grammar's down (pressSkill + its buffer) — a hold never aims a move that is not ready
   ok(sb.buffered === true && sb.cd > 0, 'a skill pressed 100ms before ready is buffered, not cast and not lost');
   const e = spawnFoe(g, g.hero.x + 200, g.hero.y);
   for (let i = 0; i < 4; i++) g.update(0, 50);
@@ -226,7 +226,7 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
 
 // ---------- a press OUTSIDE the buffer window is not remembered ----------
 { const g = bareBattle(); g.buildHUD(); const sb = g.skillBtns[0]; sb.cd = 0.3;
-  fireUp(sb);
+  sb._handlers.pointerdown({ id: 1 }, 0, 0); // Upgrade 20 re-point: same grammar-down drive as the buffer battery above
   ok(!sb.buffered, 'a press 300ms early (outside the 150ms window) does not buffer');
   for (let i = 0; i < 8; i++) g.update(0, 50);
   ok(sb.cd === 0 && g.heldSpent.join() === '0,0,0', 'the cooldown ends quietly — no phantom cast'); }
@@ -326,17 +326,21 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
 { // THE STACK through the real HUD build: buttons, place, and the tap wall
   const g = bareBattle('david'); g.buildHUD();
   const B = g.fightBtns;
-  ok(B && B.autofire && B.dodge && B.block && B.sprint && !B.light && !B.heavy, 'Upgrade 10: the stack exists — AUTO-FIRE, DODGE, BLOCK, SPRINT (LIGHT and HEAVY are gone)');
-  ok(B.autofire.sx > 1000 && B.dodge.sx > 1000 && B.block.sx > 1000 && B.sprint.sx > 1000, 'every stack button lives on the right side of the screen');
+  ok(B && B.autofire && B.guard && B.sprint && !B.dodge && !B.block && !B.light && !B.heavy, 'Upgrade 10: the stack exists — AUTO-FIRE, GUARD, SPRINT (LIGHT and HEAVY are gone)'); // Upgrade 20 re-point: DODGE and BLOCK are one GUARD circle now
+  ok(B.autofire.sx > 1000 && B.guard.sx < 200 && B.sprint.sx < 200, 'Upgrade 20: the thumb arcs — AUTO-FIRE and the powers on the right, GUARD and SPRINT on the bottom-left rail');
   ok(g.skillBtns[1].def.name === 'Psalm' && g.skillBtns[2].def.name === 'Five Stones', 'the power buttons in the stack are David\'s moves from the data: PSALM and FIVE STONES');
-  ok(g.overFight({ x: 1178, y: 176 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight knows the stack from the field');
+  ok(g.overFight({ x: 102, y: 448 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight knows the stack from the field');
   const tx0 = g.hero.tx, ty0 = g.hero.ty;
-  g.onTap({ x: 1178, y: 176, worldX: 1178, worldY: 176 });
+  g.onTap({ x: 102, y: 448, worldX: 102, worldY: 448 });
   ok(g.hero.tx === tx0 && g.hero.ty === ty0, 'a tap ON the stack does not move the hero — the hands stay separate');
-  fireUp(B.dodge);
-  ok(g.hero.dodgeT > 0 || g.hero.iframes > 0, "the DODGE button's own press dashes");
-  fireUp(B.autofire);
-  ok(g.autoFire === false, "the AUTO-FIRE button's own press turns auto-fire off"); }
+  // Upgrade 20 re-point: the buttons' verbs resolve through the press
+  // grammar now (the helper callback is a deliberate no-op) — drive the
+  // same resolution a quick release performs. The full pointer path is
+  // proven in verify_upgrade20 with a live input stub.
+  g.guardPress = { t0: performance.now(), held: false }; g.endGuardPress();
+  ok(g.hero.dodgeT > 0 || g.hero.iframes > 0, "the GUARD button's quick release dashes (Dodge is its tap verb)");
+  g.afPress = { t0: performance.now(), held: false }; g.endPresses({});
+  ok(g.autoFire === false, "the AUTO-FIRE button's quick release turns auto-fire off"); }
 
 // ---------- the end-of-run summary renders the tally ----------
 { const e8 = Object.create(EndProto);

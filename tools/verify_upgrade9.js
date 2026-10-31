@@ -182,11 +182,16 @@ function resetWallet(n) { TokensStub._bal = n; TokensStub._spent = []; }
 // ---------- RULING 2: camp care, mid-wave ----------
 { const g = bareBattle(); g.buildHUD(); g.manna = 1000;
   ok(g.campPanelOpen === false, 'the camp panel starts closed');
-  fireUp(g.campBtn);
+  // Upgrade 20 re-point: CAMP is a press-grammar button — its TAP verb
+  // (a quick press, resolved on release) is the panel toggle the helper
+  // callback used to fire. Drive the grammar's resolution directly;
+  // the pointer path is proven in verify_upgrade20.
+  const campTap = () => { g.campPress = { t0: performance.now(), held: false }; g.endPresses({}); };
+  campTap();
   ok(g.campPanelOpen === true && g.campItems.length > 0, 'the CAMP button opens the camp panel mid-battle');
   ok(g.buyCampUpgrade(CAMP_UPGRADES[0]) === true && g.campMax === 650 && g.manna === 800, 'Fortify I bought FROM THE PANEL: same price (200), same effect (camp max 500 -> 650)');
   ok(g.campPanelOpen === true && g.campItems.length > 0, 'the panel re-rendered after its own purchase — still open, state fresh');
-  fireUp(g.campBtn);
+  campTap();
   ok(g.campPanelOpen === false, 'the CAMP button again closes it');
   g.shopOpen = true; let rs = 0; const realRS = g.renderShop; g.renderShop = () => { rs++; };
   ok(g.buyCampUpgrade(CAMP_UPGRADES[1]) === true && g.campMax === 850 && g.manna === 480 && rs === 1, 'Fortify II bought from the SHOP surface: same chain, same prices (1000-200-320=480), shop re-rendered');

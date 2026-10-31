@@ -42,7 +42,7 @@ ok(main.includes('EDITING LAYOUT — drag any button into place') && main.includ
 ok(main.includes('enter(){ ed.active=true; ed.items.forEach(it=>{ if(it.obj.disableInteractive) it.obj.disableInteractive(); }); }'), 'while editing, the buttons are NOT interactive — a drag can never fire an action');
 ok(main.includes("if(this.moveScheme!=='tap'&&!p._deferred){ this.pendTap="), 'STICK/FOLLOW defer the field tap to the release — a press is not yet a tap');
 ok(main.includes("if(this.moveScheme==='tap'){ this.hero.tx="), 'the hero\'s march-by-tap exists under TAP only — off TAP, a ground tap never march-orders him');
-ok(main.includes("case 'dodge': this.pressDodge();") && main.includes("case 'camp': this.toggleCampPanel();") && main.includes('default: if(ORDER_NAMES[act]) this.giveOrder(act);'), 'the keyboard dispatches to the buttons\' own functions (pressDodge, toggleCampPanel, giveOrder…) — no parallel logic');
+ok(main.includes("if(act==='guard'){ if(down) this.beginGuardKey(); else this.endGuardKey(); return; }") && main.includes("case 'camp': this.toggleCampPanel();") && main.includes('default: if(ORDER_NAMES[act]) this.giveOrder(act);'), 'the keyboard dispatches to the buttons\' own functions (pressDodge, toggleCampPanel, giveOrder…) — no parallel logic'); // Upgrade 20 re-point: the Guard key routes through the press grammar's own begin/end, not a parallel dodge/block path
 ok(main.includes("this.moveScheme=this.tutorial?'tap':loadMoveScheme();") && main.includes('The tutorial teaches tap-to-move; your own scheme waits outside.'), 'the tutorial forces TAP for its scene and says so in its first line');
 ok(main.includes("enterGhostEdit(){") && main.includes("layoutPositions()"), 'the menu edits ghost buttons at the layout\'s real positions (layoutPositions = defaults + save)');
 ok(main.includes('Reset layout') && main.includes('resetLayout();'), 'RESET LAYOUT stands in both editors');
@@ -140,28 +140,36 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   // Re-pointed by Upgrade 17 (documented, the house custom): ORDERS is
   // the 18th control, and the defaults are the circular geometry —
   // stack x 1178 (toggle y 76, powers to y 556), row from x 130 at y 665.
-  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => reg[d[0]] && reg[d[0]].obj.x === d[4] && reg[d[0]].obj.y === d[5]),
+  // Re-pointed by Upgrade 20: GUARD merges Dodge/Block (17 controls),
+  // the defaults are the THUMB ARCS, and in the default FEW face CAMP
+  // stands at its rail spot above ORDERS, not at its table seat.
+  ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.every(d => { const en = reg[d[0]]; if (!en) return false;
+      if (d[0] === 'cmd_camp') return en.obj.x === 1178 && en.obj.y === 182; // the Few rail spot (the seat waits for Full)
+      return en.obj.x === d[4] && en.obj.y === d[5]; }),
     'no saved layout: all 17 controls stand at the table\'s defaults');
-  ok(reg.autofire.obj.x === 1178 && reg.autofire.obj.y === 76 && reg.skill2.obj.y === 556 && reg.cmd_charge.obj.x === 130 && reg.cmd_rally.obj.x === 1066 && reg.cmd_rally.obj.y === 665,
-    '…and those defaults ARE Upgrade 10: stack x 1178 (toggle y 70, powers to y 496), row from x 130 at y 665');
-  ok(g.fightRects.length === 7 && g.fightRects.every(r => r.x === 1178 && r.r === r.h / 2), 'the onTap wall (fightRects) matches the default stack'); // Upgrade 17: the wall carries each circle's radius
-  ok(g.campBtnRect.x === 949 && g.campBtnRect.y === 665 && g.rallyBtnRect.x === 1066, 'the CAMP / RALLY tap walls sit on their buttons'); }
+  ok(reg.autofire.obj.x === 1178 && reg.autofire.obj.y === 76 && reg.guard.obj.x === 102 && reg.guard.obj.y === 448 && reg.skill2.obj.y === 556 && reg.cmd_charge.obj.x === 130 && reg.cmd_rally.obj.x === 1066 && reg.cmd_rally.obj.y === 665,
+    '…and those defaults ARE Upgrade 10: stack x 1178 (toggle y 70, powers to y 496), row from x 130 at y 665'); // Upgrade 20 re-point: the thumb arcs — right rail for toggle/powers, left rail for GUARD/SPRINT, the row as ever
+  ok(g.fightRects.length === 6 && g.fightRects.every(r => r.r === r.h / 2) && g.fightRects.some(r => r.x === 102 && r.y === 448) && g.fightRects.some(r => r.x === 1178 && r.y === 556), 'the onTap wall (fightRects) matches the default stack'); // Upgrade 17: the wall carries each circle's radius. Upgrade 20: six rects on the arcs
+  ok(g.campBtnRect.x === 1178 && g.campBtnRect.y === 182 && g.rallyBtnRect.x === 1066, 'the CAMP / RALLY tap walls sit on their buttons'); } // Upgrade 20 re-point: CAMP's wall rides its rail spot in Few
 
 // ---------- layout: the round-trip ----------
 { cleanSettings();
-  saveLayout({ skill1: { x: 900, y: 200 }, cmd_camp: { x: 300, y: 665 }, dodge: { x: 1000, y: 120 } });
+  saveLayout({ skill1: { x: 900, y: 200 }, cmd_camp: { x: 300, y: 665 }, guard: { x: 1000, y: 120 } }); // Upgrade 20 re-point: the saved seat is GUARD's (the dodge seat retired with the merge)
   const g = hudBattle();
   const reg = {}; g.layoutReg.forEach(en => { reg[en.id] = en; });
   ok(reg.skill1.obj.x === 900 && reg.skill1.obj.y === 200 && g.skillBtns[1].sx === 900 && g.skillBtns[1].sy === 200,
     'round-trip: the saved power button is rebuilt at (900,200) — container AND its sweep origin');
   ok(g.fightRects.some(r => r.x === 900 && r.y === 200) && g.fightRects.some(r => r.x === 1000 && r.y === 120),
     '…and the onTap wall moved with it (a press there is a fight press, not a march)');
-  ok(g.campBtnRect.x === 300 && g.campBtnRect.y === 665, '…and the CAMP wall moved with the CAMP button');
-  ok(reg.sprint.obj.x === 1178 && reg.sprint.obj.y === 302, 'buttons the save does not name keep their defaults'); // Upgrade 17 re-point: sprint's circular seat is y 302
+  ok(g.campBtnRect.x === 1178 && g.campBtnRect.y === 182, '…and the CAMP wall rides the Few rail above ORDERS — the saved CAMP seat waits for the Full face'); // Upgrade 20 re-point: in Few, CAMP is positioned by the ORDERS anchor, not its own seat
+  g.setFace('full');
+  ok(g.campBtnRect.x === 300 && g.campBtnRect.y === 665, '…and in Full the CAMP wall sits on the saved seat (300,665) — the seat was never lost');
+  g.setFace('few'); delete store.gxhub_wotw_face; delete store.gxhub_wotw_face_u20; // leave the store as cleanSettings found it
+  ok(reg.sprint.obj.x === 102 && reg.sprint.obj.y === 548, 'buttons the save does not name keep their defaults'); // Upgrade 17 re-point: sprint's circular seat. Upgrade 20 re-point: the left rail (102,548)
   resetLayout();
   const g2 = hudBattle();
   const reg2 = {}; g2.layoutReg.forEach(en => { reg2[en.id] = en; });
-  ok(reg2.skill1.obj.x === 1178 && reg2.skill1.obj.y === 470 && g2.campBtnRect.x === 949, 'RESET: a fresh battle stands at the exact U10 default again'); } // Upgrade 17 re-point: power 2's circular seat is y 470
+  ok(reg2.skill1.obj.x === 1178 && reg2.skill1.obj.y === 462 && g2.campBtnRect.x === 1178 && g2.campBtnRect.y === 182, 'RESET: a fresh battle stands at the exact U10 default again'); } // Upgrade 17 re-point: power 2's circular seat is y 470. Upgrade 20 re-point: the arc seat is 462, and CAMP resets to its rail spot
 
 // ---------- layout: a real editor drag in battle ----------
 { cleanSettings();
@@ -169,31 +177,31 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   g.openPause();
   ok(g.paused === true, 'the ⚙ pause opens and holds the battle');
   g.enterLayoutEdit();
-  ok(g.layoutEdit === true && g.fightBtns.dodge._disabled === true, 'EDITING: the real buttons are disabled — drags cannot fire them');
+  ok(g.layoutEdit === true && g.fightBtns.guard._disabled === true, 'EDITING: the real buttons are disabled — drags cannot fire them'); // Upgrade 20 re-point: the dragged button is GUARD
   const tx0 = g.hero.tx;
   g.onTap({ x: 500, y: 300, worldX: 500, worldY: 300, id: 1 });
   ok(g.hero.tx === tx0, '…and a field tap while editing never becomes a march order');
-  g.input.fire('pointerdown', { x: 1178, y: 166, id: 1 }); // on DODGE (Upgrade 17: its circle's centre is y 166 now)
+  g.input.fire('pointerdown', { x: 102, y: 448, id: 1 }); // on GUARD (Upgrade 20: its circle's centre is the left-rail seat)
   g.input.fire('pointermove', { x: 800, y: 300, id: 1 });
-  ok(g.fightBtns.dodge.x === 800 && g.fightBtns.dodge.y === 300 && g.fightBtns.dodge.sx === 800,
-    'the drag moves DODGE — container and sweep origin together');
+  ok(g.fightBtns.guard.x === 800 && g.fightBtns.guard.y === 300 && g.fightBtns.guard.sx === 800,
+    'the drag moves DODGE — container and sweep origin together'); // the drag still proves the dodge-hand's button — GUARD carries it now
   ok(g.hero.dodgeCd === 0, '…and DODGE never fired: no dodge was pressed, only dragged');
   g.input.fire('pointerup', { x: 800, y: 300, id: 1 });
   const saved = JSON.parse(store.gxhub_wotw_layout || '{}');
-  ok(saved.pos && saved.pos.dodge && saved.pos.dodge.x === 800 && saved.pos.dodge.y === 300, 'the layout was saved as the drag ended');
+  ok(saved.pos && saved.pos.guard && saved.pos.guard.x === 800 && saved.pos.guard.y === 300, 'the layout was saved as the drag ended');
   g.exitLayoutEdit();
   ok(g.layoutEdit === false && g.paused === true, 'DONE leaves editing and returns to the pause');
   g.closePause();
   ok(g.paused === false, 'Resume lets the battle go');
   const g2 = hudBattle();
-  ok(g2.fightBtns.dodge.x === 800 && g2.fightBtns.dodge.y === 300, 'the next battle opens with DODGE where the player left it'); }
+  ok(g2.fightBtns.guard.x === 800 && g2.fightBtns.guard.y === 300, 'the next battle opens with DODGE where the player left it'); }
 
 // ---------- binds: defaults, capture, swap, escape ----------
 { cleanSettings();
   const b = loadBinds();
-  ok(b.dodge === 'Space' && b.block === 'ShiftLeft' && b.sprint === 'KeyV' && b.skill0 === 'Digit1' && b.skill1 === 'Digit2' && b.skill2 === 'Digit3'
+  ok(b.guard === 'Space' && b.block === undefined && b.dodge === undefined && b.sprint === 'KeyV' && b.skill0 === 'Digit1' && b.skill1 === 'Digit2' && b.skill2 === 'Digit3'
     && b.volley === 'KeyQ' && b.rally === 'KeyE' && b.camp === 'KeyB' && b.autofire === 'KeyT' && b.charge === 'KeyZ' && b.shieldwall === 'KeyJ',
-    'the documented defaults: Space dodge, Shift block, 1/2/3 powers, Q volley, E rally, B camp, T auto-fire, home-row orders');
+    'the documented defaults: Space dodge, Shift block, 1/2/3 powers, Q volley, E rally, B camp, T auto-fire, home-row orders'); // Upgrade 20 re-point: Space is the GUARD key (tap dodges, hold blocks); the old block key is freed
   ok(new Set(Object.values(DEFAULT_BINDS)).size === Object.keys(DEFAULT_BINDS).length, 'no two actions share a default key');
   const s = Object.create(SettingsProto);
   s.add = { text: (x, y, str) => { const o = mkObj(); o._t = str; return o; }, graphics: () => gfxObj(),
@@ -201,26 +209,29 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
     container: (x, y) => { const o = mkObj(); o.x = x; o.y = y; return o; } };
   s.input = capInput(); s.scene = { start() {} };
   SettingsProto.create.call(s);
-  s.beginBindCapture('dodge'); s.bindKeyEvent({ code: 'KeyQ' });
-  ok(s.binds.dodge === 'KeyQ' && JSON.parse(store.gxhub_wotw_binds).dodge === 'KeyQ', 'capture: Dodge rebound to Q — and persisted');
+  s.beginBindCapture('guard'); s.bindKeyEvent({ code: 'KeyQ' }); // Upgrade 20 re-point: the captured action is Guard (Dodge's key, Dodge's swap partner)
+  ok(s.binds.guard === 'KeyQ' && JSON.parse(store.gxhub_wotw_binds).guard === 'KeyQ', 'capture: Dodge rebound to Q — and persisted');
   ok(s.binds.volley === 'Space', '…and the SWAP: Volley, which held Q, received the key Dodge gave up (Space)');
   cleanSettings();
   const s2 = Object.create(SettingsProto);
   s2.add = s.add; s2.input = capInput(); s2.scene = { start() {} };
   SettingsProto.create.call(s2);
   s2.beginBindCapture('sprint'); s2.bindKeyEvent({ code: 'Space' });
-  ok(s2.binds.sprint === 'Space' && s2.binds.dodge === 'KeyV', 'a clean swap: Sprint takes Space, Dodge receives Sprint\'s KeyV — no action left keyless');
+  ok(s2.binds.sprint === 'Space' && s2.binds.guard === 'KeyV', 'a clean swap: Sprint takes Space, Dodge receives Sprint\'s KeyV — no action left keyless');
   s2.beginBindCapture('camp'); const before = Object.assign({}, s2.binds); s2.bindKeyEvent({ code: 'Escape' });
   ok(s2._cap === null && JSON.stringify(s2.binds) === JSON.stringify(before), 'Escape cancels the capture — nothing changed'); }
 
 // ---------- the keyboard drives the real actions ----------
 { cleanSettings();
   const g = hudBattle();
-  g.keyAction('Space', true);
+  // Upgrade 20 re-point: Space is the GUARD key — the press grammar on
+  // the keyboard. A quick tap dodges (fired on the release); a hold
+  // blocks (tickPresses crosses the press, the button hold's own path).
+  g.keyAction('Space', true); g.keyAction('Space', false);
   ok(g.hero.dodgeCd > 0, 'Space pressed DODGE through pressDodge itself (cooldown running)');
-  g.keyAction('ShiftLeft', true);
-  ok(g.hero.blocking === true, 'Shift held: the guard is up (setBlock, the button\'s own path)');
-  g.keyAction('ShiftLeft', false);
+  g.keyAction('Space', true); if (g.guardPress) g.guardPress.t0 -= 300; g.tickPresses();
+  ok(g.hero.blocking === true, 'Shift held: the guard is up (setBlock, the button\'s own path)'); // the hold is Space's now — Shift is a freed key
+  g.keyAction('Space', false);
   ok(g.hero.blocking === false, 'Shift released: the guard drops');
   g.keyAction('KeyZ', true);
   ok(g.order === 'charge', 'Z gave the army order Charge, through giveOrder');
@@ -230,11 +241,11 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   ok(g.autoFire === false, 'T flipped auto-fire through toggleAutoFire');
   g.keyAction('KeyT', true);
   g.hero.dodgeCd = 0; g.shopOpen = true;
-  g.keyAction('Space', true); g.keyAction('KeyX', true);
+  g.keyAction('Space', true); g.keyAction('Space', false); g.keyAction('KeyX', true);
   ok(g.hero.dodgeCd === 0 && g.order === 'charge', 'behind the shop, the keyboard is as walled as the buttons are');
   g.shopOpen = false;
   const t = tutBattle();
-  t.keyAction('Space', true);
+  t.keyAction('Space', true); t.keyAction('Space', false);
   ok(t.tutCred.dodge === true, 'in the tutorial, the dodge KEY earns the dodge credit — same function, same hook'); }
 
 // ---------- movement schemes ----------

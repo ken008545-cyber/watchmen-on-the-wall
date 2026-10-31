@@ -46,8 +46,8 @@ ok(main.includes('heroAutoFire(){') && main.includes('if(!this.autoFire||!h||h.d
 ok(main.includes('if(h.cd>0) h.cd-=dt;') && main.includes('this.heroAutoFire();'), 'auto-fire: the hero clock runs in update() and strikes through heroAutoFire()');
 ok(!main.includes('pressAttack') && !main.includes('lightStrike') && !main.includes('heavyStrike') && !main.includes('attackTarget'), 'the manual basic-attack path is REMOVED (pressAttack / lightStrike / heavyStrike / attackTarget)');
 ok(!main.includes("mk('light'") && !main.includes("mk('heavy'") && !/lightDmg|heavyDmg|openerMul/.test(main), 'no LIGHT or HEAVY button, and their numbers (incl. the sprint opener) are gone from the FIGHT table');
-ok(main.includes("mk('autofire',SX,76,64") && main.includes("'ico_auto'") && main.includes('applyAutoFace(){'), 'the AUTO-FIRE toggle: top of the right stack, 56px tall — Upgrade 16 re-point: its state rides the symbol face (gold/lit vs dim), never words'); // Upgrade 17 re-point: a 64 circle at the stack's head
-ok(main.includes("mk('dodge',SX,166,64") && main.includes("'ico_dodge'") && main.includes("'ico_block'") && main.includes("'ico_sprint'"), 'DODGE / BLOCK / SPRINT ride the stack at 56px — Upgrade 16 re-point: symbols (swoosh, shield, boot), not word labels'); // Upgrade 17 re-point: 64 circles, wider pitch
+ok(main.includes("mk('autofire',1178,76,64") && main.includes("'ico_auto'") && main.includes('applyAutoFace(){'), 'the AUTO-FIRE toggle: top of the right stack, 56px tall — Upgrade 16 re-point: its state rides the symbol face (gold/lit vs dim), never words'); // Upgrade 17 re-point: a 64 circle at the stack's head. Upgrade 20 re-point: the arc's head, called with its seat
+ok(main.includes("mk('guard',102,448,64") && main.includes("'ico_guard'") && main.includes("'ico_sprint'"), 'DODGE / BLOCK / SPRINT ride the stack at 56px — Upgrade 16 re-point: symbols (swoosh, shield, boot), not word labels'); // Upgrade 17 re-point: 64 circles, wider pitch. Upgrade 20 re-point: GUARD (shield + swoosh) and SPRINT on the bottom-left rail
 ok(main.includes('skillIconKey(k),k.name') && main.includes('[...h.skills,h.ult].forEach'), 'power buttons are driven from the hero data — Upgrade 16 re-point: each wears the symbol its own name resolves to, never hardcoded');
 ok(main.includes('dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6') && main.includes('blockDrain:12') && main.includes('sprintDrain:8'), 'the surviving stamina kit keeps its numbers (dodge dash/i-frames/cooldown, block and sprint drains)');
 { const row = main.slice(main.indexOf('buildHUD(){'), main.indexOf('phaseName(){'));
@@ -60,7 +60,7 @@ ok(main.includes('dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6'
   ok(main.includes("if(eo==='rally'){ const rp=(s.ord==='rally'&&s.rally)?s.rally:this.rallyPoint;"), 'rally composes with the ord model: an effective rally resolves the squad\'s own point, else the army\'s');
   ok(main.includes('rallyPoints(){') && main.includes('drawRallyBanners(){'), 'the banner flies only while someone holds it (rallyPoints / drawRallyBanners)'); }
 { const stack = main.slice(main.indexOf('buildFightControls(){'), main.indexOf('toggleAutoFire(){'));
-  ok((stack.match(/,64,'',/g) || []).length === 4 && (stack.match(/\[384,470,556\]\[i\],76/g) || []).length === 1, 'the right stack: every button call site builds at SW x 56 (toggle, dodge, block, sprint, and the power-move loop that builds three)'); } // Upgrade 17 re-point: circles — the thumb cluster builds at 64, the power loop at 76
+  ok((stack.match(/,64,'',/g) || []).length === 3 && (stack.match(/\[368,462,556\]\[i\],76/g) || []).length === 1, 'the right stack: every button call site builds at SW x 56 (toggle, dodge, block, sprint, and the power-move loop that builds three)'); } // Upgrade 17 re-point: circles — the thumb cluster builds at 64, the power loop at 76. Upgrade 20 re-point: three 64 call sites (toggle, GUARD, sprint) and the power arc's seats
 { const game = JSON.parse(read('data/game.json')); const david = game.heroes.find(h => h.id === 'david');
   ok(david.skills.some(s => s.name === 'Psalm') && david.ult.name === 'Five Stones', 'the DATA names David\'s skill Psalm and his ult Five Stones — the buttons read PSALM and FIVE STONES from the data'); }
 
@@ -143,31 +143,36 @@ function countCalls(g, name) { const orig = GameProto[name]; let n = 0; g[name] 
   const g = bareBattle(); g.buildHUD();
   ok(g.autoFire === true, 'default: auto-fire is ON when no choice has ever been saved');
   ok(g.autoBtn && g.autoBtn.iconKey === 'ico_auto' && g.autoBtn.label._t === '', 'the toggle wears the bow-and-arrow symbol and NO word (Upgrade 16)');
-  fireUp(g.autoBtn);
+  // Upgrade 20 re-point: the toggle is press-grammar — a quick press
+  // resolves on release into the toggle (its TAP verb). Drive the
+  // grammar's resolution; the pointer path is proven in verify_upgrade20.
+  const afTap = gg => { gg.afPress = { t0: performance.now(), held: false }; gg.endPresses({}); };
+  afTap(g);
   ok(g.autoFire === false && store.gxhub_wotw_autofire === '0' && g.autoBtn.label._t === '', 'one press: OFF, saved as 0, the face follows (dimmed symbol, still no word)');
   const g2 = bareBattle(); g2.buildHUD();
   ok(g2.autoFire === false && g2.autoBtn.iconKey === 'ico_auto', 'a fresh scene opens with the SAVED choice — OFF persists across runs');
-  fireUp(g2.autoBtn);
+  afTap(g2);
   ok(g2.autoFire === true && store.gxhub_wotw_autofire === '1', 'pressing again: ON, saved as 1');
   delete store.gxhub_wotw_autofire; }
 
 // ---------- the stack through the real HUD build ----------
 { const g = bareBattle('david'); g.buildHUD(); const B = g.fightBtns;
-  ok(B && B.autofire && B.dodge && B.block && B.sprint && !B.light && !B.heavy, 'the stack exists: AUTO-FIRE, DODGE, BLOCK, SPRINT — and no LIGHT, no HEAVY');
-  ok(g.fightRects.length === 7 && g.fightRects.every(r => r.h >= 56), 'every stack rect is at least 56px tall (real press targets)');
-  ok(g.fightRects.every(r => r.x - r.w / 2 >= 1000), 'the whole stack lives on the right side of the screen');
+  ok(B && B.autofire && B.guard && B.sprint && !B.dodge && !B.block && !B.light && !B.heavy, 'the stack exists: AUTO-FIRE, DODGE, BLOCK, SPRINT — and no LIGHT, no HEAVY'); // Upgrade 20 re-point: GUARD stands where DODGE and BLOCK stood
+  ok(g.fightRects.length === 6 && g.fightRects.every(r => r.h >= 56), 'every stack rect is at least 56px tall (real press targets)'); // Upgrade 20 re-point: six rects — the merge removed one circle, none shrank
+  ok(g.fightRects.filter(r => r.x > 1000).length === 4 && g.fightRects.filter(r => r.x < 200).length === 2, 'the whole stack lives on the right side of the screen'); // Upgrade 20 re-point: the thumb arcs — toggle + three powers right, GUARD + SPRINT on the left rail
   ok(Math.max(...g.fightRects.map(r => r.y + r.h / 2)) < 610, 'the stack clears the command bar (bottom edge ' + Math.max(...g.fightRects.map(r => r.y + r.h / 2)) + ' < 610)');
   ok(g.skillBtns.length === 3 && g.skillBtns[0].def.name === 'Smooth Stone' && g.skillBtns[1].def.name === 'Psalm' && g.skillBtns[2].def.name === 'Five Stones', 'David\'s power buttons come from his data: SMOOTH STONE, PSALM, FIVE STONES');
   ok(g.skillBtns.map(b => b.iconKey).join(',') === 'ico_stone1,ico_psalm,ico_stones5' && g.skillBtns.every(b => b.label._t === ''), 'each power button wears the symbol of its move (stone, lyre, five stones) and no word (Upgrade 16)');
   const gS = bareBattle('samson'); gS.buildHUD();
   ok(gS.skillBtns[2].def.name !== 'Five Stones' && gS.skillBtns.every(b => b.iconKey === vm.runInContext('skillIconKey', ctx)(b.def) && b.label._t === ''), 'another hero wears HIS OWN symbols (' + gS.skillBtns.map(b => b.iconKey).join(', ') + ' from ' + gS.skillBtns.map(b => b.def.name).join(', ') + ') — nothing is hardcoded to David');
-  ok(g.overFight({ x: 1178, y: 176 }) === true && g.overFight({ x: 1178, y: 70 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight walls the whole stack (toggle included) off from march orders');
+  ok(g.overFight({ x: 102, y: 448 }) === true && g.overFight({ x: 1178, y: 70 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight walls the whole stack (toggle included) off from march orders'); // Upgrade 20 re-point: the wall follows the arcs (GUARD's left-rail seat)
   const tx0 = g.hero.tx; g.onTap({ x: 1178, y: 432, worldX: 1178, worldY: 432 });
   ok(g.hero.tx === tx0, 'a tap ON a power button does not move the hero');
-  ok(g.campBtnRect.w === 56 && g.campBtnRect.h === 56 && g.campBtnRect.y === 610 + 55, 'CAMP rides the command row at 110x56 (rect ' + g.campBtnRect.x + ',' + g.campBtnRect.y + ')'); // Upgrade 17 re-point: a 56 circle, same seat
-  fireUp(g.campBtn);
+  ok(g.campBtnRect.w === 56 && g.campBtnRect.h === 56 && g.campBtnRect.x === 1178 && g.campBtnRect.y === 182, 'CAMP rides the command row at 110x56 (rect ' + g.campBtnRect.x + ',' + g.campBtnRect.y + ')'); // Upgrade 17 re-point: a 56 circle, same seat. Upgrade 20 re-point: in the default FEW face CAMP rides the right rail above ORDERS (1178,182); the row seat (949,665) belongs to Full
+  const campTap = () => { g.campPress = { t0: performance.now(), held: false }; g.endPresses({}); }; // Upgrade 20: CAMP's tap verb, as in verify_upgrade9
+  campTap();
   ok(g.campPanelOpen === true, 'the row CAMP button opens the camp panel');
-  fireUp(g.campBtn);
+  campTap();
   ok(g.campPanelOpen === false, '...and closes it'); }
 
 // ---------- auto-fire ON: the hero fights on his own clock ----------

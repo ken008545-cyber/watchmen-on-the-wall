@@ -2391,3 +2391,168 @@ that installable app, and makes the button tell the truth everywhere.
   whether the icon launches the game standalone and edge-to-edge,
   and whether the safe-area padding clears his notch in a real
   fight — Abel's phone is the test, exactly as kennin set it up.
+
+## Upgrade 20 — Few Buttons, Deep Presses (built and shipped 2026-10-31)
+
+> STATUS: shipped live to `muse/test` on 2026-10-31 on kennin's
+> explicit ruling in chat (~01:56 CDT: "Put the new controls live
+> now"), ahead of Upgrade 19 — the sequencing question that had held
+> the push is settled by his word. The build was first held back
+> unverified-live until that ruling; the no-divergence check, push,
+> and proxy parity verification were run at ship time. Everything
+> below describes the shipped tree exactly as verified.
+
+Kennin's ruling, from the live call (2026-10-31 ~01:24 CDT), in his
+words across three turns: the buttons "need to be like easier to
+press they're on weird and awkward parts of the screen" → "We may
+need a shortened down to just a few buttons and like the way you
+press them makes them do more things" → "Adjust it for the whole
+thing." Scope: the WHOLE game, every platform. This extends Upgrade
+17's Simple face; it does not resurrect the old density.
+
+### The Few face (the default for everyone)
+
+Upgrade 17's Simple face is renamed **Few** (Controls label, plain:
+"Buttons: Few / Full"). Standing circles in Few: the 3 powers, ONE
+**Guard** circle (Dodge and Block, merged — see the grammar), Sprint,
+the auto-fire toggle, CAMP, ORDERS. Everything else lives behind
+ORDERS, as in U17. Full remains the opt-in face with every circle
+standing. Stored layouts and keybinds persist and apply in BOTH
+faces, exactly as U12/U17 left them — nobody's custom layout was
+stranded by this upgrade.
+
+**The migration rule, stated plainly:** Few is the default for
+EVERYONE — new players and existing players alike ("the whole
+thing"). A stored face choice is honored only as follows:
+- stored `simple` reads as Few (it is the face Simple became);
+- stored `full` is honored ONLY if the player actively re-picks
+  Full in Controls (or the battle pause) after this upgrade — the
+  pick stamps `gxhub_wotw_face_u20`, and the stamp is what the
+  loader trusts. A pre-U20 Full choice, and any amount of U12
+  customization (layouts, binds, movement scheme), no longer
+  implies a face: those saves are honored as layouts/binds, in both
+  faces, and the face itself opens Few.
+
+### The press grammar (tap vs hold, HOLD_MS = 280)
+
+One helper — `wirePress(btn, kind)` — gives five circles two verbs
+each. A press begins on pointerdown INSIDE the circle (U17's radius
+law); crossing 280ms "holds" it; the release — the scene-level
+pointerup, the game's real release channel — fires the tap verb if
+the press never crossed, and completes the hold verb if it did.
+While a press ripens, its rim fills toward the hold in U17's arc
+language (the powers' and Guard's own sweeps carry it; ORDERS and
+CAMP get `drawPressFx` rims), so the player SEES the second verb
+coming. A press on a cooling power routes straight to the old tap
+path (the input buffer) — a hold never aims a move that is not
+ready.
+
+| Circle | TAP | HOLD |
+|---|---|---|
+| **Guard** (new, merged) | Dodge — today's dodge exactly | Block — the guard rises at the crossing and stays until the release ends it |
+| **Powers** (×3) | Cast, exactly as pre-U20 | Aimed cast — a gold reticle wakes at the hero's aim point (nearest foe in reach, else a step ahead of his facing), drag moves it, release casts AT that point |
+| **ORDERS** | Fan open/close, as U17 | RALLY arms immediately; the fan stays shut |
+| **CAMP** | The camp panel, as ever | Quick Repair — the panel's own repair action; if it cannot run, a shake + a float saying why, never a silent nothing |
+| **Auto-fire** | Toggle, as ever | Opens the controls (the pause: sound, face, layout) |
+| **Sprint** | Toggle — unchanged; it is a state, not a verb pair | — |
+
+Aimed casts (`useSkill(i, aimPt)`): the cast's CENTER moves to the
+reticle point — area/target selection happens around there
+(Five Stones gathers its five around the point; Smooth Stone picks
+its mark around the point; Psalm's ring blooms there, its blessing
+still army-wide, as it was never local). Projectiles still fly from
+the hero's hand. An aimed cast whose point holds no mark answers
+"No target" and consumes NOTHING — no cooldown, no charge — exactly
+like a tap cast with no mark. A tap cast passes no point and is
+byte-for-byte the cast it has always been (proven target-for-target
+against a direct `useSkill` in the U20 suite). The Held tier of a
+power is read at cast time as before — aiming does not touch the
+patience economy.
+
+Guard: one circle, glyph `ico_guard` (shield + cross + the dodge
+swoosh; `ico_dodge`/`ico_block` textures are still generated,
+unassigned, so nothing naming them breaks). The stamina ring and
+the dodge veil/recovery arc now share Guard's sweep. Keybinds:
+Dodge and Block merge into ONE Guard action — Space by default
+(tap dodges, hold blocks); a pre-U20 binds save migrates (the old
+Dodge key becomes the Guard key; the old Block key is freed). The
+binds list is 16 actions; conflict-swap rules unchanged.
+
+### Placement — the thumb arcs
+
+The default seats were re-laid to natural phone-landscape thumb
+arcs (all still U12-draggable; the editor's Reset restores THESE):
+
+- Right rail: auto-fire (1178,76); ORDERS (1178,268); the powers
+  arc beneath it — (1178,368), (1178,462), (1178,556), the ult
+  nearest the corner. In Few, CAMP rides the rail directly above
+  ORDERS (1178,182, derived from ORDERS' seat + `CAMP_RAIL`); its
+  own seat (949,665) belongs to the Full face's row.
+- Left rail: GUARD (102,448), Sprint (102,548).
+- The fan row is unchanged in absolute terms (130…806, y 552): the
+  fan is one formation on the ORDERS anchor (`FAN_OFFSETS` re-based
+  on the rail seat), so dragging ORDERS carries the whole fan by
+  the same delta, as U17's did — from the rail seat the tether is
+  long, and a far drag carries the row far with it. Reset restores
+  the arcs. (Flagged below.)
+- Nothing stands mid-screen or top-left; the only top-corner
+  resident is the auto-fire toggle, as before. Diameters never
+  shrank: powers 76, thumb circles 64, command rank 56.
+
+### Tutorial
+
+The lesson teaches the grammar, advancing only on real actions as
+ever: the kit step is Guard tap (dodge) / Guard hold (block) /
+Sprint on two circles; the power step gains an aiming half (cast,
+then hold-drag-release an aimed cast onto the sturdy dummy — a
+banked early cast completes the first half silently, as the house
+rule requires); the army step is post → HOLD ORDERS (Rally arms,
+fan shut) → tap the ground to plant. LOAD_TIPS and the finish
+summary speak the grammar too.
+
+### Rooms
+
+Untouched, as U18 left them: `js/net.js` is byte-identical, the
+shared `button()` helper's signature is unchanged, and the room
+client keeps its current controls this pass. Room adoption of the
+press grammar is later work.
+
+### Verification (2026-10-31, this machine)
+
+- tools/verify_upgrade20.js (new; stubbed Phaser, REAL main.js):
+  **61/61** — the grammar statics; Guard tap/hold/short-press/
+  corner laws; aimed Stone/Psalm/Five Stones landing at the
+  reticle, an empty-point aim consuming nothing, and tap casts
+  target-identical to direct `useSkill` calls on identical fields;
+  ORDERS tap-vs-hold; CAMP hold repairing (+100 HP / −90 Manna at
+  the crossing, the release never opening the panel) and explaining
+  (whole camp, thin purse — shake + float, nothing spent); the
+  auto-fire hold opening the controls without flipping the toggle;
+  every migration case (fresh/simple/unstamped-full/stamped-full/
+  customized-with-seats-kept); editor reset standing every control
+  on the new defaults; the tutorial's gesture credits earned
+  through the real press path.
+- All eighteen suites green: **1065 PASS lines, zero failures**
+  (the pre-U20 tree stood at 995 checks; suites re-pointed by this
+  upgrade, each with its reason recorded in place: U8, U9, U10,
+  U11, U12, U15, U16, U17 — the U18 champion benchmarks did not
+  move: starter 32.8s, camp whole; the enemy curve was never
+  touched; js/gxhub.js, js/tokens.js, js/net.js and all data
+  files are byte-untouched).
+- NOT done, deliberately: the push to `muse/test` and the
+  two-proxy byte-parity proof. They run with the release, not
+  before it.
+
+### Flags for kennin's thumbs
+
+- **The 280ms hold threshold** — one number (`HOLD_MS`), his to
+  bend after real play.
+- **The reticle feel** — where it wakes (nearest foe, else a step
+  ahead of his facing) and how it drags are first-pass choices.
+- **The fan tether** — the fan follows ORDERS as one formation; a
+  far ORDERS drag now carries the command row far from its home
+  row (Reset always restores it). If that reads wrong in the hand,
+  the fan can be pinned to the home row instead.
+- The U17 glyph flags carry into the circles unchanged
+  (ico_follow busiest, ico_volley arrowheads small, ico_flank can
+  read as brackets) — and ico_guard is new beside them.

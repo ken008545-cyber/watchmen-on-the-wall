@@ -38,8 +38,8 @@ function read(p) { return fs.readFileSync(path.join(ROOT, p), 'utf8'); }
 // ---------- statics ----------
 const main = read('js/main.js');
 ok(main.includes("FACE_KEY='gxhub_wotw_face'"), 'the face joins the settings family: gxhub_wotw_face');
-ok(main.includes('function loadFace()') && main.includes('function hasPriorControls()') && main.includes("hasPriorControls()?'full':'simple'"),
-  'face derivation: an explicit choice wins; any prior Upgrade-12 customization defaults Full; a new player defaults Simple');
+ok(main.includes('function loadFace()') && main.includes('function saveFaceChoice(f)') && main.includes('FACE_MIG_KEY') && main.includes('function hasPriorControls()'),
+  'face derivation: an explicit choice wins; any prior Upgrade-12 customization defaults Full; a new player defaults Simple'); // Upgrade 20 re-point: the derivation is the MIGRATION now — Few for everyone; a stored Full counts only when re-picked after U20 (the stamp), and 'simple' reads as the Few it became. The battery below proves each case.
 ok(main.includes("const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally','build']"),
   'the fan holds the whole command rank: six orders, Volley, RALLY, BUILD — nothing removed');
 ok(main.includes('Math.hypot(lx||0,ly||0)<=circR') && main.includes('g.fillCircle(0,0,circR)'),
@@ -48,7 +48,7 @@ ok(main.includes('Math.hypot(lx||0,ly||0)<=circR') && main.includes('g.fillCircl
   ok(sweep.includes('arcSegs') && sweep.includes('fillCircle') && !sweep.includes('fillRect'), 'the cooldown sweep is a ring + disc now — no rectangular fill remains in drawSkillSweep');
   ok(sweep.includes('strokeCircle(cx,cy,r+3+(1-b.readyPulse)*5)'), 'the power-ready whisper is a ring pulse that swells as it fades'); }
 ok((main.match(/'Battle buttons'/g) || []).length >= 2, 'the Buttons: Simple / Full setting stands in BOTH Controls and the battle pause');
-ok(main.includes("tutEvent('fanopen')") && main.includes("line3:'Now tap RALLY in the open rank"), 'the tutorial teaches the fan: open ORDERS, then RALLY');
+ok(main.includes("tutEvent('rallyarm')") && main.includes('HOLD it down — a press held does more'), 'the tutorial teaches the fan: open ORDERS, then RALLY'); // Upgrade 20 re-point: the lesson's verb is the ORDERS hold now — Rally arms at once (rallyarm), the fan is the tap's business
 
 // ---------- runtime scaffolding (the U12/U16 pattern, recording stubs) ----------
 const store = {};
@@ -128,47 +128,56 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
 
 // ---------- the table: circles, hierarchy, seats ----------
 { const D = {}; LAYOUT_DEFS.forEach(d => { D[d[0]] = d; });
-  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => d[2] === d[3]), 'LAYOUT_DEFS: 18 controls, every one a circle (w == h == diameter)');
+  ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.every(d => d[2] === d[3]), 'LAYOUT_DEFS: 18 controls, every one a circle (w == h == diameter)'); // Upgrade 20 re-point: 17 controls — GUARD merged Dodge and Block into one circle
   ok(D.skill0[2] === 76 && D.skill1[2] === 76 && D.skill2[2] === 76, 'the powers are the biggest circles: 76 across');
-  ok(['autofire', 'dodge', 'block', 'sprint', 'build', 'orders'].every(id => D[id][2] === 64), 'the thumb cluster, BUILD and ORDERS: 64 across');
+  ok(['autofire', 'guard', 'sprint', 'build', 'orders'].every(id => D[id][2] === 64), 'the thumb cluster, BUILD and ORDERS: 64 across');
   ok(['cmd_charge', 'cmd_hold', 'cmd_follow', 'cmd_flank', 'cmd_fallback', 'cmd_shieldwall', 'cmd_volley', 'cmd_camp', 'cmd_rally'].every(id => D[id][2] === 56), 'the command rank: 56 across — the fan never shrinks them');
   ok(D.skill2[5] + 38 < 610 && D.autofire[5] - 32 > 0, 'the stack stands clear of the bar (last power rim 594 < 610) and of the top edge');
   ok(FAN_MEMBERS.length === 9, 'FAN_MEMBERS names all nine behind ORDERS'); }
 
 // ---------- circular hit-testing on the built HUD (Full face: all stand) ----------
-{ cleanStore(); store.gxhub_wotw_face = 'full';
+{ cleanStore(); store.gxhub_wotw_face = 'full'; store.gxhub_wotw_face_u20 = '1'; // Upgrade 20: a Full face in a test must be a STAMPED Full (the migration honors nothing else)
   const g = hudBattle();
   ok(g.face === 'full' && g.ordersBtn._visible === false, 'Full face: every circle stands, ORDERS put away');
   const all = [];
   Object.values(g.fightBtns).forEach(b => all.push(b));
   Object.values(g.cmdBtns).forEach(b => all.push(b));
   all.push(g.campBtn, g.rallyBtn, g.buildBtn, g.pauseBtn, g.spdBtn);
-  ok(all.length === 19 && all.every(b => b.circleR > 0), 'all 19 standing battle buttons are circles (7 stack + 7 row + CAMP, RALLY, BUILD, pause, speed)');
-  let centersFire = 0, cornersDead = 0;
+  ok(all.length === 18 && all.every(b => b.circleR > 0), 'all 19 standing battle buttons are circles (7 stack + 7 row + CAMP, RALLY, BUILD, pause, speed)'); // Upgrade 20 re-point: 18 stand in Full now (6 stack incl. the three powers + 7 row + CAMP, RALLY, BUILD, pause, speed) — GUARD is one circle where Dodge and Block were two
+  let centersFire = 0, cornersDead = 0, pressesBegan = 0;
+  const anyPress = () => !!(g.guardPress || g.skillPress || g.campPress || g.afPress || g.ordersPress);
   all.forEach(b => { const r = b.circleR;
-    if (b === g.fightBtns.block) { cornersDead++; return; } // Block's stub keeps only its hold handler (in the real game both fire); its centre/corner law is proven by the guard checks below
     g._nf = null; b._scale = 1;
+    const hadPress = anyPress();
     if (b._handlers.pointerdown) b._handlers.pointerdown({}, 0, 0, {});
     if (b._scale === 0.93) centersFire++; // the Upgrade-8 dip: a landed press
+    else if (!hadPress && anyPress()) pressesBegan++; // Upgrade 20: a grammar circle's landed press is its press record (the stub keeps one handler per event, so pressBegin stands where the helper's dip stood; in the real game both fire)
     b._scale = 1; g._nf = null;
     if (b._handlers.pointerdown) b._handlers.pointerdown({}, r * 0.8, r * 0.8, {}); // the bounding square's corner: distance 1.13r
     if (b._scale === 1 && !g._nf) cornersDead++; // no dip, no name float — the press never landed
     if (b._handlers.pointerup) b._handlers.pointerup({}, 0, 0, { stopPropagation() {} }); // release cleanly at center
+    g.input.fire('pointerup', {}); // Upgrade 20: a grammar press ends on the SCENE pointerup (the game's real release channel) — end it so no press lingers into the next button
   });
-  ok(centersFire === all.length - 1, 'centre presses land on every battle circle (' + centersFire + '/' + (all.length - 1) + ' by the dip; Block by its guard, below)');
+  ok(centersFire + pressesBegan === all.length, 'centre presses land on every battle circle (' + centersFire + '/' + all.length + ' by the dip; Block by its guard, below)'); // Upgrade 20 re-point: helpers land by the dip, the six grammar circles by their press records — every centre lands
   ok(cornersDead === all.length, 'corner presses land on NONE — the bounding square\'s corners are dead ground (' + cornersDead + '/' + all.length + ')');
-  // the block hold obeys the circle too (its own extra handler)
-  const bb = g.fightBtns.block;
+  if (g.campPanelOpen) g.closeCampPanel(); // the loop's CAMP tap opened the panel — close it before the guard battery (a panel gates presses)
+  if (g.paused) g.closePause(); // …and the loop's pause tap paused the battle — a paused battle gates presses too
+  // the guard hold obeys the circle too (Upgrade 20 re-point: Block's
+  // hold is GUARD's hold now, through the press grammar's own crossing)
+  const bb = g.fightBtns.guard;
   if (bb._handlers.pointerdown) bb._handlers.pointerdown({}, bb.circleR * 0.8, bb.circleR * 0.8, {});
-  ok(!g.hero.blocking, 'BLOCK: a corner hold raises no guard');
+  ok(!g.hero.blocking && !g.guardPress, 'BLOCK: a corner hold raises no guard');
   if (bb._handlers.pointerdown) bb._handlers.pointerdown({}, 0, 0, {});
-  ok(g.hero.blocking === true, 'BLOCK: a centre hold raises the guard'); g.setBlock(false);
+  g.guardPress.t0 -= 300; g.tickPresses();
+  ok(g.hero.blocking === true, 'BLOCK: a centre hold raises the guard');
+  g.input.fire('pointerup', {}); // the scene release — the game's real channel (it also drops the guard directly)
+  ok(g.hero.blocking === false, '…and the release drops it clean');
   // overFight: the wall is the circle
-  ok(g.overFight({ x: 1178, y: 384 }) === true, 'overFight: a power\'s centre is walled');
-  ok(g.overFight({ x: 1178 + 27, y: 384 + 27 }) === false, 'overFight: the power\'s bounding corner is NOT walled — the tap falls through to the field');
-  ok(g.overFight({ x: 1178 + 38, y: 384 }) === true, 'overFight: the rim itself is walled (radius inclusive)');
+  ok(g.overFight({ x: 1178, y: 368 }) === true, 'overFight: a power\'s centre is walled'); // Upgrade 20 re-point: the powers arc stands at y 368/462/556 now
+  ok(g.overFight({ x: 1178 + 27, y: 368 + 27 }) === false, 'overFight: the power\'s bounding corner is NOT walled — the tap falls through to the field');
+  ok(g.overFight({ x: 1178 + 38, y: 368 }) === true, 'overFight: the rim itself is walled (radius inclusive)');
   // glyphs + radii
-  ok(g.skillBtns.every(b => b.circleR === 38) && g.fightBtns.dodge.circleR === 32 && g.cmdBtns.charge.circleR === 28 && g.buildBtn.circleR === 32 && g.pauseBtn.circleR === 20 && g.spdBtn.circleR === 22,
+  ok(g.skillBtns.every(b => b.circleR === 38) && g.fightBtns.guard.circleR === 32 && g.cmdBtns.charge.circleR === 28 && g.buildBtn.circleR === 32 && g.pauseBtn.circleR === 20 && g.spdBtn.circleR === 22,
     'radii on the built HUD: powers 38, thumb 32, commands 28, BUILD 32, pause 20, speed 22');
   ok(g.ordersBtn.iconKey === 'ico_banner', 'ORDERS wears the banner glyph from the existing family (no new texture)');
   cleanStore(); }
@@ -184,18 +193,19 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   ok((cg.calls.strokeCircle || 0) >= 1, 'the ready whisper draws a ring pulse');
   b.readyPulse = 0; b.held = HELD.perfectAt + 1; cg.calls = {}; g.drawSkillSweep(b);
   ok((cg.calls.strokeCircle || 0) >= 1, 'a Perfect held charge wears the full pulsing rim');
-  const dg = gfxObj(true); g.fightBtns.dodge.sweep = dg; g.hero.dodgeCd = FIGHT.dodgeCd / 2;
-  const bg = gfxObj(true); g.fightBtns.block.sweep = bg; g.hero.stamina = FIGHT.stamMax / 2;
+  // Upgrade 20 re-point: the veil and the stamina ring share ONE sweep
+  // now — GUARD's. Both readings are taken off the guard circle.
+  const dg = gfxObj(true); g.fightBtns.guard.sweep = dg; g.hero.dodgeCd = FIGHT.dodgeCd / 2; g.hero.stamina = FIGHT.stamMax / 2;
   g.drawFightUI();
   ok((dg.calls.fillCircle || 0) >= 1 && (dg.calls.lineBetween || 0) > 0, 'the dodge veil is a disc with a recovery arc');
-  ok((bg.calls.lineBetween || 0) > 0, 'the block stamina reads as a ring around the Block circle');
+  ok((dg.calls.lineBetween || 0) > 0, 'the block stamina reads as a ring around the Block circle');
   cleanStore(); }
 
 // ---------- the Simple face and the fan ----------
 { cleanStore();
   const g = hudBattle();
-  ok(g.face === 'simple', 'a new player\'s battle opens on the Simple face');
-  ok(g.ordersBtn._visible === true && g.campBtn._visible === true && g.skillBtns.every(b => b._visible !== false) && g.fightBtns.dodge._visible !== false,
+  ok(g.face === 'few', 'a new player\'s battle opens on the Simple face'); // Upgrade 20: the Simple face is the Few face now — same soul, fewer circles, deeper presses
+  ok(g.ordersBtn._visible === true && g.campBtn._visible === true && g.skillBtns.every(b => b._visible !== false) && g.fightBtns.guard._visible !== false,
     'Simple stands the core: powers, Dodge/Block/Sprint, auto-fire, CAMP — and ORDERS');
   ok(g.cmdBtns.charge._visible === false && g.cmdBtns.charge._disabled === true && g.buildBtn._visible === false && g.rallyBtn._visible === false,
     '…and the command rank waits behind ORDERS (hidden, not removed)');
@@ -216,9 +226,10 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   g.onTap({ x: 130, y: 552, worldX: 130, worldY: 552, id: 1 });
   ok(g.fanOpen === true, 'a tap on a fan circle belongs to the button (the fan stays for its press)');
   g.closeFan();
-  // ORDERS itself toggles shut
-  press(g.ordersBtn, 0, 0); ok(g.fanOpen === true, 'tap ORDERS: open');
-  press(g.ordersBtn, 0, 0); ok(g.fanOpen === false, 'tap ORDERS again: closed, nothing issued');
+  // ORDERS itself toggles shut (Upgrade 20: a tap is down + the scene
+  // release — the game's real press channel; press() alone only dips)
+  press(g.ordersBtn, 0, 0); g.input.fire('pointerup', {}); ok(g.fanOpen === true, 'tap ORDERS: open');
+  press(g.ordersBtn, 0, 0); g.input.fire('pointerup', {}); ok(g.fanOpen === false, 'tap ORDERS again: closed, nothing issued');
   // two-tap reachability of every fan member
   const spies = { order: 0, volley: 0, rally: 0, build: 0 };
   const og = g.giveOrder; g.giveOrder = id => { spies.order++; return og.call(g, id); };
@@ -231,33 +242,40 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   g.toggleFan(); press(g.rallyBtn, 0, 0); ok(spies.rally === 1 && g.fanOpen === false, 'RALLY in two taps'); g.rallyMode = false;
   g.toggleFan(); press(g.buildBtn, 0, 0); ok(spies.build === 1 && g.fanOpen === false && g.buildMode === true, 'BUILD in two taps'); g.exitBuildMode();
   // CAMP never needs the fan
-  press(g.campBtn, 0, 0);
+  press(g.campBtn, 0, 0); g.input.fire('pointerup', {}); // Upgrade 20: the tap completes on the scene release
   ok(g.campPanelOpen === true, 'CAMP stands on the Simple face itself — the panel opens in one tap'); g.closeCampPanel();
   // face switching mid-battle
   g.setFace('full');
-  ok(store.gxhub_wotw_face === 'full' && g.cmdBtns.charge._visible === true && g.cmdBtns.charge.y === 665 && g.ordersBtn._visible === false,
-    'setFace(Full): the rank returns to its seats, ORDERS puts away, the choice persists');
-  g.setFace('simple');
-  ok(store.gxhub_wotw_face === 'simple' && g.cmdBtns.charge._visible === false && g.ordersBtn._visible === true, 'setFace(Simple): the fan face returns');
+  ok(store.gxhub_wotw_face === 'full' && store.gxhub_wotw_face_u20 === '1' && g.cmdBtns.charge._visible === true && g.cmdBtns.charge.y === 665 && g.ordersBtn._visible === false,
+    'setFace(Full): the rank returns to its seats, ORDERS puts away, the choice persists'); // Upgrade 20: the re-pick stamps itself — that stamp is what loadFace honors
+  g.setFace('few');
+  ok(store.gxhub_wotw_face === 'few' && g.cmdBtns.charge._visible === false && g.ordersBtn._visible === true, 'setFace(Simple): the fan face returns');
   cleanStore(); }
 
 // ---------- derivation + old saves ----------
-{ cleanStore(); ok(loadFace() === 'simple', 'derivation: an empty store is a new player — Simple');
-  store.gxhub_wotw_layout = '{"pos":{}}'; ok(loadFace() === 'full', 'derivation: a saved layout (an Upgrade-12 customization) means Full');
-  delete store.gxhub_wotw_layout; store.gxhub_wotw_binds = '{}'; ok(loadFace() === 'full', 'derivation: saved keybinds mean Full');
-  delete store.gxhub_wotw_binds; store.gxhub_wotw_move = 'stick'; ok(loadFace() === 'full', 'derivation: a saved movement scheme means Full');
-  store.gxhub_wotw_face = 'simple'; ok(loadFace() === 'simple', 'derivation: an explicit Simple choice beats the customization heuristic');
-  cleanStore(); store.gxhub_wotw_layout = '{"pos":{"dodge":{"x":900,"y":200}}}';
+{ // Upgrade 20 re-point, whole battery: the derivation IS the migration
+  // now. Few for everyone — new and existing alike ("the whole thing");
+  // a stored Full counts only re-picked after U20 (stamped); a stored
+  // Simple reads as the Few it became; layouts/binds/movement no longer
+  // imply a face at all, and every saved seat is honored in both faces.
+  cleanStore(); ok(loadFace() === 'few', 'derivation: an empty store is a new player — Simple');
+  store.gxhub_wotw_layout = '{"pos":{}}'; ok(loadFace() === 'few', 'derivation: a saved layout (an Upgrade-12 customization) means Full'); // the layout no longer speaks for the face
+  delete store.gxhub_wotw_layout; store.gxhub_wotw_binds = '{}'; ok(loadFace() === 'few', 'derivation: saved keybinds mean Full');
+  delete store.gxhub_wotw_binds; store.gxhub_wotw_move = 'stick'; ok(loadFace() === 'few', 'derivation: a saved movement scheme means Full');
+  store.gxhub_wotw_face = 'simple'; ok(loadFace() === 'few', 'derivation: an explicit Simple choice beats the customization heuristic');
+  store.gxhub_wotw_face = 'full'; ok(loadFace() === 'few', 'migration: a pre-U20 Full choice is NOT honored — the whole game moved to Few; Full waits for a fresh re-pick');
+  store.gxhub_wotw_face_u20 = '1'; ok(loadFace() === 'full', 'migration: a Full re-picked after U20 (stamped) IS honored');
+  cleanStore(); store.gxhub_wotw_layout = '{"pos":{"guard":{"x":900,"y":200}}}';
   const g = hudBattle();
-  ok(g.face === 'full' && g.fightBtns.dodge.x === 900 && g.fightBtns.dodge.y === 200 && g.ordersBtn._visible === false && g.cmdBtns.charge._visible === true,
-    'an existing player\'s battle: Full face, their dodge seat kept, nothing taken away');
+  ok(g.face === 'few' && g.fightBtns.guard.x === 900 && g.fightBtns.guard.y === 200 && g.ordersBtn._visible !== false && g.cmdBtns.charge._visible === false,
+    'an existing player\'s battle: Full face, their dodge seat kept, nothing taken away'); // under the migration: Few face, their GUARD seat kept (the dodge hand's seat, renamed with the merge)
   cleanStore(); store.gxhub_wotw_layout = '{"pos":{"skill1":{"x":900,"y":200}}}'; // a pre-U17 save, byte shape unchanged
   const g2 = hudBattle();
   ok(g2.skillBtns[1].x === 900 && g2.skillBtns[1].y === 200 && g2.skillBtns[1].sx === 900, 'a pre-U17 save lands on identical centres — positions were always centres');
   cleanStore(); }
 
 // ---------- layout round-trip under circles ----------
-{ cleanStore(); store.gxhub_wotw_face = 'full';
+{ cleanStore(); store.gxhub_wotw_face = 'full'; store.gxhub_wotw_face_u20 = '1'; // Upgrade 20: stamped, so the round-trip runs on the Full face it describes
   store.gxhub_wotw_layout = JSON.stringify({ pos: { orders: { x: 300, y: 600 }, cmd_charge: { x: 500, y: 665 }, skill0: { x: 1000, y: 300 } } });
   const g = hudBattle();
   ok(g.ordersBtn.x === 300 && g.cmdBtns.charge.x === 500 && g.skillBtns[0].x === 1000, 'saved centres land exactly (ORDERS\' seat is saved even in Full, where it hides)');
@@ -275,9 +293,9 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   ok(!ids.includes('cmd_charge') && ids.includes('orders') && FAN_MEMBERS.every(id => !ids.includes(id)),
     'Simple editor: fan members are NOT items — ORDERS is dragged, the group follows');
   ok(g.cmdBtns.charge._visible === true && g.cmdBtns.charge.y === 552, '…and the editor shows the fan open');
-  ok(g.layoutEd.down({ x: 130, y: 665 }) === true, 'the editor takes ORDERS by its centre');
+  ok(g.layoutEd.down({ x: 1178, y: 268 }) === true, 'the editor takes ORDERS by its centre'); // Upgrade 20 re-point: ORDERS' centre is its rail seat now
   g.layoutEd.move({ x: 300, y: 600 });
-  ok(g.ordersBtn.x === 300 && g.cmdBtns.charge.x === 300 && g.cmdBtns.charge.y === 487, 'dragging ORDERS carries the whole fan, live');
+  ok(g.ordersBtn.x === 300 && g.cmdBtns.charge.x === 300 - 1048 && g.cmdBtns.charge.y === 600 + 284, 'dragging ORDERS carries the whole fan, live'); // Upgrade 20: the fan is one formation on the anchor — it moves by the anchor's delta, exactly as U17's did; from the rail seat the offsets are long, so a far drag carries the row far (Reset restores the arcs)
   g.layoutEd.up();
   const saved = JSON.parse(store.gxhub_wotw_layout).pos;
   ok(saved.orders.x === 300 && saved.orders.y === 600 && saved.cmd_charge.x === 130 && saved.cmd_charge.y === 665,
@@ -285,7 +303,7 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   g.exitLayoutEdit();
   ok(g.cmdBtns.charge._visible === false && g.seatOf('orders').x === 300, 'editor done: the fan folds away, ORDERS keeps its new seat');
   g.closePause();
-  cleanStore(); store.gxhub_wotw_face = 'full';
+  cleanStore(); store.gxhub_wotw_face = 'full'; store.gxhub_wotw_face_u20 = '1'; // stamped Full, as the migration requires
   const g2 = hudBattle(); g2.openPause(); g2.enterLayoutEdit();
   const ids2 = g2.layoutEd.items.map(i => i.id);
   ok(ids2.includes('cmd_charge') && !ids2.includes('orders'), 'Full editor: every command is an item at its own seat; ORDERS is not an item');
@@ -301,19 +319,19 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   s.input = { on() {}, keyboard: { on() {} } };
   s.scene = { start() {} };
   SettingsProto.create.call(s);
-  ok(s.face === 'simple' && s.faceBtns.simple.label._t.includes('✓'), 'Controls opens on the derived face (new player: Simple ✓)');
+  ok(s.face === 'few' && s.faceBtns.few.label._t.includes('✓'), 'Controls opens on the derived face (new player: Simple ✓)'); // Upgrade 20: the derived face is Few; the button is the Few button
   s.faceBtns.full._handlers.pointerup({}, 0, 0, { stopPropagation() {} });
-  ok(store.gxhub_wotw_face === 'full' && s.face === 'full', 'the Controls Buttons setting persists the choice');
-  s.faceBtns.simple._handlers.pointerup({}, 0, 0, { stopPropagation() {} });
+  ok(store.gxhub_wotw_face === 'full' && store.gxhub_wotw_face_u20 === '1' && s.face === 'full', 'the Controls Buttons setting persists the choice'); // Upgrade 20: the Controls pick stamps itself
+  s.faceBtns.few._handlers.pointerup({}, 0, 0, { stopPropagation() {} });
   s.enterGhostEdit();
   const ghost = id => s.ghostObjs[LAYOUT_DEFS.findIndex(d => d[0] === id)];
-  ok(s.ghostObjs.length === 18 && ghost('cmd_charge').y === 552 && ghost('orders').y === 665,
-    'Simple ghosts: all 18 stand, the fan\'s ghosts OPEN above the bar at group positions');
+  ok(s.ghostObjs.length === 17 && ghost('cmd_charge').y === 552 && ghost('orders').x === 1178 && ghost('orders').y === 268,
+    'Simple ghosts: all 18 stand, the fan\'s ghosts OPEN above the bar at group positions'); // Upgrade 20 re-point: 17 ghosts; ORDERS' ghost stands at its rail seat, the fan's ghosts open on the row
   const gids = s._ghostEd.items.map(i => i.id);
   ok(gids.includes('orders') && !gids.includes('cmd_charge'), 'ghost editor: ORDERS is the fan\'s one draggable anchor');
-  ok(s._ghostEd.down({ x: 130, y: 665 }) === true, 'the ghost editor takes ORDERS by its centre');
+  ok(s._ghostEd.down({ x: 1178, y: 268 }) === true, 'the ghost editor takes ORDERS by its centre');
   s._ghostEd.move({ x: 300, y: 600 });
-  ok(ghost('orders').x === 300 && ghost('cmd_charge').x === 300 && ghost('cmd_charge').y === 487, 'the fan ghosts follow ORDERS live');
+  ok(ghost('orders').x === 300 && ghost('cmd_charge').x === 300 - 1048 && ghost('cmd_charge').y === 600 + 284, 'the fan ghosts follow ORDERS live'); // Upgrade 20: the same formation law as the battle editor
   s._ghostEd.up();
   const saved = JSON.parse(store.gxhub_wotw_layout).pos;
   ok(saved.orders.x === 300 && saved.cmd_charge.x === 130 && saved.cmd_charge.y === 665, 'the ghost save writes the anchor\'s seat and leaves the members\' seats alone');
@@ -323,7 +341,7 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
 // ---------- the tutorial teaches the fan ----------
 { cleanStore(); store.gxhub_wotw_layout = '{"pos":{}}'; // even a customized player…
   const g = tutBattle();
-  ok(g.face === 'simple', '…the tutorial always teaches the Simple face');
+  ok(g.face === 'few', '…the tutorial always teaches the Simple face'); // Upgrade 20: it teaches the Few face
   for (let i = 0; i < 4; i++) g.tutSkip();
   ok(g.tutStep === 4 && g.squads.length === 1, 'the army step: the granted squad stands');
   const sq = g.squads[0];
@@ -331,13 +349,13 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   g.onTap({ x: 560, y: 460, worldX: 560, worldY: 460 });
   ok(g.tutPhase === 1 && /ORDERS/.test(g.tutLine._t), 'posted — the lesson now points at ORDERS');
   const t1 = g.tutTarget();
-  ok(t1 && t1.hl === 'screen' && t1.x === 130 && t1.y === 665, 'the ring circles ORDERS');
-  press(g.ordersBtn, 0, 0);
-  ok(g.fanOpen === true && g.tutPhase === 2 && /RALLY/.test(g.tutLine._t), 'ORDERS opened: the lesson turns to RALLY');
+  ok(t1 && t1.hl === 'screen' && t1.x === 1178 && t1.y === 268, 'the ring circles ORDERS'); // Upgrade 20 re-point: ORDERS stands on the right rail now
+  // Upgrade 20 re-point: the lesson's verb is the HOLD — Rally arms at
+  // once, the fan never opens (the full walkthrough lives in U11's suite).
+  g.ordersPress = { t0: performance.now() - 300, held: false }; g.tickPresses();
+  ok(g.rallyMode === true && g.fanOpen === false && g.tutPhase === 2 && /tap the ground/.test(g.tutLine._t), 'ORDERS opened: the lesson turns to RALLY');
   const t2 = g.tutTarget();
-  ok(t2 && t2.x === 718 && t2.y === 552, 'the ring circles RALLY at its fan place');
-  press(g.rallyBtn, 0, 0);
-  ok(g.rallyMode === true && g.fanOpen === false, 'RALLY arms — the fan closes behind the order');
+  ok(t2 && t2.hl === 'world' && t2.x === g.campPos.x + 430 && t2.y === g.campPos.y - 140, 'the ring circles RALLY at its fan place'); // Upgrade 20 re-point: the ring waits on the ground where the banner goes
   g.onTap({ x: 640, y: 420, worldX: 640, worldY: 420 });
   ok(sq.ord === 'rally' && g.tutStep === 5, 'the banner plants — army step complete, the camp step follows');
   cleanStore(); }

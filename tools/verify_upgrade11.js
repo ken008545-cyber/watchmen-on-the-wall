@@ -163,22 +163,33 @@ function freshFlags() { delete store.gxhub_wotw_tutorial_done; delete store.gxhu
   ok(stepUntil(g, () => !!g.tutCred.autofired, 400), 'the hero fired ON HIS OWN — auto-fire proved by the real strike');
   ok(/AUTO-FIRE button/.test(g.tutLine._t), 'the line now names the toggle: "' + g.tutLine._t.slice(0, 60) + '..."');
   ok(g.tutStep === 1, '...but the step waits for the flip itself');
-  fireUp(g.autoBtn); // the real AUTO-FIRE button
+  // Upgrade 20 re-point: the toggle's flip resolves through the press
+  // grammar (a quick press = its TAP verb). Drive the resolution the
+  // release performs; the pointer path is proven in verify_upgrade20.
+  const afTap = () => { g.afPress = { t0: performance.now(), held: false }; g.endPresses({}); };
+  afTap(); // the real AUTO-FIRE button's tap
   ok(g.tutCred.autotoggled === true && g.tutStep === 2, 'one flip of the real toggle completes the step (left OFF — the flip itself is what counts)');
-  fireUp(g.autoBtn); // back on for the rest of the lesson, player's choice
+  afTap(); // back on for the rest of the lesson, player's choice
   // (c) DODGE, BLOCK, SPRINT — the real fight buttons' own paths
   ok(g.pressDodge() === 'dodged' && g.tutCred.dodge === true, 'DODGE pressed — counted');
-  ok(/Still to try: Block, Sprint/.test(g.tutSub._t), 'the line names what is left: "' + g.tutSub._t + '"');
+  ok(/Still to try: Hold Guard, Sprint/.test(g.tutSub._t), 'the line names what is left: "' + g.tutSub._t + '"'); // Upgrade 20 re-point: the kit is GUARD's two verbs + Sprint
   ok(g.setBlock(true) === true && g.tutCred.block === true, 'BLOCK raised — counted');
   ok(/Still to try: Sprint/.test(g.tutSub._t), '...one left');
   g.setBlock(false); // a held button is lifted before sprinting — the real play order
   g.toggleSprint();
   ok(g.tutCred.sprint === true && g.tutStep === 3, 'SPRINT on — the kit step completes');
-  // (d) POWER — a sturdier dummy, a real cast
+  // (d) POWER — a sturdier dummy, a real cast, then an AIMED cast
   ok(g.enemies.some(e => e.tutDummy && e.max === 320), 'the sturdier dummy stands in (320 HP)');
   ok(/Psalm and Five Stones/.test(g.tutLine._t) && /whispers/.test(g.tutLine._t), 'the power line names Psalm, Five Stones — and the whisper');
   g.useSkill(1); // Psalm, by its own button's path
-  ok(g.tutCred.power === true && g.tutStep === 4 && g.skillBtns[1].cd > 17, 'Psalm cast for real (cooldown running) — the power step completes');
+  ok(g.tutCred.power === true && g.tutStep === 3 && g.tutPhase === 1 && g.skillBtns[1].cd > 17, 'Psalm cast for real (cooldown running) — the step turns to its aiming half'); // Upgrade 20 re-point: the power step is two halves now
+  ok(/aim one/.test(g.tutLine._t), 'the aiming line shows: "' + g.tutLine._t.slice(0, 60) + '..."');
+  g.skillBtns[1].cd = 0; // the lesson does not make the student wait out a real cooldown to learn the aim
+  const dum2 = g.enemies.find(e => e.tutDummy && e.max === 320);
+  g.skillPress = { t0: performance.now() - 300, held: false, i: 1 }; g.tickPresses();
+  ok(g.skillPress.held === true, 'holding the power past the threshold raises the aim (the rim filled, the reticle woke)');
+  g.skillAim = { x: dum2.x, y: dum2.y }; g.endPresses({});
+  ok(g.tutCred.aimed === true && g.tutStep === 4, 'release: the aimed cast lands on the dummy — the power step completes');
   // (e) COMMAND YOUR ARMY — granted squad, post, then rally
   ok(g.squads.length === 1 && g.squads[0].def.id === 'shepherd_militia', 'one squad stands granted — a Shepherd Militia, free, for the lesson');
   const sq = g.squads[0];
@@ -186,19 +197,19 @@ function freshFlags() { delete store.gxhub_wotw_tutorial_done; delete store.gxhu
   ok(g.selSquad === sq, 'tap the squad: selected');
   g.onTap({ x: 560, y: 460, worldX: 560, worldY: 460 });
   ok(sq.ord === 'post' && sq.post.x === 560 && sq.post.y === 460 && g.tutPhase === 1, 'tap the ground: posted — and the step turns to its rally half');
-  // Upgrade 17 re-point: the rally half is now two halves — the lesson
-  // teaches the Simple face's fan first (open ORDERS), then RALLY.
+  // Upgrade 17 re-point: the rally half was two halves — the lesson
+  // taught the Simple face's fan first (open ORDERS), then RALLY.
+  // Upgrade 20 re-point: the lesson teaches the press grammar instead —
+  // HOLD ORDERS and Rally arms at once; the fan is the tap's business.
   ok(/ORDERS/.test(g.tutLine._t), 'the orders line shows: "' + g.tutLine._t.slice(0, 60) + '..."');
-  fireUp(g.ordersBtn);
-  ok(g.fanOpen === true && g.tutPhase === 2, 'tap ORDERS: the fan opens — and the step turns to its rally half');
-  ok(/RALLY/.test(g.tutLine._t), 'the rally line shows');
-  fireUp(g.rallyBtn);
-  ok(g.rallyMode === true && g.fanOpen === false, 'tap RALLY: planting arms — and the fan closes behind the order');
+  g.ordersPress = { t0: performance.now() - 300, held: false }; g.tickPresses();
+  ok(g.rallyMode === true && g.fanOpen === false && g.tutPhase === 2, 'HOLD ORDERS: Rally arms at once, the fan never opens — and the step turns to its planting half');
+  ok(/tap the ground/.test(g.tutLine._t), 'the planting line shows');
   g.onTap({ x: 640, y: 420, worldX: 640, worldY: 420 });
   ok(sq.ord === 'rally' && sq.rally.x === 640 && sq.rally.y === 420 && g.tutStep === 5, 'tap the ground: the banner plants, the squad holds it — army step complete');
   // (f) THE CAMP — the real panel, mid-fight
   ok(/Fortify/.test(g.tutLine._t) && /Repair/.test(g.tutLine._t), 'the camp line explains Fortify and Repair');
-  fireUp(g.campBtn);
+  g.campPress = { t0: performance.now(), held: false }; g.endPresses({}); // Upgrade 20: CAMP's tap verb opens the panel
   ok(g.campPanelOpen === true && g.tutStep === 6, 'the CAMP button opened the real camp panel — step complete');
   g.closeCampPanel();
   // (g) ORBS — the grant
@@ -234,16 +245,20 @@ function freshFlags() { delete store.gxhub_wotw_tutorial_done; delete store.gxhu
 // ---------- silent credit: done early counts when the step arrives ----------
 { freshFlags(); delete store.gxhub_wotw_autofire;
   const g = tutBattle();
-  fireUp(g.autoBtn); // flip the toggle OFF during step (a) — before its step exists
+  const afTap = () => { g.afPress = { t0: performance.now(), held: false }; g.endPresses({}); }; // Upgrade 20: the toggle's tap verb, as in the walkthrough
+  afTap(); // flip the toggle OFF during step (a) — before its step exists
   ok(g.tutCred.autotoggled === true && g.tutStep === 0 && g.autoFire === false, 'the early flip is recorded, and step (a) is undisturbed');
-  fireUp(g.autoBtn); // and back ON — still step (a); the step-(b) credit now stands banked
+  afTap(); // and back ON — still step (a); the step-(b) credit now stands banked
   ok(g.autoFire === true, 'flipped back on — auto-fire armed for the dummy');
   g.useSkill(1); // Psalm cast during step (a) — the power step is four steps away
   ok(g.tutCred.power === true, 'the early cast is recorded too');
   g.onTap({ x: 430, y: 600, worldX: 430, worldY: 600 });
   ok(stepUntil(g, () => g.tutStep === 2, 600), 'move, then the dummy falls to auto-fire — and the auto-fire step completes with NO flip during the step: the early flips were honored');
   g.tutSkip(); // past the kit step
-  ok(g.tutStep === 4 && g.squads.length === 1, 'the power step, on entry, found its cast already done and advanced itself — the army step stands, squad granted');
+  ok(g.tutStep === 3 && g.tutPhase === 1, 'the power step, on entry, found its cast already done and turned to its aiming half — silent credit honored'); // Upgrade 20 re-point: the banked cast now completes the FIRST half; the step waits for an aimed cast
+  g.skillBtns[1].cd = 0;
+  g.skillPress = { t0: performance.now() - 300, held: false, i: 1 }; g.tickPresses(); g.skillAim = { x: g.hero.x + 50, y: g.hero.y }; g.endPresses({});
+  ok(g.tutStep === 4 && g.squads.length === 1, 'the aimed cast finishes it — the army step stands, squad granted');
   freshFlags(); }
 
 // ---------- safety: nothing in here can hurt the player ----------
