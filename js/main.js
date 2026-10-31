@@ -54,6 +54,43 @@ const BOSS={ p2At:2/3, p3At:1/3,
   heavyEvery:6, heavyWindup:1.1, heavyMul:3, heavyRangePad:26,
   slamEvery:7, slamDelay:1.2, slamRadius:110, slamMul:2, escortCount:4,
   enrageSpeedMul:1.35, enrageRateMul:0.7, enrageHeavyEvery:4.5, enrageHeavyMul:4 };
+// Upgrade 14 — THE LAST PIECES (kennin's start word, 2026-10-30): endless
+// champions, the Bible heroes' identities, and the weekly twists, all
+// from ERA-IDEAS.md.
+//  ENDLESS: the goal-wave champion's engine (Upgrade 7, untouched) also
+//  rises in endless mode — one champion every ENDLESS_CHAMP_EVERY waves
+//  past the goal, at the same spawn scale (curve x5 HP / x1.6 dmg) with
+//  the same three phases. Ten is the campaign's own rhythm — the goal
+//  itself is wave 10 — so the deep game keeps the same heartbeat.
+//  HEROES: Deborah and Samson already stand on the roster with their
+//  powers; what was missing is who they ARE. Deborah, the Palm Judge:
+//  her song hangs over the field — while she leads, the whole enemy
+//  line advances at deborahSongAdvance of its pace, and her ult (Song
+//  of Deborah) is the crescendo that halves it outright. Samson, the
+//  Nazirite: power that peaks when he stands alone — with no living
+//  squad within samsonAloneRange px, his basic blows land at
+//  samsonAloneDmgMul. The price is the standing itself: an army held
+//  away from its hero. Both passives multiply the player's own side
+//  only — enemy stats and the wave curve are never read from here.
+//  TWISTS: one law per calendar week for Bible runs, alternating by
+//  week index (deterministic: the same week always names the same
+//  law). Night of the Torches — every wave is a night wave, and a
+//  stronger one than nature makes: ranged squads reach torchRangeMul,
+//  the enemy marches at torchEnemySpd (a plain night is 1.1 / 1.08).
+//  The Seventh Day — every seventhEvery-th wave holds its whole spawn
+//  back seventhRest seconds while manna rains at seventhMannaPerSec
+//  (150 over the rest: a wave-bonus-sized gift, on the economy's own
+//  scale). First-pass numbers, kennin's to tune.
+const ENDLESS_CHAMP_EVERY=10;
+const HEROISM={ deborahSongAdvance:0.92, samsonAloneRange:240, samsonAloneDmgMul:1.5 };
+const TWIST={ torchRangeMul:1.25, torchEnemySpd:1.15, seventhEvery:7, seventhRest:10, seventhMannaPerSec:15 };
+const TWISTS=[
+  {id:'torches', name:'Night of the Torches', blurb:'Every wave is night — your ranged reach farther, the enemy marches faster.'},
+  {id:'seventh', name:'The Seventh Day', blurb:'Every 7th wave opens with ten seconds of rest — no enemy comes, and manna rains.'},
+];
+function weekIndex(d){ d=d||new Date(); const days=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return Math.floor((days+3)/7); }
+function twistForWeek(w){ const n=TWISTS.length; return TWISTS[((w%n)+n)%n]; }
+function currentTwist(){ return twistForWeek(weekIndex()); }
 // Upgrade 9: COMMAND & CARE — kennin's three rulings from the 2026-10-30
 // call. (1) The army no longer trails the hero by default: squads post where
 // they stand until directed (tap-to-order, below); the command bar speaks
@@ -397,7 +434,9 @@ class EraSelect extends Phaser.Scene{ constructor(){super('EraSelect');}
       if(!open) txt(this,x,y-10,e.blurb,13,'#8a7a6a',{align:'center',wordWrap:{width:260}}).setOrigin(0.5);
       const z=this.add.zone(x,y,292,190).setInteractive({useHandCursor:true}); z.on('pointerup',()=>{ SFX.unlock(); if(open) this.scene.start('HeroSelect',{level:{era:e.id}}); else this.toast(e.name+' is coming in a later update — its battlefield art is not ready yet.'); }); });
     button(this,90,680,140,46,'Back',()=>this.scene.start('Menu'));
-    this.msg=txt(this,W/2,632,'',18,'#f2c14e').setOrigin(0.5); }
+    this.msg=txt(this,W/2,632,'',18,'#f2c14e').setOrigin(0.5);
+    // Upgrade 14: the era screen names the week's law before anyone marches.
+    const tw=currentTwist(); this.msg.setText('This week in the Bible era: '+tw.name+' — '+tw.blurb); }
   toast(m){ this.msg.setText(m); } }
 
 // ---------- Conquest battle (replaces the tower-defense Game scene) ----------
@@ -446,7 +485,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.moveScheme=this.tutorial?'tap':loadMoveScheme();
     this.binds=loadBinds();
     this.stick=null; this.followOn=false; this.followPt=null; this.pendTap=null;
-    this.paused=false; this.layoutEdit=false; this.layoutReg=[]; this.pauseItems=[]; this.editItems=[]; }
+    this.paused=false; this.layoutEdit=false; this.layoutReg=[]; this.pauseItems=[]; this.editItems=[];
+    // Upgrade 14: the week's law rides a Bible run (null in other eras,
+    // and null in the tutorial, whose economy firewall stays sealed).
+    // seventhT/seventhAcc are the Seventh Day's rest clock and its manna
+    // drip accumulator, driven by update() while the held-back wave waits.
+    this.twist=(!this.tutorial&&this.eraId==='bible')?currentTwist().id:null; this.seventhT=0; this.seventhAcc=0; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -485,7 +529,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // shop — no wave ever starts here (waveActive never turns on), so no
     // shop, no victory screen and no end() can ever fire in the tutorial.
     if(this.tutorial){ this.startTutorial(); }
-    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:''),4200); this.openShop(true); }
+    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:'')+(this.twist?'\nThis week\'s law: '+this.twistDef().name+' — '+this.twistDef().blurb:''),4200); this.openShop(true); }
   }
   // HUD, command bar, toasts, shop and overlays are screen furniture: anything
   // at depth >= 30 is pinned to the camera so the world can scroll beneath it.
@@ -542,7 +586,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.pauseBtnRect={x:1246,y:20,w:56,h:34};
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
-  phaseName(){ return this.wave%2===0&&this.wave>0?'Night':'Day'; }
+  phaseName(){ return this.wave>0&&this.isNightWave(this.wave)?'Night':'Day'; }
   refreshHUD(){ const goalTxt=this.endless?'∞ (goal cleared)':String(this.goalWave);
     this.stat.setText('Manna '+Math.floor(this.manna)+'   Camp '+Math.max(0,Math.ceil(this.campHp))+'/'+this.campMax+'   Wave '+this.wave+'/'+goalTxt+'   '+(this.waveActive?this.phaseName():'')+'   Grokonians +'+this.earned+'   '+this.heroDef.name+'   Squads '+this.squads.length+'/'+this.squadCap);
     // Upgrade 9: the order line names WHO the command bar speaks to — the
@@ -551,7 +595,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const selAlive=this.selSquad&&!this.selSquad.dead, disp=selAlive?(this.selSquad.ord||this.order):this.order;
     if(selAlive) this.orderTxt.setText('Squad: '+this.selSquad.def.name+' — '+(this.selSquad.ord==='post'?'Posted':(disp==='rally'?'Rally':(ORDER_NAMES[disp]||disp)))+(this.volleyMode?'   •   VOLLEY: tap a spot':'')+(this.rallyMode?'   •   RALLY: tap a spot':''));
     else this.orderTxt.setText('Order: '+(this.order==='rally'?'Rally':ORDER_NAMES[this.order])+(this.volleyMode?'   •   VOLLEY: tap a spot':'')+(this.rallyMode?'   •   RALLY: tap a spot':''));
-    if(this.buffTxt){ const bp=[]; if(this.buffStrT>0) bp.push('STR '+Math.ceil(this.buffStrT)+'s'); if(this.buffSpdT>0) bp.push('SPD '+Math.ceil(this.buffSpdT)+'s'); if(this.buffIronT>0) bp.push('IRON '+Math.ceil(this.buffIronT)+'s'); this.buffTxt.setText(bp.join('    ·    ')); }
+    if(this.buffTxt){ const bp=[]; if(this.buffStrT>0) bp.push('STR '+Math.ceil(this.buffStrT)+'s'); if(this.buffSpdT>0) bp.push('SPD '+Math.ceil(this.buffSpdT)+'s'); if(this.buffIronT>0) bp.push('IRON '+Math.ceil(this.buffIronT)+'s'); if(this.hero&&this.samsonAlone()) bp.push('ALONE ×'+HEROISM.samsonAloneDmgMul); this.buffTxt.setText(bp.join('    ·    ')); }
     const okey=(selAlive?this.selSquad.def.id:'army')+'|'+disp;
     if(this._lastOrder!==okey){ this._lastOrder=okey; Object.entries(this.cmdBtns).forEach(([id,b])=>{ if(b.redraw) b.redraw(id===disp); }); }
     Object.entries(this.cmdBtns).forEach(([id,b])=>{ b.alpha=(id==='volley'&&this.volleyCd>0)?0.5:1; });
@@ -1099,8 +1143,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(!t) return;
     h.cd=hd.rate;
     if(h.blocking) this.setBlock(false);
-    if(hd.range<80){ this.damage(t,hd.dmg*this.orbDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkMelee(true); }
-    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.orbDmgMul(),type:hd.dmgType,crit:0.1},620); if(hd.dmgType==='holy') SFX.atkBow(true); else SFX.atkSling(true); }
+    if(hd.range<80){ this.damage(t,hd.dmg*this.heroDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkMelee(true); }
+    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.heroDmgMul(),type:hd.dmgType,crit:0.1},620); if(hd.dmgType==='holy') SFX.atkBow(true); else SFX.atkSling(true); }
     if(this.tutorial) this.tutEvent('autofired'); } // Upgrade 11: proof the hero fired on his own
   pressDodge(){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
     if(h.dodgeCd>0){ if(h.dodgeCd<=INPUT_BUFFER) h.dodgeBuf=true; return 'buffered'; }
@@ -1264,6 +1308,18 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // The two timed multipliers, consulted exactly where damage and speed are
   // computed (hero attack + movement, squad movement) — no parallel systems.
   orbDmgMul(){ return this.buffStrT>0?1.5:1; }
+  // Upgrade 14: hero identity and weekly-twist helpers (see HEROISM /
+  // TWIST at the top of the file). enemySpdMul is Deborah's song over
+  // the field; samsonAlone is Samson's standing, read live — a squad
+  // marching to his side ends it the moment it arrives, and a squad's
+  // fall can wake it mid-fight. heroDmgMul is the hero's full basic-
+  // attack multiplier: the orb's strength, and Samson's alone-price.
+  twistDef(){ return TWISTS.find(t=>t.id===this.twist)||null; }
+  isNightWave(w){ return w%2===0||this.twist==='torches'; }
+  enemySpdMul(){ return this.heroDef&&this.heroDef.id==='deborah'?HEROISM.deborahSongAdvance:1; }
+  samsonAlone(){ if(!this.heroDef||this.heroDef.id!=='samson'||!this.hero||this.hero.down>0) return false;
+    return !this.squads.some(s=>!s.dead&&Phaser.Math.Distance.Between(s.x,s.y,this.hero.x,this.hero.y)<=HEROISM.samsonAloneRange); }
+  heroDmgMul(){ return this.orbDmgMul()*(this.samsonAlone()?HEROISM.samsonAloneDmgMul:1); }
   orbSpdMul(){ return this.buffSpdT>0?1.3:1; }
   tryBuyOrb(o){ const h=this.hero; if(!h) return 'none';
     if(o.cd>0){ this.toast(o.def.name+' is recharging — '+Math.ceil(o.cd)+'s'); return 'cooldown'; }
@@ -1365,22 +1421,30 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(w>=5) push('pebble_golem',Math.min(w-3,6));
       if(w>=7) push('idol_golem',Math.min(w-5,4));
       if(w===this.goalWave) push('idol_golem',1); // goal-wave champion (boss-scaled at spawn)
+      else if(this.endless&&w>this.goalWave&&w%ENDLESS_CHAMP_EVERY===0) push('idol_golem',1); // Upgrade 14: the endless champion, on the ten-wave heartbeat
     } else { // generic fallback for future eras
       push(E[3].id,Math.min(2+w,10)); push(E[0].id,w>=5?Math.min(w-3,5):0); push(E[1].id,w>=4?Math.min(w-2,6):0); push(E[2].id,w>=6?Math.min(w-4,4):0);
     }
     return comp.filter(([,n])=>n>0); }
   startWave(){ this.wave++; this.waveActive=true; this.campHurtThisWave=false;
-    const night=this.wave%2===0;
+    const night=this.isNightWave(this.wave); this.waveNight=night;
     if(this.nightRect) this.nightRect.destroy();
     if(night) this.nightRect=this.add.rectangle(this.worldW/2,this.worldH/2,this.worldW,this.worldH,0x0a1030,0.22).setDepth(18);
     const hpM=hpScaleForWave(this.wave), dmM=dmgScaleForWave(this.wave);
     let t=0.6, bossDone=false;
-    this.waveComp(this.wave).forEach(([def,n])=>{ for(let i=0;i<n;i++){ const boss=(this.wave===this.goalWave&&def.id==='idol_golem'&&i===n-1&&!this.endless&&!bossDone); if(boss) bossDone=true;
+    // Upgrade 14: a champion wave is the goal wave — or, in endless, every
+    // ENDLESS_CHAMP_EVERY waves past it. One champion per wave, always.
+    const champWave=(this.wave===this.goalWave&&!this.endless)||(this.endless&&this.wave>this.goalWave&&this.wave%ENDLESS_CHAMP_EVERY===0);
+    this.waveComp(this.wave).forEach(([def,n])=>{ for(let i=0;i<n;i++){ const boss=(champWave&&def.id==='idol_golem'&&i===n-1&&!bossDone); if(boss) bossDone=true;
         this.spawnQ.push({def,at:t,boss}); t+=def.spawnGap||(def.role==='ranged'?1.1:0.75); } t+=1.2; });
     this.spawnQ.sort((a,b)=>a.at-b.at); this.waveClock=0; this.waveHpM=hpM; this.waveDmM=dmM;
-    SFX.wave(); this.toast('Wave '+this.wave+(night?' — Night':' — Day')+(this.wave===this.goalWave&&!this.endless?' — the goal wave!':'')); this.refreshHUD(); }
+    // Upgrade 14: the Seventh Day — the wave's whole spawn holds back for
+    // the rest; update() rains the manna while the field stands empty.
+    this.seventhT=0; this.seventhAcc=0;
+    if(this.twist==='seventh'&&this.wave%TWIST.seventhEvery===0){ this.spawnQ.forEach(q=>{ q.at+=TWIST.seventhRest; }); this.seventhT=TWIST.seventhRest; }
+    SFX.wave(); this.toast('Wave '+this.wave+(night?' — Night':' — Day')+(this.wave===this.goalWave&&!this.endless?' — the goal wave!':'')+(champWave&&this.endless?' — a champion rises!':'')+(this.seventhT>0?' — the Seventh Day: rest, and manna rains':'')); this.refreshHUD(); }
   spawn(q){ const d=q.def, hpM=this.waveHpM*(q.boss?5:1), dmM=this.waveDmM*(q.boss?1.6:1);
-    const e={def:d,hp:d.hp*hpM,max:d.hp*hpM,dmg:d.dmg*dmM,range:d.range,rate:d.rate,speed:d.speed*(this.wave%2===0?1.08:1),
+    const e={def:d,hp:d.hp*hpM,max:d.hp*hpM,dmg:d.dmg*dmM,range:d.range,rate:d.rate,speed:d.speed*(this.waveNight?(this.twist==='torches'?TWIST.torchEnemySpd:1.08):1),
       x:this.worldW+20+Math.random()*30,y:120+Math.random()*Math.max(60,this.worldH-280),cd:0,dead:false,boss:q.boss,armorType:'flesh',ph:Math.random()*6};
     e.spr=uspr(this,e.x,e.y,d,q.boss?120:(d.img?66:(SZ[d.sprite]||54))); applyTint(e.spr,d);
     e.spr.setDepth(7); e.bar=this.add.graphics().setDepth(12); if(d.heals) e.healCd=1.5; if(q.boss) this.setupBoss(e); this.enemies.push(e);
@@ -1388,7 +1452,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     return e; }
   // --- goal-wave champion: boss name + health bar (the old TD treatment) ---
   setupBoss(e){ this.boss=e; this.bossBar=this.add.graphics().setDepth(32).setScrollFactor(0);
-    this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+' — GOAL-WAVE CHAMPION',20,GOLD).setOrigin(0.5).setDepth(32).setScrollFactor(0);
+    this.bossName=txt(this,W/2,HUD_Y-30,e.def.name.toUpperCase()+(this.endless?' — ENDLESS CHAMPION · WAVE '+this.wave:' — GOAL-WAVE CHAMPION'),20,GOLD).setOrigin(0.5).setDepth(32).setScrollFactor(0);
     // Upgrade 7: phase state lives on the champion itself. heavyT counts to
     // the next wind-up, heavyWind is the wind-up in progress (the champion
     // stands committed while it runs), slamT/slam are the Phase II ground
@@ -1722,7 +1786,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // field coins (Upgrade 3): one every ~6s of an active wave, max 8 out
     if(this.waveActive){ this.coinT-=dt; if(this.coinT<=0){ this.coinT=6; if(this.coins.length<8) this.spawnCoin(); } }
     this.collectCoins();
-    const night=this.wave%2===0;
+    // Upgrade 14: the Seventh Day's manna rain — while the held-back
+    // wave waits out its rest, manna drips onto the camp at the twist's
+    // rate (150 across the ten seconds). Whole-manna steps only; the
+    // fraction carries in seventhAcc so the total is exact.
+    if(this.seventhT>0&&this.waveActive){ const step=Math.min(dt,this.seventhT); this.seventhT-=step; this.seventhAcc+=step*TWIST.seventhMannaPerSec;
+      const whole=Math.floor(this.seventhAcc); if(whole>0){ this.seventhAcc-=whole; this.manna+=whole; }
+      if(this.seventhT<=0) this.floatText(this.campPos.x,this.campPos.y-70,'The Seventh Day — manna has rained','#f2c14e'); }
+    const night=this.isNightWave(this.wave);
     // hero movement + combat
     const h=this.hero, hd=h.def;
     // Upgrade 12: FOLLOW arms itself when a press is simply HELD (the
@@ -1737,6 +1808,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(this.stick){ const m=Math.hypot(this.stick.dx,this.stick.dy);
         if(m>10){ h.tx=h.x+this.stick.dx/m*130; h.ty=h.y+this.stick.dy/m*130; } else { h.tx=h.x; h.ty=h.y; } }
       else if(this.followOn&&this.followPt){ h.tx=this.followPt.wx; h.ty=this.followPt.wy; } }
+    // Upgrade 14: Samson's strength announces itself when it wakes —
+    // he stands alone, and the field should know why he suddenly hits
+    // like a falling gate.
+    if(this.heroDef.id==='samson'){ const al=this.samsonAlone(); if(al&&!this._samAlone) this.floatText(h.x,h.y-84,'Strength alone!','#ffe98a'); this._samAlone=al; }
     if(h.down>0){ this.tickHeroDown(dt); }
     else if(h.dodgeT>0){ // Upgrade 8: the dodge dash owns the body until it ends
       const dst=FIGHT.dodgeDist/FIGHT.dodgeTime*dt; h.x+=h.dodgeDx*dst; h.y+=h.dodgeDy*dst; h.dodgeT-=dt;
@@ -1772,7 +1847,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.squads=this.squads.filter(s=>!s.dead);
     if(this.selSquad&&this.selSquad.dead) this.selSquad=null;
     this.squads.forEach((s,idx)=>{ if(s.buffRateT>0) s.buffRateT-=dt; if(s.buffDmgT>0) s.buffDmgT-=dt;
-      const rangeMul=(night&&s.def.role==='ranged')?1.1:1, range=s.range*rangeMul;
+      const rangeMul=(night&&s.def.role==='ranged')?(this.twist==='torches'?TWIST.torchRangeMul:1.1):1, range=s.range*rangeMul;
       const foe=this.nearestEnemy(s.x,s.y,range);
       // Upgrade 9: each squad marches by its EFFECTIVE order — its own
       // directed order, or the army's when it carries none. Posted is the
@@ -1825,12 +1900,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; def={x:s.x,y:s.y,kind:'squad',s}; } }
         const dc=Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y);
         if(def){ const dx=def.x-e.x, dy=def.y-e.y, dl=Math.hypot(dx,dy)||1;
-          if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0))*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
+          if(bd>e.range+6){ const sp=e.speed*(1-(e.slow||0))*this.enemySpdMul()*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0); }
           else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate;
             if(def.kind==='hero') this.hurtHero(e.dmg); else this.hurtSquad(def.s,e.dmg);
             SFX.enemyAttack(e); this.spark(def.x,def.y,0xc0392b,2); } }
         } else if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
-          const sp=e.speed*(1-(e.slow||0))*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
+          const sp=e.speed*(1-(e.slow||0))*this.enemySpdMul()*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
         } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } }
       }
       const p={x:e.x,y:e.y}; e.spr.setOrigin(0.5,0.9).setPosition(p.x,p.y+(e.def.size||18)).setDepth((e.boss?9:7)+p.y/1000);

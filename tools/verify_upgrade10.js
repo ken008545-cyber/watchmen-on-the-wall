@@ -184,7 +184,7 @@ function countCalls(g, name) { const orig = GameProto[name]; let n = 0; g[name] 
   const shots = countCalls(g, 'shoot');
   const e = spawnFoe(g, g.hero.x + 50, g.hero.y); e.hp = 1000;
   g.update(0, 50);
-  ok(shots() === 0 && approx(1000 - e.hp, 30), 'melee auto-fire lands instantly at full basic (30), no shot thrown'); }
+  ok(shots() === 0 && approx(1000 - e.hp, 45), 'melee auto-fire lands instantly at full basic — Samson alone, so 30 x 1.5 (Upgrade 14) = 45, no shot thrown'); }
 
 // ---------- auto-fire OFF: zero basic damage, skills still fire ----------
 { const g = bareBattle('david'); g.autoFire = false;

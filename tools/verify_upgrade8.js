@@ -269,7 +269,7 @@ function stepUntil(g, pred, max) { let n = 0; while (!pred() && n < (max || 40))
   const e = spawnFoe(g, g.hero.x + 50, g.hero.y); e.hp = 1000;
   const by = spawnFoe(g, e.x + 30, e.y); by.hp = 1000;
   g.update(0, 50);
-  ok(approx(1000 - e.hp, 30) && by.hp === 1000, 'melee auto-fire lands instantly at full basic (30); the bystander is untouched — no cleave without a heavy'); }
+  ok(approx(1000 - e.hp, 45) && by.hp === 1000, 'melee auto-fire lands instantly at full basic — Samson stands alone in this battery, so 30 x his 1.5 alone (Upgrade 14) = 45; the bystander is untouched — no cleave without a heavy'); }
 { // DODGE BUFFER (replaces the attack-press buffer battery): a dodge
   // pressed inside its window still fires as the cooldown ends — the
   // skill input buffer battery above covers power moves the same way

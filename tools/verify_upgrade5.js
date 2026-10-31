@@ -21,7 +21,7 @@ ok(main.includes('const ORBS=[') && main.includes("id:'strength'") && main.inclu
 ok(main.includes('this.buildOrbs();') && main.includes('buildOrbs(){'), 'orbs built in create()');
 ok(/find\(o=>Math\.hypot\(wx-o\.x,wy-o\.y\)<=42\)/.test(main) && main.includes('this.tryBuyOrb(orb)'), 'onTap routes orb taps (world coords) to tryBuyOrb');
 ok(main.includes("Tokens.spend('orb:'+o.def.id,o.def.cost)"), 'purchases spend through Tokens.spend');
-ok(/dmg\*this\.orbDmgMul\(\)/.test(main), 'hero damage (melee + projectile) passes through orbDmgMul()'); // Upgrade 8: strikes are manual now — the multiplier rides lightStrike/heavyStrike's dmg
+ok(/dmg\*this\.heroDmgMul\(\)/.test(main), 'hero damage (melee + projectile) passes through heroDmgMul()'); // Upgrade 14 re-point: heroDmgMul() composes orbDmgMul() with Samson's alone factor — the orb multiplier still rides every hero blow, now through the composed helper (orbDmgMul itself is asserted directly below)
 ok(/hd\.speed\*this\.orbSpdMul\(\)/.test(main), 'hero movement passes through orbSpdMul()'); // Upgrade 8: movement speed is composed (orb x sprint x block) before *dt
 ok(/\(eo==='shieldwall'\?0\.6:1\)\*this\.orbSpdMul\(\)/.test(main), 'squad movement passes through orbSpdMul()'); // Upgrade 9 re-point: the multiplier now keys on the squad's EFFECTIVE order (eo = its own order or the army's) — same law, wider subject
 ok(main.includes('this.orbTick(dt)'), 'update() ticks orb buffs/cooldowns');
