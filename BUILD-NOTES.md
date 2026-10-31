@@ -2291,3 +2291,103 @@ js/gxhub.js and js/tokens.js are byte-identical (empty git diff).
   whether the pistol reads as fast, the scatter as wide, the Bible's
   blast as weighty; the wpn_bible glyph at shoulder size (0.34 scale);
   the reveal panel over a live shop. kennin's ears and eyes rule next.
+
+## Hotfix — iPhone fullscreen: the installable app (built 2026-10-31)
+
+kennin's commission, from live play with his brother Abel: Abel plays
+on an iPhone and the game's Fullscreen button does nothing there; on
+kennin's Samsung it works. He asked for "either a downloadable app or
+he can make it full screen from there."
+
+**ROOT CAUSE.** iOS Safari does not implement the Fullscreen API for
+arbitrary page elements — on an iPhone there is no way for any web
+page to fullscreen itself, so the button could only fail silently.
+The supported route is the installed home-screen web app: Add to Home
+Screen installs the game, and the installed icon launches it
+standalone — edge-to-edge, truly full screen. This hotfix delivers
+that installable app, and makes the button tell the truth everywhere.
+
+### What shipped
+
+- **The manifest** (`manifest.webmanifest`, a text file on the
+  branch): name "Watchmen on the Wall", short_name "Watchmen",
+  display standalone, orientation landscape, background and theme
+  #0d0906 (the stone hall), start_url and scope the game's own root
+  (".", so it resolves on both serving origins and under the hub's
+  /g/<id>/ path alike).
+- **The icons** — 192 and 512 for the manifest, 180 for Apple's
+  touch icon — cut with PIL from the APPROVED logo v2: a square crop
+  (0,100)-(340,440) on the watchtower and its eye-and-shield banner,
+  no title text. They are binary, so they travel the wotw-assets KV
+  route like the unit art: both proxy Workers (watchmen-game and
+  wotw-playtest) now also serve assets/icons/* from KV by basename,
+  and both learned the webmanifest content type
+  (application/manifest+json) so the manifest serves as JSON.
+  Upload script: gxhub/deploy-test/upload_icons_kv.py.
+- **The Apple declarations** in index.html: apple-mobile-web-app-
+  capable yes, status bar black-translucent, the apple-touch-icon
+  link, the standard mobile-web-app-capable beside them, a theme-
+  color, and **viewport-fit=cover** so a standalone launch can paint
+  edge-to-edge.
+- **Safe areas, the simple route:** CSS only, in index.html. The
+  #game container is padded by all four env(safe-area-inset-*) values
+  and the canvas is capped at the viewport minus the insets (the old
+  plain 100vw/100vh caps stand as the fallback line before the calc).
+  Phaser's FIT + CENTER_BOTH centring is untouched — the canvas
+  simply centres inside the safe area, so no battle circle can sit
+  under the notch or the home indicator in standalone landscape.
+  Every inset is 0 on rectangular screens, Android included.
+- **The button tells the truth** (js/main.js): a PURE function
+  `displayMode(env)` reads an injectable navigator/window/document
+  and answers standalone / ios-install / browser. Standalone (either
+  signal: display-mode media query or navigator.standalone) — both
+  Fullscreen buttons hide; it is already fullscreen. iOS without the
+  Fullscreen API — tapping the button opens a short panel:
+  "On iPhone, install the game for true fullscreen: tap Share, then
+  Add to Home Screen — it opens like an app, full screen." While the
+  panel stands, Game.onTap is sealed behind it. An iOS browser that
+  CAN fullscreen (capability present) takes the native route — the
+  capability decides, not the badge. Android and desktop are
+  byte-for-byte the old behavior: the same startFullscreen calls.
+- **The hub speaks too:** one small line on the Watchmen game page
+  only (gated on the game id, in both page branches), under the
+  frame: "Playing on iPhone? Open the game, tap Share, then Add to
+  Home Screen — it opens like an app, in true fullscreen." Deployed
+  from the live-matching tree (src-studio copied to src-iosline),
+  bindings verified identical after on both Workers (12/12 hub,
+  9/9 play), AUTH_GATE untouched, nothing else changed.
+- **NO SERVICE WORKER — deliberate.** This project has been bitten
+  by stale builds before; a service worker is a cache with opinions,
+  and iOS home-screen installability does not require one. The game
+  installs and launches standalone without it, and every load stays
+  as fresh as the proxies serve it (no-store, as always).
+
+### Verification (2026-10-31, this machine)
+
+- tools/verify_hotfix_ios.js (stubbed Phaser, REAL main.js):
+  **30/30** — the shell statics (manifest link, Apple metas,
+  viewport-fit, all four safe-area insets in the CSS); the manifest
+  parsed with its required fields; the three PNGs' real dimensions
+  on disk; the UA matrix over the pure displayMode (iPhone Safari →
+  install; iPhone standalone by navigator.standalone AND by the
+  display-mode query → hidden; iPadOS in its MacIntel disguise →
+  install; iPhone WITH the API → native; Android and desktop →
+  native); the panel in a stubbed scene (exact sentence, one panel
+  only, field taps sealed behind it, Got it destroys every piece);
+  standalone and native routes opening nothing; and no
+  serviceWorker anywhere in main.js.
+- All seventeen suites green: **995 checks** (965 standing + 30 new),
+  zero re-points — the U3 canvas-cap check passes on the fallback
+  declaration the calc now overrides.
+- Live, after push and proxy redeploys: the manifest serves 200 with
+  the JSON content type at BOTH proxies; all three icon routes serve
+  200 image/png, byte-identical to the generated files, at BOTH
+  proxies; the served index.html carries the manifest link, the
+  Apple metas and viewport-fit (grep of the served bytes); the
+  served js/main.js matches the local file byte for byte; the hub
+  line is live on the Watchmen game page, once.
+- NOT verified — cannot be, from here: the install flow itself.
+  Whether Add to Home Screen offers the install on Abel's iPhone,
+  whether the icon launches the game standalone and edge-to-edge,
+  and whether the safe-area padding clears his notch in a real
+  fight — Abel's phone is the test, exactly as kennin set it up.

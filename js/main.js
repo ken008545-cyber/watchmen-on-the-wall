@@ -91,6 +91,51 @@ const TWISTS=[
 function weekIndex(d){ d=d||new Date(); const days=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return Math.floor((days+3)/7); }
 function twistForWeek(w){ const n=TWISTS.length; return TWISTS[((w%n)+n)%n]; }
 function currentTwist(){ return twistForWeek(weekIndex()); }
+// ---------- iPhone fullscreen hotfix (kennin, 2026-10-31) ----------
+// Abel plays on an iPhone, where Safari gives a web page no Fullscreen
+// API for page elements: the old button could only fail silently there.
+// The supported route is the installed home-screen app — Add to Home
+// Screen launches this game standalone, edge-to-edge and truly full
+// screen. So the button now tells the truth by platform:
+//   standalone  -> the game is already fullscreen; the button hides.
+//   iOS browser -> the button opens a short panel naming the install.
+//   elsewhere   -> the button requests real fullscreen, as it always did.
+// displayMode is a PURE function over an injectable environment so the
+// verification suite can prove the whole UA matrix without a browser.
+const IOS_FS_HELP='On iPhone, install the game for true fullscreen: tap Share, then Add to Home Screen — it opens like an app, full screen.';
+function displayMode(env){ env=env||{};
+  const nav=env.navigator||(typeof navigator!=='undefined'?navigator:null);
+  const win=env.window||(typeof window!=='undefined'?window:null);
+  const doc=env.document||(typeof document!=='undefined'?document:null);
+  let standalone=false;
+  try{ standalone=!!(win&&win.matchMedia&&win.matchMedia('(display-mode: standalone)').matches); }catch(e){}
+  if(nav&&nav.standalone===true) standalone=true;
+  const ua=(nav&&nav.userAgent)||'';
+  const platform=(nav&&nav.platform)||'';
+  const ios=/iPhone|iPad|iPod/.test(ua)||(platform==='MacIntel'&&(nav&&nav.maxTouchPoints||0)>1);
+  const root=doc&&doc.documentElement;
+  const canFullscreen=!!(root&&(root.requestFullscreen||root.webkitRequestFullscreen));
+  if(standalone) return {mode:'standalone',standalone:true,ios:ios,canFullscreen:canFullscreen,showButton:false,installHelp:false};
+  if(ios&&!canFullscreen) return {mode:'ios-install',standalone:false,ios:true,canFullscreen:false,showButton:true,installHelp:true};
+  return {mode:'browser',standalone:false,ios:ios,canFullscreen:canFullscreen,showButton:true,installHelp:false};
+}
+function showIOSFullscreenHelp(s){ if(!s||s._iosFsPanel) return false;
+  const items=[]; s._iosFsPanel=items;
+  const g=s.add.graphics(); if(g.setDepth) g.setDepth(90); items.push(g);
+  g.fillStyle(0x0d0906,0.82); g.fillRect(0,0,W,H);
+  g.fillStyle(0x140c07,0.98); g.fillRoundedRect(W/2-380,218,760,284,14);
+  g.lineStyle(3,0xd9a441,1); g.strokeRoundedRect(W/2-380,218,760,284,14);
+  const title=txt(s,W/2,258,'FULLSCREEN ON IPHONE',26,GOLD).setOrigin(0.5); if(title.setDepth) title.setDepth(91); items.push(title);
+  const body=txt(s,W/2,340,IOS_FS_HELP,20,PARCH,{align:'center',wordWrap:{width:660}}).setOrigin(0.5); if(body.setDepth) body.setDepth(91); items.push(body);
+  const close=button(s,W/2,454,180,44,'Got it',()=>{ items.forEach(o=>{ try{ o.destroy(); }catch(e){} }); s._iosFsPanel=null; },{size:17});
+  if(close.setDepth) close.setDepth(92); items.push(close);
+  return true;
+}
+function fullscreenRoute(s){ const st=displayMode();
+  if(st.mode==='standalone') return 'standalone';
+  if(st.installHelp){ showIOSFullscreenHelp(s); return 'install'; }
+  return 'native';
+}
 // ---------- Upgrade 18: WEAPONS & LOOT (kennin, 2026-10-31) ----------
 // "I also want to add guns... I want there to be guns and different type
 // of weapons and powers. I also want the bible to be a weapon as well. I
@@ -783,7 +828,8 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     // Upgrade 12: the Controls door — movement scheme, keybinds and the
     // button-layout editor live in the Settings scene.
     button(this,1112,510,300,50,'Controls',()=>this.scene.start('Settings'),{size:20});
-    button(this,1150,42,220,46,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:17});
+    const fsMenuBtn=button(this,1150,42,220,46,'Fullscreen',()=>{ if(fullscreenRoute(this)==='native'){ try{ this.scale.startFullscreen(); }catch(e){} } },{size:17});
+    if(displayMode().mode==='standalone') fsMenuBtn.setVisible(false);
     // Upgrade 18: the Armory's front door — the Rack, where found
     // weapons are kept and the carried one is chosen.
     button(this,130,42,220,46,'Armory',()=>this.scene.start('Armory',{from:'Menu'}),{size:17});
@@ -934,7 +980,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.moveScheme=this.tutorial?'tap':loadMoveScheme();
     this.binds=loadBinds();
     this.stick=null; this.followOn=false; this.followPt=null; this.pendTap=null;
-    this.paused=false; this.layoutEdit=false; this.layoutReg=[]; this.pauseItems=[]; this.editItems=[];
+    this.paused=false; this.layoutEdit=false; this.layoutReg=[]; this.pauseItems=[]; this.editItems=[]; this._iosFsPanel=null;
     // Upgrade 17: the battle face. The tutorial always teaches SIMPLE
     // (the fan is part of the lesson); a real run takes the player's
     // own face — the saved choice, else Full for a player who already
@@ -1081,7 +1127,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // utility whose whole word is its meaning, and no circle that fits
     // the corner could carry it — noted in BUILD-NOTES, not hidden.
     this.spdBtn=button(this,1221,HUD_Y+80,44,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:15,circle:44}).setDepth(31);
-    const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:13}); fsb.setDepth(31);
+    const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ if(fullscreenRoute(this)==='native'){ try{ this.scale.startFullscreen(); }catch(e){} } },{size:13}); fsb.setDepth(31); this.fsb=fsb;
+    if(displayMode().mode==='standalone') fsb.setVisible(false);
     // Upgrade 12: the pause/settings entry — a small ⚙ above the fight
     // stack. It opens the pause overlay (movement scheme, the layout
     // editor, resume, quit), and its rect is walled in onTap like the
@@ -1132,7 +1179,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       t.setText(label); t.setPosition(x+22,y+4); t.setVisible(true);
       x+=w+8; }); }
   toast(m,ms){ if(this._toast) this._toast.destroy(); const t=txt(this,W/2,HUD_Y-70,m,22,GOLD,{backgroundColor:'#140c07cc',padding:{x:10,y:4},wordWrap:{width:900},align:'center'}).setOrigin(0.5).setDepth(40).setScrollFactor(0); this._toast=t; this.tweens.add({targets:t,alpha:0,delay:ms||1800,duration:600,onComplete:()=>t.destroy()}); }
-  onTap(p){ if(this.over||this.shopOpen||this.victoryOpen||p.y>=HUD_Y) return;
+  onTap(p){ if(this._iosFsPanel||this.over||this.shopOpen||this.victoryOpen||p.y>=HUD_Y) return;
     // Upgrade 12: while paused or editing the layout, field taps belong
     // to those overlays — never to the marching hand behind them.
     if(this.paused||this.layoutEdit) return;
