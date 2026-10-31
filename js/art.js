@@ -50,6 +50,18 @@ window.makeArt = function(scene){
   tex('spear',40,8,(g)=>{ g.fillStyle(0x5a4020,1); g.fillRect(0,3,32,2); g.fillStyle(0x9c7a3c,1); g.fillTriangle(30,0,40,4,30,8);});
   // Ark of the covenant shown as a simple tent camp (no depiction of holy objects in combat)
   tex('camp',90,70,(g)=>{ g.fillStyle(0x8a6a3c,1); g.fillTriangle(5,65,45,8,85,65); g.lineStyle(3,INK); g.strokeTriangle(5,65,45,8,85,65); g.fillStyle(0x3a2412,1); g.fillTriangle(35,65,45,35,55,65); g.lineBetween(45,8,45,0);});
+  // --- Upgrade 18: weapon projectiles — an arrow, a bullet, a bolt of light ---
+  tex('arrow',28,8,(g)=>{ g.fillStyle(0x8a6a3c,1); g.fillRect(2,3,20,2); g.lineStyle(1.5,INK); g.strokeRect(2,3,20,2);
+    g.fillStyle(0xc8ccd4,1); g.fillTriangle(20,0,28,4,20,8); g.fillStyle(0xd8572a,1); g.fillTriangle(2,0,8,4,2,8); });
+  tex('bullet',10,10,(g)=>{ g.fillStyle(0xf2c14e,0.4); g.fillCircle(5,5,4.6); g.fillStyle(0xfff3c0,1); g.fillCircle(5,5,2.6); g.fillStyle(0xffffff,1); g.fillCircle(5,5,1.2); });
+  tex('light',22,22,(g)=>{ g.fillStyle(0xfff3c0,0.3); g.fillCircle(11,11,10); g.fillStyle(0xf2c14e,0.55); g.fillCircle(11,11,7); g.fillStyle(0xfffbe8,1); g.fillCircle(11,11,4); });
+  // --- Upgrade 18: the loot chests, one per grade — wood, iron, gold ---
+  function chestTex(key,body,band,latch){ tex(key,54,44,(g)=>{ g.fillStyle(body,1); g.fillRect(4,16,46,24); g.lineStyle(3,INK); g.strokeRect(4,16,46,24);
+    g.fillStyle(body,1); g.fillPoints([new Phaser.Geom.Point(4,18),new Phaser.Geom.Point(50,18),new Phaser.Geom.Point(44,6),new Phaser.Geom.Point(10,6)],true);
+    g.lineStyle(3,INK); g.strokePoints([new Phaser.Geom.Point(4,18),new Phaser.Geom.Point(50,18),new Phaser.Geom.Point(44,6),new Phaser.Geom.Point(10,6)],true,true);
+    g.fillStyle(band,1); g.fillRect(23,6,8,34); g.fillRect(4,24,46,5); g.lineStyle(2,INK); g.strokeRect(23,6,8,34);
+    g.fillStyle(latch,1); g.fillCircle(27,22,4.5); g.lineStyle(2,INK); g.strokeCircle(27,22,4.5); }); }
+  chestTex('chest_wood',0x8a6a3c,0x5a4020,0xb08d4a); chestTex('chest_iron',0x8a8f98,0x5a5f68,0xc8ccd4); chestTex('chest_gold',0xc9a227,0x8a6420,0xfff3c0);
 };
 window.makeArt2=function(scene){ const INK=0x140c07;
  function tex(k,w,h,fn){const g=scene.make.graphics({add:false});fn(g);g.generateTexture(k,w,h);g.destroy();}

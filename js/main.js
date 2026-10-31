@@ -91,6 +91,159 @@ const TWISTS=[
 function weekIndex(d){ d=d||new Date(); const days=Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); return Math.floor((days+3)/7); }
 function twistForWeek(w){ const n=TWISTS.length; return TWISTS[((w%n)+n)%n]; }
 function currentTwist(){ return twistForWeek(weekIndex()); }
+// ---------- Upgrade 18: WEAPONS & LOOT (kennin, 2026-10-31) ----------
+// "I also want to add guns... I want there to be guns and different type
+// of weapons and powers. I also want the bible to be a weapon as well. I
+// want the weapons to drop rpg with chests and things like that."
+// (Building stays HELD by his word the same night — U15 stands as-is;
+// this upgrade adds no building work and ports none to rooms.)
+//
+// The hero's basic attack is weapon-driven now. Seven FAMILIES — sling,
+// bow, sword, spear, and the guns: pistol, rifle, scattergun — each with
+// its own pattern, its own synthesized voice (js/sfx.js), and an innate
+// TRAIT. Six RARITY TIERS — kennin's ladder, the GX Monsters ladder —
+// scale a family's stats modestly and strengthen its trait. THE BALANCE
+// BOUND: the Common sling IS the pre-U18 attack, number for number
+// (dmg 18, rate 0.7, range 140, crit 0.10, a stone at 620), so the
+// standing champion benchmark (~32.5s, camp whole) is reproduced with
+// it equipped and the enemy curve never moves. Weapon damage is rated
+// for a standard arm: the hero's own damage stat scales it (hero dmg /
+// 18), and his tempo scales its rate (hero rate / 0.7) — so David feels
+// exactly the table, Samson's strength carries any weapon harder, and
+// mastery keeps meaning what it meant. A weapon carries its own damage
+// type (the guns and the old arms are physical; the Bible is holy) —
+// the hero's innate dmgType governed only the old built-in attack.
+//
+// THE BIBLE stands apart: not a family, never on the ladder, never
+// sold — found, in Gold chests alone, at low odds. Its attack throws
+// bolts of light; its power, the Word, is a periodic verse-blast around
+// the hero plus a strength aura for squads standing near him.
+//
+// CHESTS are the only road to new weapons: ~2% of ordinary enemies, a
+// real chance from ELITES (the roster's elite class — the non-champion
+// Idol Golem; flagged in BUILD-NOTES), guaranteed from champions. The
+// hero banks a chest by walking over it; chests open in the
+// intermission on a reveal panel — battle is never interrupted by
+// loot. THE RACK is the persistent armory below (guarded storage, the
+// CQ pattern): duplicates of an owned family+tier convert to Manna at
+// reveal, and banked-but-unopened chests wait in the Rack for the next
+// intermission — they never vanish. Rooms keep their fixed loadout:
+// weapons are solo-first, like U15 was (js/net.js untouched).
+const WEAPON_TIERS=[
+  { id:'common',    name:'Common',    color:0xc8ccd4, css:'#c8ccd4', mul:1,    rateMul:1,    rangeMul:1,    critAdd:0,    dupManna:25  },
+  { id:'uncommon',  name:'Uncommon',  color:0x8fd06a, css:'#8fd06a', mul:1.15, rateMul:1.03, rangeMul:1.04, critAdd:0.02, dupManna:40  },
+  { id:'rare',      name:'Rare',      color:0x6ab0f2, css:'#6ab0f2', mul:1.30, rateMul:1.06, rangeMul:1.08, critAdd:0.04, dupManna:70  },
+  { id:'epic',       name:'Epic',      color:0xb07ae8, css:'#b07ae8', mul:1.50, rateMul:1.10, rangeMul:1.12, critAdd:0.07, dupManna:120 },
+  { id:'legendary', name:'Legendary', color:0xf2a03c, css:'#f2a03c', mul:1.75, rateMul:1.14, rangeMul:1.16, critAdd:0.10, dupManna:200 },
+  { id:'mythic',    name:'Mythic',    color:0xf25c5c, css:'#f25c5c', mul:2.05, rateMul:1.18, rangeMul:1.20, critAdd:0.14, dupManna:325 },
+];
+const WEAPON_FAMILIES={
+  sling:{ name:'Sling', type:'physical', dmg:18, rate:0.70, range:140, crit:0.10, proj:'stone',
+    traitName:'True Aim', trait:'Crit chance grows with rarity — a shepherd\'s eye, sharpened.',
+    names:['Shepherd\'s Sling','Watchman\'s Sling','Sling of the Valley','Sling of the Mighty Men','Sling of Elah','The Seventh Stone'] },
+  bow:{ name:'Bow', type:'physical', dmg:15, rate:0.55, range:185, crit:0.12, proj:'arrow',
+    traitName:'Keen String', trait:'Crits land harder as rarity rises — the string sings truer.',
+    names:['Hunter\'s Bow','Bow of the Watch','Bow of Kedar','Bow of the Mighty','Bow of Jonathan','Bow of the Morning'] },
+  sword:{ name:'Sword', type:'physical', dmg:24, rate:0.80, range:58, crit:0.10, proj:null,
+    traitName:'Cleave', trait:'The swing is an arc, and the arc widens with rarity — everything in it is struck.',
+    names:['Short Sword','Soldier\'s Sword','Sword of the Wall','Sword of Gilead','Blade of the Captain','Sword of the Dawn'] },
+  spear:{ name:'Spear', type:'physical', dmg:21, rate:0.85, range:96, crit:0.08, proj:null,
+    traitName:'Long Reach', trait:'The thrust runs through its mark — and pierces one more at Epic, another at Mythic.',
+    names:['Casting Spear','Spear of the Guard','Spear of the Wall','Spear of Phinehas','Spear of Joshua','Spear of the Host'] },
+  pistol:{ name:'Pistol', type:'physical', dmg:13, rate:0.38, range:150, crit:0.22, proj:'bullet',
+    traitName:'Deadeye', trait:'Fast hands, and a crit chance that grows with rarity.',
+    names:['Pocket Pistol','Frontier Pistol','Duelist\'s Pistol','Officer\'s Pistol','The Peacemaker','The Last Word'] },
+  rifle:{ name:'Rifle', type:'physical', dmg:30, rate:1.05, range:260, crit:0.12, proj:'bullet',
+    traitName:'Through the Line', trait:'The shot does not stop at its mark — it pierces the whole line.',
+    names:['Long Rifle','Sharpshooter\'s Rifle','Rifle of the Ridge','Marksman\'s Rifle','The Long Witness','Rifle of the Seventh Hill'] },
+  scattergun:{ name:'Scattergun', type:'physical', dmg:7, rate:1.00, range:100, crit:0.05, proj:'stone',
+    traitName:'Fuller Spread', trait:'More pellets join the spread as rarity rises — five at Common, seven at Mythic.',
+    names:['Scattergun','Coach Gun','Trench Sweeper','The Harvester','The Wide Net','Thunder of the Field'] },
+};
+const WEAPON_FAMILY_ORDER=['sling','bow','sword','spear','pistol','rifle','scattergun'];
+// THE BIBLE — singular, off the ladder. blast* is the Word spoken around
+// the bearer; aura* is its strength for the squads near him.
+const BIBLE_WEAPON={ family:'bible', name:'The Bible', display:'The Bible — the Word of God', type:'holy',
+  dmg:26, rate:0.62, range:195, crit:0.15, proj:'light',
+  blastEvery:6, blastDmg:45, blastRadius:130, auraRange:175, auraDmgMul:1.25,
+  traitName:'The Word', trait:'Every few seconds the Word speaks: a blast of light around the bearer, and strength for the squads who stand near him.' };
+const BIBLE_VERSES=['"Thy word is a lamp unto my feet." Ps 119:105','"The word of God is quick, and powerful." Heb 4:12','"Heaven and earth shall pass away, but my words shall not pass away." Matt 24:35','"Thy word have I hid in mine heart." Ps 119:11'];
+// Resolution: family + tier -> the carried weapon. Monotonic by
+// construction — every multiplier rises with the tier, so within a
+// family a higher tier is never weaker in damage, rate, range or crit,
+// and each trait number (arc / pierce / pellets / critMul) steps up at
+// its named tiers.
+function resolveWeapon(family,tier){ if(family==='bible') return Object.assign({tier:-1,tierName:'Unique',key:'bible',familyName:'The Bible'},BIBLE_WEAPON);
+  const F=WEAPON_FAMILIES[family]||WEAPON_FAMILIES.sling, T=WEAPON_TIERS[tier]||WEAPON_TIERS[0];
+  const w={ family:family, tier:tier, tierName:T.name, key:family+':'+tier, name:F.names[tier]||F.name, familyName:F.name,
+    type:F.type, proj:F.proj, traitName:F.traitName, trait:F.trait,
+    dmg:Math.round(F.dmg*T.mul*10)/10, rate:Math.round(F.rate/T.rateMul*1000)/1000,
+    range:Math.round(F.range*T.rangeMul), crit:Math.round((F.crit+T.critAdd)*100)/100,
+    arc:0, pierce:0, pellets:0, critMul:1 };
+  if(family==='sword') w.arc=110+18*tier;                      // the arc's total width, degrees: 110 -> 200
+  if(family==='spear') w.pierce=1+(tier>=3?1:0)+(tier>=5?1:0); // foes struck through, beyond the first
+  if(family==='scattergun') w.pellets=5+Math.floor(tier/2);    // 5,5,6,6,7,7
+  if(family==='bow') w.critMul=1+0.12*tier;                    // crits land harder
+  if(family==='rifle') w.pierce=99;                            // through the whole line
+  return w; }
+function parseWeaponKey(key){ if(key==='bible') return {family:'bible',tier:-1};
+  const p=String(key||'').split(':'); const f=WEAPON_FAMILIES[p[0]]?p[0]:'sling';
+  return {family:f,tier:Math.max(0,Math.min(5,parseInt(p[1],10)||0))}; }
+// --- chests: grades, drop chances, loot rolls ---
+// Grades weight the rarity odds; Gold alone can hold the Bible, at
+// BIBLE_ODDS, and only while the Rack lacks it (the Bible is unique —
+// a bearer who carries it finds an ordinary weapon instead).
+const CHEST_GRADES={
+  wood:{ name:'Wooden Chest', color:0xb08d4a, css:'#b08d4a', tiers:[0.62,0.25,0.10,0.025,0.005,0] },
+  iron:{ name:'Iron Chest',   color:0xc8ccd4, css:'#c8ccd4', tiers:[0.38,0.30,0.20,0.09,0.025,0.005] },
+  gold:{ name:'Golden Chest', color:0xf2c14e, css:'#f2c14e', tiers:[0.18,0.24,0.26,0.18,0.10,0.04] },
+};
+const CHEST_DROPS={
+  normal:  { chance:0.02, grades:[['wood',0.80],['iron',0.18],['gold',0.02]] },
+  elite:   { chance:0.35, grades:[['wood',0.45],['iron',0.40],['gold',0.15]] },
+  champion:{ chance:1,    grades:[['iron',0.55],['gold',0.45]] },
+};
+const BIBLE_ODDS=0.03;
+// rng is injectable so the harness drives the real rolls with a seeded
+// stream; the game passes nothing and gets Math.random.
+function rollChestDrop(kind,rng){ const R=rng||Math.random, D=CHEST_DROPS[kind]||CHEST_DROPS.normal;
+  if(R()>=D.chance) return null;
+  let r=R(), acc=0; for(const pair of D.grades){ acc+=pair[1]; if(r<acc) return pair[0]; } return D.grades[0][0]; }
+// Roll order is fixed — Bible check (Gold only), family, tier — so a
+// seeded stream reads the same way every time.
+function rollLoot(grade,rng,hasBible){ const R=rng||Math.random, G=CHEST_GRADES[grade]||CHEST_GRADES.wood;
+  if(grade==='gold'&&!hasBible&&R()<BIBLE_ODDS) return { bible:true };
+  const family=WEAPON_FAMILY_ORDER[Math.min(WEAPON_FAMILY_ORDER.length-1,Math.floor(R()*WEAPON_FAMILY_ORDER.length))];
+  let r=R(), acc=0, tier=0; for(let i=0;i<G.tiers.length;i++){ acc+=G.tiers[i]; tier=i; if(r<acc) break; }
+  return { family:family, tier:tier }; }
+// --- THE RACK: the persistent armory (the CQ pattern, guarded) ---
+const RACK_KEY='gxhub_wotw_rack_v1';
+const Rack={ _s:null,
+  _base(){ return { owned:{ 'sling:0':true }, equipped:'sling:0', pending:[] }; },
+  _load(){ if(this._s) return this._s;
+    try{ const s=Object.assign(this._base(),JSON.parse(localStorage.getItem(RACK_KEY)||'{}'));
+      if(!s.owned||typeof s.owned!=='object') s.owned={ 'sling:0':true };
+      if(!s.owned['sling:0']) s.owned['sling:0']=true; // the starter can never be lost
+      if(!Array.isArray(s.pending)) s.pending=[];
+      if(!s.equipped||!s.owned[s.equipped]) s.equipped='sling:0';
+      this._s=s; }catch(e){ this._s=this._base(); }
+    return this._s; },
+  _save(){ try{ localStorage.setItem(RACK_KEY,JSON.stringify(this._s)); }catch(e){} },
+  reset(){ this._s=null; try{ localStorage.removeItem(RACK_KEY); }catch(e){} this._load(); },
+  owns(key){ return !!this._load().owned[key]; },
+  grant(key){ const s=this._load(); if(s.owned[key]) return 'dup'; s.owned[key]=true; this._save(); return 'new'; }, // 'new' | 'dup' — a duplicate converts to Manna at reveal
+  equippedKey(){ return this._load().equipped; },
+  equip(key){ const s=this._load(); if(!s.owned[key]) return false; s.equipped=key; this._save(); return true; },
+  equippedWeapon(){ const p=parseWeaponKey(this.equippedKey()); return resolveWeapon(p.family,p.tier); },
+  pending(){ return this._load().pending.slice(); },
+  setPending(list){ const s=this._load(); s.pending=(list||[]).filter(g=>CHEST_GRADES[g]); this._save(); },
+  // The armory's list: the Bible first (it stands above the ladder),
+  // then families in arsenal order, tiers ascending.
+  list(){ const s=this._load(), out=[];
+    if(s.owned['bible']) out.push(resolveWeapon('bible',-1));
+    WEAPON_FAMILY_ORDER.forEach(f=>{ for(let t=0;t<6;t++){ if(s.owned[f+':'+t]) out.push(resolveWeapon(f,t)); } });
+    return out; },
+};
 // Upgrade 15 — GATHER & BUILD (kennin, voice 2026-10-30: gather by mining
 // — wood from trees, stone from rocks — then build defenses around the
 // camp, "like fences, like in Fortnite Save the World where you have to
@@ -527,6 +680,40 @@ function makeIcons(scene){ if(!scene||!scene.make||!scene.make.graphics) return;
   tex('ico_auto',g=>{ arc(g,60,60,42,-Math.PI*0.35,Math.PI*0.95,6,STONE); head(g,100,44,-0.6,BRIGHT); // the circular arrow
     arc(g,54,60,21,-Math.PI*0.42,Math.PI*0.42,6,GOLD); // the bow
     g.lineStyle(3,PARCH,1); const a=Math.PI*0.42; g.lineBetween(54+Math.cos(-a)*21,60+Math.sin(-a)*21,54+Math.cos(a)*21,60+Math.sin(a)*21); }); // its string
+  // --- Upgrade 18: the arsenal's glyphs (the armory, the reveal, the hero's marker) ---
+  tex('wpn_sling',g=>{ g.lineStyle(6,GOLD,1); g.lineBetween(60,96,60,58); g.lineBetween(60,58,40,30); g.lineBetween(60,58,80,30); // the fork
+    g.lineStyle(3,PARCH,1); g.lineBetween(40,30,86,44); g.lineBetween(80,30,86,44); // the straps
+    g.fillStyle(BRIGHT,1); g.fillEllipse(90,44,15,12); }); // the stone, loaded
+  tex('wpn_bow',g=>{ arc(g,52,60,40,-Math.PI*0.42,Math.PI*0.42,6,GOLD); // the bow
+    g.lineStyle(3,PARCH,1); const a=Math.PI*0.42; g.lineBetween(52+Math.cos(-a)*40,60+Math.sin(-a)*40,52+Math.cos(a)*40,60+Math.sin(a)*40); // its string
+    g.lineStyle(4,BRIGHT,1); g.lineBetween(38,60,88,60); head(g,92,60,0,BRIGHT); // the arrow, drawn
+    g.lineStyle(3,STONE,1); g.lineBetween(38,60,30,52); g.lineBetween(38,60,30,68); });
+  tex('wpn_sword',g=>{ g.lineStyle(9,GOLD,1); g.lineBetween(60,66,60,26); // the blade, upright
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:60,y:8},{x:66,y:26},{x:54,y:26}],true); // its point
+    g.lineStyle(6,PARCH,1); g.lineBetween(38,70,82,70); // the guard
+    g.lineStyle(7,STONE,1); g.lineBetween(60,74,60,94); g.fillStyle(BRIGHT,1); g.fillCircle(60,100,6); }); // grip + pommel
+  tex('wpn_spear',g=>{ g.lineStyle(6,STONE,1); g.lineBetween(34,94,78,42); // the long shaft
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:92,y:14},{x:96,y:34},{x:76,y:44},{x:72,y:24}],true); // the leaf head
+    g.lineStyle(3,GOLD,1); g.lineBetween(72,44,82,34); });
+  tex('wpn_pistol',g=>{ g.fillStyle(GOLD,1); g.fillRect(22,34,66,13); // the barrel
+    g.fillStyle(BRIGHT,1); g.fillRect(82,36,12,9); // the muzzle
+    g.fillStyle(STONE,1); g.fillPoints([{x:34,y:47},{x:52,y:47},{x:46,y:88},{x:30,y:88}],true); // the grip
+    g.fillStyle(GOLD,1); g.fillCircle(58,30,6); g.fillRect(28,28,10,6); }); // hammer + sight
+  tex('wpn_rifle',g=>{ g.fillStyle(GOLD,1); g.fillRect(14,40,78,10); // the long barrel
+    g.fillStyle(BRIGHT,1); g.fillRect(92,42,12,6); // the muzzle
+    g.fillStyle(STONE,1); g.fillPoints([{x:14,y:50},{x:44,y:50},{x:38,y:66},{x:12,y:62}],true); // the stock
+    g.fillStyle(STONE,1); g.fillPoints([{x:56,y:50},{x:68,y:50},{x:64,y:74},{x:54,y:74}],true); // the grip
+    g.lineStyle(3,PARCH,1); g.lineBetween(52,40,52,30); g.lineBetween(76,40,76,32); }); // the sights
+  tex('wpn_scatter',g=>{ g.fillStyle(GOLD,1); g.fillRect(26,32,58,10); g.fillRect(26,50,58,10); // twin barrels, wide
+    g.fillStyle(BRIGHT,1); g.fillCircle(88,37,6); g.fillCircle(88,55,6); // the open mouths
+    g.fillStyle(STONE,1); g.fillPoints([{x:26,y:60},{x:50,y:60},{x:42,y:78},{x:22,y:74}],true); g.fillPoints([{x:58,y:60},{x:70,y:60},{x:66,y:84},{x:56,y:84}],true); });
+  tex('wpn_bible',g=>{ g.fillStyle(PARCH,1); // the open book, honored — parchment pages, gold cover beneath
+    g.fillPoints([{x:60,y:44},{x:38,y:36},{x:20,y:40},{x:20,y:84},{x:38,y:80},{x:60,y:88}],true);
+    g.fillPoints([{x:60,y:44},{x:82,y:36},{x:100,y:40},{x:100,y:84},{x:82,y:80},{x:60,y:88}],true);
+    g.fillStyle(GOLD,1); g.fillPoints([{x:60,y:92},{x:36,y:84},{x:16,y:88},{x:16,y:92},{x:104,y:92},{x:104,y:88},{x:84,y:84},{x:60,y:92}],true);
+    g.lineStyle(2,STONE,1); [34,46,70,84].forEach(x=>{ g.lineBetween(x,50,x+(x<60?2:-2),74); }); // the written lines
+    g.lineStyle(4,BRIGHT,1); g.lineBetween(60,10,60,28); g.lineBetween(51,18,69,18); // the cross of light above it
+    spark(g,88,20,8,BRIGHT); spark(g,32,16,6,GOLD); });
 }
 
 // ---------- Boot: a real loading screen (Upgrade 3) ----------
@@ -597,6 +784,9 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     // button-layout editor live in the Settings scene.
     button(this,1112,510,300,50,'Controls',()=>this.scene.start('Settings'),{size:20});
     button(this,1150,42,220,46,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:17});
+    // Upgrade 18: the Armory's front door — the Rack, where found
+    // weapons are kept and the carried one is chosen.
+    button(this,130,42,220,46,'Armory',()=>this.scene.start('Armory',{from:'Menu'}),{size:17});
     // Upgrade 11: the tutorial's front door — always here, never locked,
     // replayable any time. It runs the Bible era with David, the hero the
     // lesson is written for (its power step names Psalm and Five Stones).
@@ -617,6 +807,9 @@ class HeroSelect extends Phaser.Scene{ constructor(){super('HeroSelect');}
   create(){ backdrop(this,0.7); Music.play(this,'menu');
     txt(this,W/2,36,this.browse?'Heroes':'Choose your Hero',38,GOLD).setOrigin(0.5);
     txt(this,W/2,76,'Grokonians: '+Tokens.balance()+'   •   Mastery gives +2% damage and HP per level, and faster skills at level 5',17,GOLD).setOrigin(0.5);
+    // Upgrade 18: the Armory stands beside the heroes, too — choose the
+    // weapon before you choose who carries it.
+    button(this,1160,36,180,40,'Armory',()=>this.scene.start('Armory',{from:'HeroSelect',fromData:{browse:this.browse,level:this.level}}),{size:16});
     DATA.heroes.forEach((h,i)=>{ const col=i%6,row=Math.floor(i/6),x=113+col*211,y=230+row*286, ok=heroUnlocked(h), M=Progress.mastery(h.id);
       const g=this.add.graphics(); g.fillStyle(h.theme==='liberty'?0x1a1e26:0x2a1a10,0.93); g.fillRoundedRect(x-100,y-134,200,272,10); g.lineStyle(3,ok?0xd9a441:0x5a4a3a); g.strokeRoundedRect(x-100,y-134,200,272,10);
       const im=spr(this,x,y-72,h.id,104); if(ok) this.tweens.add({targets:im,scaleY:im.scaleY*1.04,y:im.y-3,yoyo:true,repeat:-1,duration:900+i*37,ease:'Sine.inOut'}); else im.setTint(0x222222);
@@ -759,7 +952,30 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // its bar, and the intermission spent on the field (the shop's other
     // room, on the shop's own deadline).
     this.wood=0; this.stone=0; this.builds=[]; this.nodes=[]; this.buildMode=false; this.buildTool='fence'; this.gatherT=0;
-    this.interField=false; this.buildItems=[]; this.interItems=[]; this.buildBarRect=null; this.interBtnRects=[]; this.buildBtnRect=null; }
+    this.interField=false; this.buildItems=[]; this.interItems=[]; this.buildBarRect=null; this.interBtnRects=[]; this.buildBtnRect=null;
+    // Upgrade 18: the carried weapon — the Rack's equipped piece,
+    // resolved. The tutorial always teaches the starter sling (the
+    // lesson's weapon), whatever the Rack holds. pendingChests are the
+    // banked chests waiting for this intermission (the Rack keeps them
+    // between runs); fieldChests lie on the field, unbanked; the
+    // reveal queue is the intermission's opening ceremony.
+    this.weaponKey=this.tutorial?'sling:0':Rack.equippedKey();
+    // The starter is not a found weapon: while it is what the Rack
+    // holds, every hero fights with HIS OWN HAND — his innate damage,
+    // rate, range and type, delivered as it always was (a melee blow
+    // at hand range, a stone or an ember beyond it). That is what
+    // "the starter preserves today's behavior" means for the whole
+    // roster, Samson's jawbone and Deborah's holy ember included; for
+    // David the innate profile IS the Common sling, number for number.
+    // The moment a found weapon is equipped, its pattern takes over.
+    if(this.weaponKey==='sling:0'){ const hd0=this.heroDef;
+      this.weapon={ family:'innate', key:'sling:0', tier:0, tierName:'Innate', name:hd0.name+'\'s own hand', familyName:'His own hand',
+        type:hd0.dmgType, dmg:hd0.dmg, rate:hd0.rate, range:hd0.range, crit:0.10, proj:hd0.dmgType==='holy'?'ember':'stone',
+        arc:0, pierce:0, pellets:0, critMul:1, traitName:'His Own Hand', trait:'' }; }
+    else { const wp=parseWeaponKey(this.weaponKey); this.weapon=resolveWeapon(wp.family,wp.tier); }
+    this.bibleT=null; this._verseI=0;
+    this.fieldChests=[]; this.pendingChests=this.tutorial?[]:Rack.pending();
+    this.revealQueue=[]; this.revealItems=[]; this.revealPanel=false; this.lootFound=[]; }
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -799,7 +1015,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // shop — no wave ever starts here (waveActive never turns on), so no
     // shop, no victory screen and no end() can ever fire in the tutorial.
     if(this.tutorial){ this.startTutorial(); }
-    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:'')+(this.twist?'\nThis week\'s law: '+this.twistDef().name+' — '+this.twistDef().blurb:''),4200); this.openShop(true); }
+    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:'')+(this.twist?'\nThis week\'s law: '+this.twistDef().name+' — '+this.twistDef().blurb:'')+'\nCarrying: '+this.weapon.name,4200); this.openShop(true); }
   }
   // HUD, command bar, toasts, shop and overlays are screen furniture: anything
   // at depth >= 30 is pinned to the camera so the world can scroll beneath it.
@@ -1045,7 +1261,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       blocking:false,sprint:false,stamina:FIGHT.stamMax,stamDelay:0,guardBreakT:0};
     this.hero.spr=spr(this,hx,hy,h.id).setDepth(8); this.hero.hpBar=this.add.graphics().setDepth(12);
     this.hero.guardFx=this.add.graphics().setDepth(15);
-    this.hero.ring=this.add.circle(hx,hy,h.range,0xffffff,0.04).setStrokeStyle(1,0xd9a441,0.4).setDepth(3); }
+    // Upgrade 18: the range ring is the WEAPON's reach now, stroked in
+    // its tier's color (the Bible's ring burns gold-white), and a small
+    // weapon glyph rides at the hero's shoulder — what he carries is
+    // readable at a glance, modestly.
+    const w=this.weapon||resolveWeapon('sling',0), tierCol=w.family==='bible'?0xfff3c0:(WEAPON_TIERS[Math.max(0,w.tier)]||WEAPON_TIERS[0]).color;
+    this.hero.ring=this.add.circle(hx,hy,w.range,0xffffff,0.04).setStrokeStyle(1,tierCol,0.45).setDepth(3);
+    this.hero.wpn=this.add.image(hx+26,hy-44,'wpn_'+(w.family==='innate'?'sling':w.family)).setDepth(9).setScale(0.34);
+    this.hero.wpnShown=w.family!=='innate'; if(!this.hero.wpnShown&&this.hero.wpn.setVisible) this.hero.wpn.setVisible(false); }
   hurtHero(n,heavy){ const h=this.hero; if(h.down>0) return;
     // Upgrade 8: dodge i-frames are true invulnerability — a blow timed
     // into a dodge simply is not there, heavy or otherwise, and it cannot
@@ -1562,14 +1785,49 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // like every hero hit — the pre-Upgrade-8 behavior, numbers unchanged.
   // When the toggle is OFF he performs NO basic attacks at all; his
   // power moves still fire by button. Striking drops a raised guard.
+  // Upgrade 18: the basic attack is the WEAPON's. Each family fires its
+  // own pattern (below); the Common sling's branch is the pre-U18 attack
+  // verbatim — same stone, same speed, same numbers — because the
+  // resolver returns dmg 18 / rate 0.7 / range 140 / crit 0.10 for it
+  // and David's scaling factors are both 1. The hero faces his target
+  // when he strikes, so sword arcs and spear lines read his facing.
   heroAutoFire(){ const h=this.hero, hd=h.def; if(!this.autoFire||!h||h.down>0||h.cd>0) return;
-    const t=this.nearestEnemy(h.x,h.y,hd.range+(hd.range<80?8:0));
+    const w=this.weapon||(this.weapon=resolveWeapon('sling',0));
+    const t=this.nearestEnemy(h.x,h.y,w.range+(w.range<80?8:0));
     if(!t) return;
-    h.cd=hd.rate;
+    h.cd=w.rate*(hd.rate/0.7);
     if(h.blocking) this.setBlock(false);
-    if(hd.range<80){ this.damage(t,hd.dmg*this.heroDmgMul(),hd.dmgType,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkMelee(true); }
-    else { this.shoot(h.x,h.y,t,hd.dmgType==='holy'?'ember':'stone',{dmg:hd.dmg*this.heroDmgMul(),type:hd.dmgType,crit:0.1},620); if(hd.dmgType==='holy') SFX.atkBow(true); else SFX.atkSling(true); }
+    const dl=Math.hypot(t.x-h.x,t.y-h.y)||1; h.faceX=(t.x-h.x)/dl; h.faceY=(t.y-h.y)/dl;
+    const dmg=w.dmg*(hd.dmg/18)*this.heroDmgMul();
+    if(w.family==='innate'){ // his own hand: the pre-U18 attack, verbatim
+      if(w.range<80){ this.damage(t,hd.dmg*this.heroDmgMul(),w.type,{crit:0.1}); this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkMelee(true); }
+      else { this.shoot(h.x,h.y,t,w.proj,{dmg:hd.dmg*this.heroDmgMul(),type:w.type,crit:0.1},620); if(w.type==='holy') SFX.atkBow(true); else SFX.atkSling(true); } }
+    else if(w.family==='sword'){ // CLEAVE: everything inside the arc is struck
+      const half=(w.arc||110)*Math.PI/360, fa=Math.atan2(h.faceY,h.faceX);
+      this.enemies.slice().forEach(e=>{ if(e.dead||Math.hypot(e.x-h.x,e.y-h.y)>w.range+10) return;
+        let da=Math.abs(Math.atan2(e.y-h.y,e.x-h.x)-fa); if(da>Math.PI) da=2*Math.PI-da;
+        if(da<=half) this.damage(e,dmg,w.type,{crit:w.crit}); });
+      this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkMelee(true); }
+    else if(w.family==='spear'){ // the thrust: a line through the mark, pierced
+      this.lineHits(h.x,h.y,t.x,t.y,w.range,26).slice(0,1+(w.pierce||0)).forEach(e=>this.damage(e,dmg,w.type,{crit:w.crit}));
+      this.spark(t.x,t.y,0xe8e0c8,3); SFX.atkSpear(true); }
+    else if(w.family==='scattergun'){ // the spread: pellets seek the nearest foes in reach, round-robin
+      const foes=this.enemies.filter(e=>!e.dead&&Math.hypot(e.x-h.x,e.y-h.y)<=w.range)
+        .sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y));
+      for(let i=0;i<(w.pellets||5);i++) this.shoot(h.x,h.y,foes[i%foes.length],'stone',{dmg:dmg,type:w.type,crit:w.crit},700);
+      SFX.atkScatter(true); }
+    else if(w.family==='rifle'){ this.shoot(h.x,h.y,t,'bullet',{dmg:dmg,type:w.type,crit:w.crit,pierce:99,flyRange:w.range+40},1350); SFX.atkRifle(true); }
+    else if(w.family==='pistol'){ this.shoot(h.x,h.y,t,'bullet',{dmg:dmg,type:w.type,crit:w.crit},1050); SFX.atkPistol(true); }
+    else if(w.family==='bow'){ this.shoot(h.x,h.y,t,'arrow',{dmg:dmg,type:w.type,crit:w.crit,critMul:w.critMul||1},820); SFX.atkBow(true); }
+    else if(w.family==='bible'){ this.shoot(h.x,h.y,t,'light',{dmg:dmg,type:'holy',crit:w.crit},900); SFX.bibleShot(); }
+    else { this.shoot(h.x,h.y,t,'stone',{dmg:dmg,type:w.type,crit:w.crit},620); SFX.atkSling(true); }
     if(this.tutorial) this.tutEvent('autofired'); } // Upgrade 11: proof the hero fired on his own
+  // Foes standing on the line from (x,y) toward (tx,ty), nearest first:
+  // projection inside the reach, perpendicular distance inside the width.
+  lineHits(x,y,tx,ty,range,width){ const dx=tx-x, dy=ty-y, dl=Math.hypot(dx,dy)||1, ux=dx/dl, uy=dy/dl;
+    return this.enemies.filter(e=>{ if(e.dead) return false; const ex=e.x-x, ey=e.y-y, p=ex*ux+ey*uy;
+      return p>=0&&p<=range+10&&Math.abs(ex*uy-ey*ux)<=width; })
+      .sort((a,b)=>((a.x-x)*ux+(a.y-y)*uy)-((b.x-x)*ux+(b.y-y)*uy)); }
   pressDodge(){ const h=this.hero; if(!h||this.over||this.shopOpen||this.victoryOpen||h.down>0) return 'none';
     if(h.dodgeCd>0){ if(h.dodgeCd<=INPUT_BUFFER) h.dodgeBuf=true; return 'buffered'; }
     // Dash where the hero is heading (his march target), else where he faces.
@@ -1857,7 +2115,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // shopEndsAt deadline keeps running in update(), the field bar below
   // carries the same countdown, and the wave starts from the field at
   // zero exactly once (beginInterWave), or early by its button.
-  leaveShopToField(){ if(!this.shopOpen) return; this.shopOpen=false; this.shopFirst=false; this.clearShop();
+  leaveShopToField(){ if(!this.shopOpen||this.revealPanel) return; this.shopOpen=false; this.shopFirst=false; this.clearShop();
     this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
     this.interField=true; this.renderInterBar(); }
   renderInterBar(){ this.clearInterBar(); const items=[]; this.interItems=items;
@@ -1911,6 +2169,27 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   samsonAlone(){ if(!this.heroDef||this.heroDef.id!=='samson'||!this.hero||this.hero.down>0) return false;
     return !this.squads.some(s=>!s.dead&&Phaser.Math.Distance.Between(s.x,s.y,this.hero.x,this.hero.y)<=HEROISM.samsonAloneRange); }
   heroDmgMul(){ return this.orbDmgMul()*(this.samsonAlone()?HEROISM.samsonAloneDmgMul:1); }
+  // Upgrade 18: THE WORD — while the Bible is carried and a wave is
+  // being fought, its blast gathers and speaks every blastEvery
+  // seconds: holy damage to every foe within blastRadius of the hero,
+  // a ring of light, and the next verse in the rotation spoken over
+  // him. Its aura is separate and constant: squads standing within
+  // auraRange strike at auraDmgMul (bibleAuraMul, read at the squad
+  // attack site). Neither runs in the shop, the tutorial (which never
+  // carries it), or after the run.
+  bibleTick(dt){ if(!this.weapon||this.weapon.family!=='bible'||!this.waveActive||this.over) return;
+    const h=this.hero; if(!h||h.down>0) return;
+    this.bibleT=(this.bibleT==null?BIBLE_WEAPON.blastEvery:this.bibleT)-dt;
+    if(this.bibleT>0) return;
+    this.bibleT=BIBLE_WEAPON.blastEvery;
+    const dmg=BIBLE_WEAPON.blastDmg*(h.def.dmg/18)*this.heroDmgMul();
+    this.enemies.slice().forEach(e=>{ if(!e.dead&&Math.hypot(e.x-h.x,e.y-h.y)<=BIBLE_WEAPON.blastRadius) this.damage(e,dmg,'holy',{}); });
+    if(this.add.circle){ const c=this.add.circle(h.x,h.y,14,0xfff3c0,0.35).setDepth(15);
+      if(this.tweens) this.tweens.add({targets:c,radius:BIBLE_WEAPON.blastRadius,alpha:0,duration:480,onComplete:()=>c.destroy()}); }
+    this.floatText(h.x,h.y-84,BIBLE_VERSES[this._verseI=((this._verseI||0)+1)%BIBLE_VERSES.length],'#fff3c0');
+    SFX.bibleBlast(); }
+  bibleAuraMul(s){ if(!this.weapon||this.weapon.family!=='bible'||!this.hero||this.hero.down>0) return 1;
+    return Math.hypot(s.x-this.hero.x,s.y-this.hero.y)<=BIBLE_WEAPON.auraRange?BIBLE_WEAPON.auraDmgMul:1; }
   orbSpdMul(){ return this.buffSpdT>0?1.3:1; }
   tryBuyOrb(o){ const h=this.hero; if(!h) return 'none';
     if(o.cd>0){ this.toast(o.def.name+' is recharging — '+Math.ceil(o.cd)+'s'); return 'cooldown'; }
@@ -2167,7 +2446,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const c=this.add.circle(s.x,s.y,BOSS.slamRadius,0xff8a3a,0.3).setDepth(6); this.tweens.add({targets:c,alpha:0,scale:1.15,duration:320,onComplete:()=>c.destroy()}); }
   // --- combat core ---
   damage(e,amt,type,opt){ if(e.dead) return; opt=opt||{};
-    let m=(DATA.armorTable[e.armorType]||{})[type]||1; if(opt.crit&&Math.random()<opt.crit){ m*=e.boss?2.5:2; this.floatText(e.x,e.y-20,'CRIT','#f2c14e'); }
+    let m=(DATA.armorTable[e.armorType]||{})[type]||1; if(opt.crit&&Math.random()<opt.crit){ m*=(e.boss?2.5:2)*(opt.critMul||1); this.floatText(e.x,e.y-20,'CRIT','#f2c14e'); }
     e.hp-=amt*m; SFX.enemyHit(amt); if(e.def&&e.def.sprite==='golem') SFX.golemGroan(); // Upgrade 13: stone complains when it is struck
     if(e.boss&&e.hp>0) this.bossPhaseSync(e); // Upgrade 7: crossing a phase line changes the champion NOW, once
     if(opt.slow){ e.slow=Math.max(e.slow||0,opt.slow); e.slowT=Math.max(e.slowT||0,1.2); }
@@ -2177,8 +2456,31 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(e.hp<=0) this.kill(e); }
   kill(e){ e.dead=true; this.kills++; this.manna+=e.def.bounty||5; this.tr('kills'); if(e.def.sprite==='locust') this.tr('flyKills');
     if(e.boss){ this.tr('bossKills'); this.clearBoss(); this.toast(e.def.name+' has fallen!',2400); } this.gx(DATA_P().xp.kill); if(e.def&&e.def.sprite==='golem') SFX.golemDie(); else SFX.enemyDie(); this.spark(e.x,e.y,0xcdbd95,8);
+    // Upgrade 18: the chest roll — the ONLY road to new weapons. A
+    // champion always leaves one; an elite (the non-champion Idol
+    // Golem) at a real chance; an ordinary enemy rarely. The tutorial
+    // drops none: its economy firewall stays sealed.
+    if(!this.tutorial){ const kind=e.boss?'champion':(e.def.id==='idol_golem'?'elite':'normal');
+      const grade=rollChestDrop(kind); if(grade) this.dropChest(grade,e.x,e.y,kind!=='normal'); }
     this.tweens.add({targets:e.spr,alpha:0,scale:0.3,duration:250,onComplete:()=>e.spr.destroy()}); e.bar.destroy(); this.refreshHUD(); }
-  shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); this.shots.push({s,target,opt,speed:speed||560,lx:target.x,ly:target.y}); }
+  // A chest on the field: it lies where the foe fell until the hero
+  // walks over it and banks it. Unbanked chests belong to the field and
+  // end with the run; banked ones wait in the Rack (see openShop).
+  dropChest(grade,x,y,announce){ if(!this.fieldChests) this.fieldChests=[];
+    const spr=this.add.image(x,y,'chest_'+grade).setDepth(6);
+    if(this.tweens) this.tweens.add({targets:spr,y:y-6,duration:800,yoyo:true,repeat:-1,ease:'Sine.inOut'});
+    this.fieldChests.push({grade:grade,x:x,y:y,spr:spr});
+    if(announce) this.floatText(x,y-34,grade==='gold'?'A golden chest!':'A chest!',CHEST_GRADES[grade].css);
+    return grade; }
+  collectChests(){ if(!this.fieldChests||!this.fieldChests.length||!this.hero||this.hero.down>0) return; const h=this.hero;
+    this.fieldChests=this.fieldChests.filter(c=>{ if(Math.hypot(c.x-h.x,c.y-h.y)>=30) return true;
+      if(c.spr) c.spr.destroy(); this.pendingChests.push(c.grade); Rack.setPending(this.pendingChests);
+      this.floatText(c.x,c.y-18,'Chest banked — it opens after the wave',GOLD); SFX.chest(); return false; }); }
+  shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); const sh={s,target,opt,speed:speed||560,lx:target.x,ly:target.y};
+    // Upgrade 18: a piercing shot (the rifle) remembers where it was
+    // fired from, whom it has already struck, and how far it may fly.
+    if(opt&&opt.pierce){ sh.hitSet=new Set(); sh.ox=x; sh.oy=y; sh.pc=0; }
+    this.shots.push(sh); }
   spark(x,y,col,n){ for(let i=0;i<(n||4);i++){ const p=this.add.image(x,y,'spark').setTint(col).setDepth(16).setScale(0.8); this.tweens.add({targets:p,x:x+Phaser.Math.Between(-24,24),y:y+Phaser.Math.Between(-24,24),alpha:0,scale:0.2,duration:350,onComplete:()=>p.destroy()}); } }
   floatText(x,y,s,c){ const t=txt(this,x,y,s,14,c).setOrigin(0.5).setDepth(25); this.tweens.add({targets:t,y:y-26,alpha:0,duration:700,onComplete:()=>t.destroy()}); }
   // Upgrade 16: the press float — a battle button's press floats its NAME
@@ -2270,7 +2572,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     else { this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; }
     // squads and hero mend between waves
     this.squads.forEach(s=>{ s.hp=s.max; }); this.hero.hp=this.heroDef.hp;
-    this.renderShop(first); }
+    this.renderShop(first);
+    // Upgrade 18: banked chests open HERE, in the intermission, on the
+    // reveal panel — on this same honest clock, never in the fight.
+    this.openRevealIfAny(); }
   shopTimerLabel(){ const s=Math.max(0,Math.ceil(this.shopT)); return 'Next wave in '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
   shopAdd(o){ this.shopItems.push(o); return o; }
   clearShop(){ this.shopItems.forEach(o=>{ try{o.destroy();}catch(e){} }); this.shopItems=[]; }
@@ -2347,7 +2652,68 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.fixUI();
   }
   updateShopHead(){ if(this.shopHead2) this.shopHead2.setText('Manna '+Math.floor(this.manna)+'  •  Squads '+this.squads.length+'/'+this.squadCap+'  •  Next: wave '+(this.wave+1)+' ('+((this.wave+1)%2===0?'night':'day')+')  •  Goal: wave '+this.goalWave+(this.endless?' (cleared — Endless)':'')); }
-  closeShop(){ this.shopOpen=false; this.shopFirst=false; this.shopEndsAt=0; this.clearShop(); this.startWave(); }
+  closeShop(){ this.shopOpen=false;
+    // Upgrade 18: a chest mid-reveal holds the wave — the shop simply
+    // stays open behind the reveal panel (its deadline is held by
+    // update() while the panel stands; see the shop branch there).
+    if(this.revealPanel){ this.shopOpen=true; this.toast('The chest first — what it holds may change your plans'); return; }
+    this.shopFirst=false; this.shopEndsAt=0; this.clearShop(); this.startWave(); }
+  // --- Upgrade 18: the intermission reveal ---
+  // The reveal is a panel (panels stay panels, U17) standing over the
+  // shop at depth 60/61. Its law is one line: a chest opens only while
+  // the shop stands (revealOpenChest refuses otherwise) — loot never
+  // interrupts a battle. The queue lives in the Rack as it drains, so
+  // quitting mid-reveal loses nothing: what was not opened is still
+  // waiting at the next intermission.
+  openRevealIfAny(){ if(this.tutorial||this.revealPanel||!this.pendingChests||!this.pendingChests.length) return false;
+    this.revealQueue=this.pendingChests.slice(); this.pendingChests=[]; Rack.setPending(this.revealQueue);
+    this.revealPanel=true; this.renderRevealCard(); return true; }
+  revealAdd(o){ if(!this.revealItems) this.revealItems=[]; this.revealItems.push(o); if(o&&o.setScrollFactor) o.setScrollFactor(0); return o; }
+  clearReveal(){ (this.revealItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.revealItems=[]; }
+  renderRevealCard(){ this.clearReveal(); const grade=this.revealQueue[0]; if(!grade){ this.closeReveal(); return; }
+    const G=CHEST_GRADES[grade];
+    const g=this.add.graphics().setDepth(60); g.fillStyle(0x140c07,0.97); g.fillRoundedRect(W/2-320,170,640,380,12); g.lineStyle(3,G.color,1); g.strokeRoundedRect(W/2-320,170,640,380,12); this.revealAdd(g);
+    this.revealAdd(txt(this,W/2,208,'A chest from the field',26,GOLD).setOrigin(0.5).setDepth(61));
+    this.revealAdd(txt(this,W/2,240,G.name+(this.revealQueue.length>1?'  •  '+this.revealQueue.length+' waiting':''),16,G.css).setOrigin(0.5).setDepth(61));
+    const im=this.add.image(W/2,326,'chest_'+grade).setDepth(61); if(im.setScale) im.setScale(2.2); this.revealAdd(im);
+    this.revealAdd(txt(this,W/2,392,'What the field gave up is opened here, between waves —\nnever in the middle of the fight.',15,PARCH,{align:'center'}).setOrigin(0.5).setDepth(61));
+    const b=button(this,W/2,486,280,52,'Open the chest',()=>this.revealOpenChest(),{size:19}); b.setDepth(61); this.revealAdd(b);
+    this.fixUI(); }
+  revealOpenChest(){ if(!this.shopOpen||!this.revealPanel) return false; // intermission only — the reveal's whole law
+    const grade=this.revealQueue[0]; if(!grade) return false;
+    SFX.chestOpen();
+    const loot=rollLoot(grade,null,Rack.owns('bible'));
+    this.revealQueue.shift(); Rack.setPending(this.revealQueue);
+    if(loot.bible){ Rack.grant('bible'); this.lootFound.push('The Bible'); this.renderRevealResult(resolveWeapon('bible',-1),'new'); return true; }
+    const w=resolveWeapon(loot.family,loot.tier), res=Rack.grant(w.key);
+    if(res==='dup'){ const gain=WEAPON_TIERS[w.tier].dupManna; this.manna+=gain;
+      this.lootFound.push(w.name+' (already held → +'+gain+' Manna)'); this.renderRevealResult(w,'dup',gain); }
+    else { this.lootFound.push(w.name); this.renderRevealResult(w,'new'); }
+    this.refreshHUD(); return true; }
+  renderRevealResult(w,kind,gain){ this.clearReveal();
+    const isB=w.family==='bible', T=isB?null:WEAPON_TIERS[w.tier], col=isB?'#fff3c0':T.css, colN=isB?0xfff3c0:T.color;
+    const g=this.add.graphics().setDepth(60); g.fillStyle(0x140c07,0.97); g.fillRoundedRect(W/2-320,170,640,380,12); g.lineStyle(3,colN,1); g.strokeRoundedRect(W/2-320,170,640,380,12); this.revealAdd(g);
+    this.revealAdd(txt(this,W/2,204,isB?'THE WORD':(kind==='dup'?'Already on your Rack':w.tierName+' '+w.familyName),24,col).setOrigin(0.5).setDepth(61));
+    const im=this.add.image(W/2,282,'wpn_'+w.family).setDepth(61); if(im.setScale) im.setScale(0.92); this.revealAdd(im);
+    this.revealAdd(txt(this,W/2,352,isB?BIBLE_WEAPON.display:w.name,22,col).setOrigin(0.5).setDepth(61));
+    let stats='DMG '+w.dmg+'  ·  every '+w.rate+'s  ·  range '+w.range+(w.arc?'  ·  arc '+w.arc+'°':'')+(w.pierce?'  ·  pierces '+(w.pierce>=99?'the line':(w.pierce+1)):'')+(w.pellets?'  ·  '+w.pellets+' pellets':'');
+    this.revealAdd(txt(this,W/2,384,stats,16,PARCH).setOrigin(0.5).setDepth(61));
+    if(kind==='dup') this.revealAdd(txt(this,W/2,416,'Your Rack already holds this one. It melts down to +'+gain+' Manna —\nno chest is ever wasted.',15,'#f2c14e',{align:'center'}).setOrigin(0.5).setDepth(61));
+    else { this.revealAdd(txt(this,W/2,412,w.traitName+' — '+w.trait,14,'#cdbd95',{align:'center',wordWrap:{width:580}}).setOrigin(0.5).setDepth(61));
+      if(isB) this.revealAdd(txt(this,W/2,452,'Found, not bought — it cannot be purchased, not with Manna, not with Grokonians.',14,'#fff3c0').setOrigin(0.5).setDepth(61));
+      else if(this.weapon) this.revealAdd(txt(this,W/2,452,'Carrying now: '+this.weapon.name+' — DMG '+this.weapon.dmg+' · range '+this.weapon.range,14,'#cdbd95').setOrigin(0.5).setDepth(61)); }
+    if(kind==='new'){ const eb=button(this,W/2-150,506,270,46,'Equip it now',()=>this.revealEquip(w.key),{size:17}); eb.setDepth(61); this.revealAdd(eb);
+      const kb=button(this,W/2+150,506,270,46,'Keep in the Rack',()=>this.revealNext(),{size:17}); kb.setDepth(61); this.revealAdd(kb); }
+    else { const cb=button(this,W/2,506,270,46,'Continue',()=>this.revealNext(),{size:17}); cb.setDepth(61); this.revealAdd(cb); }
+    this.fixUI(); }
+  revealEquip(key){ if(Rack.equip(key)){ const p=parseWeaponKey(key); this.weaponKey=key; this.weapon=resolveWeapon(p.family,p.tier); this.bibleT=null;
+      if(this.hero){ if(this.hero.ring&&this.hero.ring.setRadius) this.hero.ring.setRadius(this.weapon.range);
+        if(this.hero.wpn){ this.hero.wpnShown=true; if(this.hero.wpn.setVisible) this.hero.wpn.setVisible(true); if(this.hero.wpn.setTexture) this.hero.wpn.setTexture('wpn_'+this.weapon.family); } }
+      this.toast('Carrying: '+this.weapon.name); }
+    this.revealNext(); }
+  revealNext(){ if(this.revealQueue&&this.revealQueue.length) this.renderRevealCard(); else this.closeReveal(); }
+  closeReveal(){ this.revealPanel=false; this.revealQueue=[]; this.clearReveal(); Rack.setPending(this.pendingChests||[]); }
+  persistChests(){ Rack.setPending((this.pendingChests||[]).concat(this.revealQueue||[])); }
   waveClear(){ this.waveActive=false; this.wavesCleared=this.wave;
     let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*this.banquet); this.banquet=0; } // banquet stores its multiplier (1.5 at Ready; a Held cast strengthens it, Upgrade 8)
     const perfect=!this.campHurtThisWave; this.manna+=bonus; this.lastBonus=bonus;
@@ -2375,6 +2741,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       // never grants hidden bonus time and never freezes mid-shop. At zero,
       // closeShop() flips shopOpen off before startWave(), so the wave can
       // only ever start once.
+      // Upgrade 18: ONE exception, named — while the chest reveal panel
+      // stands, the deadline is HELD (shifted by exactly the elapsed
+      // frame, never more): the reveal is the intermission's first
+      // business, and a player reading what the field gave up is not
+      // idle time the wave should eat.
+      if(this.revealPanel){ this.shopEndsAt+=delta; this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000); if(this.shopTimerTxt) this.shopTimerTxt.setText(this.shopTimerLabel()); return; }
       this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
       if(this.shopTimerTxt) this.shopTimerTxt.setText(this.shopTimerLabel());
       if(this.shopT<=0) this.closeShop();
@@ -2403,12 +2775,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     { const vb=this.cmdBtns&&this.cmdBtns.volley; // Volley's cooldown sweep
       if(vb&&vb.sweep){ vb.sweep.clear(); if(this.volleyCd>0){ const f=Math.min(1,this.volleyCd/12), r=(vb.sw||56)/2; vb.sweep.fillStyle(0x000000,0.45); vb.sweep.fillCircle(vb.sx,vb.sy,r-2); arcSegs(vb.sweep,vb.sx,vb.sy,r-4,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-f),4,0xf2c14e,0.9); } } }
     this.orbTick(dt);
+    this.bibleTick(dt); // Upgrade 18: the Word, while the Bible is carried
     this.fightTick(dt); // Upgrade 8: recovery, buffers, wind-ups, stamina
     // spawns
     if(this.waveActive){ this.waveClock+=dt; while(this.spawnQ.length&&this.spawnQ[0].at<=this.waveClock) this.spawn(this.spawnQ.shift()); }
     // field coins (Upgrade 3): one every ~6s of an active wave, max 8 out
     if(this.waveActive){ this.coinT-=dt; if(this.coinT<=0){ this.coinT=6; if(this.coins.length<8) this.spawnCoin(); } }
     this.collectCoins();
+    this.collectChests(); // Upgrade 18: walk over a chest to bank it
     // Upgrade 14: the Seventh Day's manna rain — while the held-back
     // wave waits out its rest, manna drips onto the camp at the twist's
     // rate (150 across the ten seconds). Whole-manna steps only; the
@@ -2453,6 +2827,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.heroAutoFire();
     this.gatherTick(dt); // Upgrade 15: standing at a tree or rock gathers — mid-wave and in the field intermission alike
     h.spr.setOrigin(0.5,0.9).setPosition(h.x,h.y+18).setDepth(8+h.y/1000); h.ring.setPosition(h.x,h.y);
+    if(h.wpn&&h.wpnShown) h.wpn.setPosition(h.x+26,h.y-26).setAlpha(h.down>0?0.35:1); // Upgrade 18: the carried weapon rides at his shoulder
     h.hpBar.clear(); h.hpBar.fillStyle(0x000000,0.7); h.hpBar.fillRect(h.x-22,h.y-48,44,5); h.hpBar.fillStyle(0x5aa33b,1); h.hpBar.fillRect(h.x-22,h.y-48,44*Math.max(0,h.hp)/hd.hp,5);
     // Upgrade 8: a raised guard shows as an arc on the hero's facing side.
     if(h.guardFx){ const g=h.guardFx; g.clear();
@@ -2493,7 +2868,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       else if(foe&&dl>range*0.9&&eo!=='hold'){ const st=Math.min(dl,spd*dt); s.x+=dx/dl*st; s.y+=dy/dl*st; }
       s.spr.setOrigin(0.5,0.9).setPosition(s.x,s.y+16).setDepth(7+s.y/1000);
       s.cd-=dt*(s.buffRateT>0?1.4:1);
-      if(foe&&s.cd<=0){ s.cd=s.rate; const dmg=s.dmg*(s.buffDmgT>0?1.3:1); this.squadAtkSfx(s);
+      if(foe&&s.cd<=0){ s.cd=s.rate; const dmg=s.dmg*(s.buffDmgT>0?1.3:1)*this.bibleAuraMul(s); this.squadAtkSfx(s);
         if(s.def.role==='ranged'||s.def.role==='support') this.shoot(s.x,s.y-20,foe,'stone',{dmg,type:'physical',crit:0.08},620);
         else { this.damage(foe,dmg,'physical',{crit:0.08}); this.spark(foe.x,foe.y,0xe8e0c8,2); } }
       // Levite Healer (Upgrade 3): mends the most-wounded squad within 120px at 6 HP/s.
@@ -2551,11 +2926,28 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // shots
     for(const s of this.shots){ const tg=s.target; if(tg&&!tg.dead&&tg.x!==undefined){ s.lx=tg.x; s.ly=tg.y; }
       const a=Phaser.Math.Angle.Between(s.s.x,s.s.y,s.lx,s.ly), step=s.speed*dt;
-      if(Phaser.Math.Distance.Between(s.s.x,s.s.y,s.lx,s.ly)<=step+4){ s.done=true; s.s.destroy(); SFX.hit();
-        if(s.opt.splash){ const at=s.opt.splashAt||{x:s.lx,y:s.ly}; this.enemies.forEach(e=>{ if(!e.dead&&Phaser.Math.Distance.Between(e.x,e.y,at.x,at.y)<s.opt.splash) this.damage(e,s.opt.dmg,s.opt.type,s.opt); });
-          const c=this.add.circle(at.x,at.y,s.opt.splash,0xd9a441,0.22).setDepth(4); this.tweens.add({targets:c,alpha:0,duration:350,onComplete:()=>c.destroy()}); }
-        else if(tg&&!tg.dead) this.damage(tg,s.opt.dmg,s.opt.type,s.opt); }
-      else { s.s.x+=Math.cos(a)*step; s.s.y+=Math.sin(a)*step; s.s.rotation+=0.3; } }
+      if(Phaser.Math.Distance.Between(s.s.x,s.s.y,s.lx,s.ly)<=step+4){
+        // Upgrade 18: a piercing shot does not die at its mark — it
+        // strikes the mark (once) and flies on, straight, until its
+        // pierce count or fly range runs out.
+        if(s.opt&&s.opt.pierce&&s.hitSet){ if(tg&&!tg.dead&&!s.hitSet.has(tg)){ s.hitSet.add(tg); s.pc++; this.damage(tg,s.opt.dmg,s.opt.type,s.opt); SFX.hit(); }
+          const flown=Math.hypot(s.s.x-s.ox,s.s.y-s.oy);
+          if(s.pc>s.opt.pierce||flown>=(s.opt.flyRange||9999)){ s.done=true; s.s.destroy(); }
+          else { const a2=Math.atan2(s.ly-s.oy,s.lx-s.ox), fr=(s.opt.flyRange||9999)+80; s.lx=s.ox+Math.cos(a2)*fr; s.ly=s.oy+Math.sin(a2)*fr; s.target=null; } }
+        else { s.done=true; s.s.destroy(); SFX.hit();
+          if(s.opt.splash){ const at=s.opt.splashAt||{x:s.lx,y:s.ly}; this.enemies.forEach(e=>{ if(!e.dead&&Phaser.Math.Distance.Between(e.x,e.y,at.x,at.y)<s.opt.splash) this.damage(e,s.opt.dmg,s.opt.type,s.opt); });
+            const c=this.add.circle(at.x,at.y,s.opt.splash,0xd9a441,0.22).setDepth(4); this.tweens.add({targets:c,alpha:0,duration:350,onComplete:()=>c.destroy()}); }
+          else if(tg&&!tg.dead&&!(s.hitSet&&s.hitSet.has(tg))) this.damage(tg,s.opt.dmg,s.opt.type,s.opt); } }
+      else { const px=s.s.x, py=s.s.y; s.s.x+=Math.cos(a)*step; s.s.y+=Math.sin(a)*step; s.s.rotation+=0.3;
+        // Upgrade 18: a piercing shot strikes every foe its flight
+        // segment crosses (segment distance, so a fast shot cannot
+        // jump over a foe between frames), each foe once, until its
+        // pierce count or its fly range runs out.
+        if(s.opt&&s.opt.pierce&&s.hitSet){ const vx=s.s.x-px, vy=s.s.y-py, vv=vx*vx+vy*vy||1;
+          for(const e of this.enemies){ if(e.dead||s.hitSet.has(e)) continue;
+            const tt=Math.max(0,Math.min(1,((e.x-px)*vx+(e.y-py)*vy)/vv));
+            if(Math.hypot(e.x-(px+vx*tt),e.y-(py+vy*tt))<=22){ s.hitSet.add(e); s.pc++; this.damage(e,s.opt.dmg,s.opt.type,s.opt); if(s.pc>s.opt.pierce) break; } }
+          if(s.pc>s.opt.pierce||Math.hypot(s.s.x-s.ox,s.s.y-s.oy)>(s.opt.flyRange||9999)){ s.done=true; s.s.destroy(); } } } }
     this.shots=this.shots.filter(s=>!s.done);
     // Upgrade 8: skill buttons live here — cooldown drains, a buffered press
     // fires the moment its move is ready, and a ready move accrues Held
@@ -2586,6 +2978,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.refreshHUD();
   }
   end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.closeCampPanel(); this.closeFan();
+    // Upgrade 18: unopened chests are never lost with the run — what
+    // was banked (or mid-reveal) waits in the Rack for the next
+    // intermission, and the end screen says so.
+    this.persistChests(); if(this.revealPanel){ this.revealPanel=false; this.clearReveal(); }
     this.interField=false; this.clearInterBar(); this.exitBuildMode(); // Upgrade 15: the field furniture leaves with the run
     const XP=DATA_P().xp;
     if(win){ this.tr('clears'); this.gx(XP.clear); this.earn('clear',DATA.grokonians.clear);
@@ -2601,7 +2997,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.flush(); const ev=Progress.takeEvents();
     const rec={score:this.kills*10+Math.round(campFrac*20)*50+this.wavesCleared*100+stars*500};
     if(window.GXHub&&GXHub.submitScore) GXHub.submitScore(rec.score,this.wavesCleared); // GX Hub leaderboard (no-op standalone)
-    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless,held:this.heldSpent?this.heldSpent.slice():[0,0,0]})); } }
+    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless,held:this.heldSpent?this.heldSpent.slice():[0,0,0],loot:this.lootFound?this.lootFound.slice():[],chestsWaiting:Rack.pending().length})); } }
 
 class End extends Phaser.Scene{ constructor(){super('End');}
   create(d){ backdrop(this,0.7);
@@ -2617,9 +3013,46 @@ class End extends Phaser.Scene{ constructor(){super('End');}
     const L=Progress.level(), M=Progress.mastery(d.hero);
     txt(this,W/2,425,'+'+d.xp+' XP   •   Level '+L.lv+' ('+L.into+'/'+L.need+')   •   Mastery '+M.lv+'   •   Battle Pass tier '+Progress.bpTier(),20).setOrigin(0.5);
     const notes=(d.newUnlock?['New hero unlocked: Gideon!']:[]).concat(d.ev||[]).slice(0,4); notes.forEach((n,i)=>txt(this,W/2,460+i*26,n,19,'#f2c14e').setOrigin(0.5));
+    // Upgrade 18: the run's findings, and any chest still waiting.
+    if(d.loot&&d.loot.length) txt(this,W/2,566,'Found: '+d.loot.join('  ·  '),15,'#f2c14e',{align:'center',wordWrap:{width:1100}}).setOrigin(0.5);
+    if(d.chestsWaiting) txt(this,W/2,590,d.chestsWaiting+' chest'+(d.chestsWaiting>1?'s':'')+' waiting in your Rack — '+(d.chestsWaiting>1?'they open':'it opens')+' at your next intermission.',14,'#cdbd95').setOrigin(0.5);
     button(this,W/2-280,600,250,58,'Play again',()=>this.scene.start('HeroSelect',{level:{era:d.era||'bible'}}),{size:22});
     button(this,W/2,600,250,58,'Battle Pass',()=>this.scene.start('BattlePass'),{size:22});
     button(this,W/2+280,600,250,58,'Era select',()=>this.scene.start('EraSelect'),{size:22}); } }
+
+// ---------- The Rack: the Armory (Upgrade 18) ----------
+// A panel scene, reached from the Menu and from Hero Select: every
+// weapon the player has found, by family and tier, with its stats and
+// its trait — and the one carried into the next run chosen here. The
+// Bible's card stands first and gilt when it has been found. Nothing
+// here is for sale: the Rack holds only what the field gave up.
+class Armory extends Phaser.Scene{ constructor(){super('Armory');}
+  init(d){ this.from=(d&&d.from)||'Menu'; this.fromData=(d&&d.fromData)||null; this.page=(d&&d.page)||0; }
+  create(){ backdrop(this,0.78); Music.play(this,'menu');
+    txt(this,W/2,40,'The Rack — Armory',38,GOLD).setOrigin(0.5);
+    txt(this,W/2,78,'Weapons are found in chests on the field — never bought. The Bible is found, never sold.',16,'#cdbd95').setOrigin(0.5);
+    const eq=Rack.equippedKey(), ew=Rack.equippedWeapon();
+    txt(this,W/2,108,eq==='sling:0'?'Carrying: the starter — every hero fights with his own hand until a found weapon is carried':'Carrying: '+ew.name,18,'#f2c14e').setOrigin(0.5);
+    const pend=Rack.pending();
+    if(pend.length) txt(this,W/2,134,pend.length+' chest'+(pend.length>1?'s':'')+' waiting — '+(pend.length>1?'they open':'it opens')+' at your next intermission',14,GOLD).setOrigin(0.5);
+    const list=Rack.list(), pages=Math.max(1,Math.ceil(list.length/12));
+    if(this.page>=pages) this.page=pages-1;
+    list.slice(this.page*12,this.page*12+12).forEach((w,i)=>{ const col=i%6,row=Math.floor(i/6),x=113+col*211,y=290+row*230;
+      const isB=w.family==='bible', T=isB?null:WEAPON_TIERS[w.tier], equipped=w.key===eq;
+      const g=this.add.graphics(); g.fillStyle(isB?0x2a2410:0x2a1a10,0.93); g.fillRoundedRect(x-100,y-100,200,200,10); g.lineStyle(equipped?4:2,equipped?0xf2c14e:(isB?0xfff3c0:T.color)); g.strokeRoundedRect(x-100,y-100,200,200,10);
+      const im=this.add.image(x,y-52,'wpn_'+w.family); if(im.setScale) im.setScale(0.62);
+      txt(this,x,y+2,isB?'The Bible':w.name,14,isB?'#fff3c0':T.css,{align:'center',wordWrap:{width:188}}).setOrigin(0.5);
+      txt(this,x,y+28,(isB?'Unique':w.tierName+' '+w.familyName)+'  ·  DMG '+w.dmg+'  ·  '+w.rate+'s  ·  rng '+w.range,12,PARCH,{align:'center',wordWrap:{width:188}}).setOrigin(0.5);
+      txt(this,x,y+54,w.traitName,12,'#cdbd95',{align:'center',wordWrap:{width:188}}).setOrigin(0.5);
+      if(equipped) txt(this,x,y+82,'✓ Carried',15,'#8fd06a').setOrigin(0.5);
+      else button(this,x,y+82,150,34,'Carry it',()=>{ if(Rack.equip(w.key)){ SFX.build(); this.scene.restart({from:this.from,fromData:this.fromData,page:this.page}); } },{size:14});
+    });
+    txt(this,W/2,648,ew.traitName+' — '+ew.trait,14,'#cdbd95',{align:'center',wordWrap:{width:1050}}).setOrigin(0.5);
+    if(pages>1){ button(this,520,680,56,42,'◀',()=>this.scene.restart({from:this.from,fromData:this.fromData,page:(this.page+pages-1)%pages}),{size:16});
+      txt(this,W/2,680,(this.page+1)+'/'+pages,16,PARCH).setOrigin(0.5);
+      button(this,760,680,56,42,'▶',()=>this.scene.restart({from:this.from,fromData:this.fromData,page:(this.page+1)%pages}),{size:16}); }
+    button(this,90,680,140,46,'Back',()=>this.scene.start(this.from,this.fromData||undefined));
+  } }
 
 // ---------- Battle Pass ----------
 class BattlePass extends Phaser.Scene{ constructor(){super('BattlePass');}
@@ -2774,4 +3207,4 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
 
 window.__game=new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#0d0906',
   scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{activePointers:3},
-  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,BattlePass,Profile,Game,End]});
+  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,Armory,BattlePass,Profile,Game,End]});

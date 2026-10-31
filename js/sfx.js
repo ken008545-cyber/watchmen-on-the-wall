@@ -168,6 +168,36 @@ window.SFX = (function(){
     bossWarn(dur){ if(!gate('pow',0.12)) return; const d=Math.max(0.3,+dur||1);
       tone2({type:'sawtooth',f0:95,f1:185,dur:d,vol:0.09,att:d*0.7}); tone2({type:'sawtooth',f0:142,f1:278,dur:d,vol:0.045,att:d*0.7}); },
     bossBoom(scale){ const s=+scale||1; if(!gate('impact',0.34*s)) return; this.stomp();
-      tone2({type:'sine',f0:58,f1:22,dur:0.55,vol:0.34*s}); nz2({dur:0.4,fq:130,q:0.6,vol:0.2*s,type:'lowpass'}); }
+      tone2({type:'sine',f0:58,f1:22,dur:0.55,vol:0.34*s}); nz2({dur:0.4,fq:130,q:0.6,vol:0.2*s,type:'lowpass'}); },
+    // ============ Upgrade 18: the guns, the chests, the Bible ============
+    // Gunfire is synthesized like everything else — a crack (broadband
+    // burst), a body (the report's fall), and a low tail for weight.
+    // The hero's mix is heavier than any squad's, as with every attack.
+    atkPistol(hero){ const v=hero?0.3:0.15; if(!gate('atk',v)) return;
+      nz2({dur:0.05,fq:3400,q:0.6,vol:hero?0.3:0.15,type:'highpass'});            // the crack
+      tone2({type:'square',f0:320,f1:90,dur:0.07,vol:hero?0.12:0.06});            // the report
+      tone2({type:'sine',f0:130,f1:55,dur:0.1,vol:hero?0.14:0.07}); },            // the tail
+    atkRifle(hero){ const v=hero?0.42:0.22; if(!gate('atk',v)) return;
+      nz2({dur:0.07,fq:2600,q:0.6,vol:hero?0.36:0.19,type:'highpass'});           // the crack, longer
+      nz2({dur:0.22,fq:300,q:0.7,vol:hero?0.2:0.1,type:'lowpass'});               // the roll-off
+      tone2({type:'sine',f0:105,f1:38,dur:0.24,vol:v}); },                        // the boom under it
+    atkScatter(hero){ const v=hero?0.44:0.24; if(!gate('atk',v)) return;
+      nz2({dur:0.09,fq:2000,q:0.5,vol:hero?0.34:0.18,type:'highpass'});
+      nz2({dur:0.3,fq:220,q:0.6,vol:hero?0.26:0.14,type:'lowpass'});              // the broad roar
+      tone2({type:'sine',f0:88,f1:30,dur:0.3,vol:v});
+      nz2({dur:0.05,fq:1500,q:0.8,vol:hero?0.12:0.06,delay:0.03}); },             // the spread's second breath
+    // A chest banked: wood knocked, a latch, a small sparkle of promise.
+    chest(){ if(lim('chest',90)){ tone2({type:'sine',f0:210,f1:120,dur:0.07,vol:0.14}); nz2({dur:0.05,fq:900,q:1.5,vol:0.1});
+      setTimeout(()=>tone('triangle',1175,1175,0.12,0.07),70); } },
+    // A chest opened in the intermission: the lid, then the reveal chord.
+    chestOpen(){ if(lim('chestopen',150)){ nz2({dur:0.14,fq:500,q:1,vol:0.14}); tone2({type:'sine',f0:160,f1:80,dur:0.16,vol:0.12});
+      [523,659,784].forEach((f,i)=>setTimeout(()=>tone('triangle',f,f,0.24,0.09),110+i*70)); } },
+    // The Bible's bolt: a struck note of light — pure, bright, unhurried.
+    bibleShot(){ if(lim('bshot',70)&&gate('atk',0.16)){ tone2({type:'sine',f0:1568,f1:2093,dur:0.14,vol:0.07});
+      tone2({type:'triangle',f0:784,f1:1046,dur:0.12,vol:0.08}); } },
+    // The Word: a verse-blast — a deep bell swell under a bright crown.
+    bibleBlast(){ if(!gate('pow',0.3)) return;
+      tone2({type:'sine',f0:196,f1:196,dur:0.7,vol:0.16,att:0.12}); tone2({type:'sine',f0:392,f1:392,dur:0.6,vol:0.08,att:0.12});
+      [1046,1318,1568].forEach((f,i)=>tone2({type:'triangle',f0:f,f1:f,dur:0.3,vol:0.06,delay:0.05+i*0.06})); }
   };
 })();

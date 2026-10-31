@@ -2127,3 +2127,167 @@ when the step arrives.
   **ico_volley** (small arrowheads) are the two most likely to blur;
   **ico_flank** is third. If any face reads worse round, the fix is a
   glyph redraw, not a return to squares — his eyes rule next.
+
+## Upgrade 18 — Weapons & Loot: the arsenal, the chests, the Rack (built 2026-10-31)
+
+kennin's commission, verbatim: "I also want to add guns. Ima hold on
+the building mechanic for now I want there to be guns and different
+type of weapons and powers. I also want the bible to be a weapon as
+well. I want the weapons to drop rpg with chests and things like that."
+Building is HELD by the same word: U15 stands exactly as it was — no
+new building work, no room port. This upgrade is the arsenal.
+
+### The arsenal — seven families, six tiers, one Bible
+
+The hero's basic attack is weapon-driven (`heroAutoFire` reads
+`this.weapon`). Base stats are the Common tier's; the tier ladder
+multiplies damage (×1 / 1.15 / 1.30 / 1.50 / 1.75 / 2.05), quickens
+rate (÷1 → ÷1.18), stretches range (+0% → +20%) and adds crit
+(+0 → +0.14). Weapon damage is rated for a standard arm and scaled by
+the hero's own damage stat (hero dmg / 18); its rate is scaled by his
+tempo (hero rate / 0.7) — David feels the table exactly, Samson's
+strength carries any weapon harder, mastery keeps its meaning.
+
+| Family | DMG | Rate | Range | Pattern | Trait (strengthens with rarity) |
+|---|---|---|---|---|---|
+| Sling | 18 | 0.70 | 140 | one stone, 620 speed | True Aim — crit grows |
+| Bow | 15 | 0.55 | 185 | one arrow, 820 | Keen String — crits hit harder (critMul 1 → 1.6) |
+| Sword | 24 | 0.80 | 58 | melee ARC, instant | Cleave — arc widens 110° → 200° |
+| Spear | 21 | 0.85 | 96 | melee thrust, line | Long Reach — pierces 1, +1 at Epic, +1 at Mythic |
+| Pistol | 13 | 0.38 | 150 | one bullet, 1050 | Deadeye — crit 0.22 base, grows |
+| Rifle | 30 | 1.05 | 260 | one bullet, 1350, PIERCES THE LINE | Through the Line |
+| Scattergun | 7/pellet | 1.00 | 100 | pellets seek nearest foes | Fuller Spread — 5,5,6,6,7,7 pellets |
+| **The Bible** | 26 | 0.62 | 195 | bolts of light, holy | **The Word** — see below |
+
+Every family has a generated name per tier (42 names, e.g. a Rare
+rifle is the "Rifle of the Ridge"; a Mythic sling is "The Seventh
+Stone"), its own synthesized voice (atkPistol / atkRifle / atkScatter
+join the U13 kit — crack, body, low tail; no audio files), and a
+code-drawn glyph in the U16 hand (wpn_* textures; the Bible's is an
+open book under a cross of light). A weapon carries its own damage
+type: the arms and guns are physical, the Bible is holy. The hero's
+innate dmgType governed only the old built-in attack (see the starter
+rule below) — FLAG for kennin: Deborah's basic attack is physical
+while she carries a found weapon; her skills are untouched.
+
+**THE STARTER RULE (the baseline, kept whole).** The Rack's starter
+(sling:0) is not treated as a found weapon: while it is what the Rack
+holds, every hero fights with HIS OWN HAND — innate damage, rate,
+range and type, delivered exactly as pre-U18 (Samson's instant melee
+30, Deborah's holy ember, David's stone). For David the innate
+profile IS the Common sling, number for number. The moment any found
+weapon is equipped, its pattern takes over for whoever leads. This is
+what keeps the standing benchmark honest, and four prior suites
+(U8/U10/U13/U14) assert Samson's blow by name.
+
+**THE BIBLE.** Singular, off the ladder, never sold. Attack: bolts of
+light (holy, dmg 26, rate 0.62, range 195, crit 0.15). Its power, the
+Word: every 6s of an active wave, a verse-blast — 45 holy damage
+(hero-scaled) to every foe within 130 of the bearer, a ring of light,
+and the next verse in a four-verse rotation spoken over him
+(Ps 119:105, Heb 4:12, Matt 24:35, Ps 119:11) — plus a constant
+strength aura: squads within 175 of the bearer strike at ×1.25
+(read at the one squad-attack site; no parallel system). It is found,
+never bought: no shop path and no Grokonian path exists — the suite
+proves Rack.grant has exactly two call sites, both inside the reveal.
+
+### Chests — the only road to new weapons
+
+Drops roll at the kill, by what fell (CHEST_DROPS): ordinary enemies
+**2%**, ELITES **35%**, champions (goal + endless) **100%**. Grades
+weight the rarity odds (CHEST_GRADES): Wood mostly Common/Uncommon
+and never Mythic; Iron reaches Mythic at 0.5%; Gold's ladder is
+flattest (Mythic 4%) and **Gold alone can hold the Bible, at 3%** —
+and only while the Rack lacks it (the Bible is unique; a bearer who
+carries it finds an ordinary weapon instead). Champions drop Iron
+(55%) or Gold (45%) only. The hero banks a chest by walking over it;
+**chests open in the intermission**, on a reveal panel over the shop
+(depth 60/61 — panels stay panels): chest, grade, Open — then the
+weapon's glyph, name in its tier color, stats beside the carried
+weapon's, its trait, and Equip-it-now / Keep-in-the-Rack. Battle is
+never interrupted by loot. While the reveal stands, the shop's
+60-second deadline is HELD (update shifts it by exactly the elapsed
+frame) and Next Wave refuses — the reveal is the intermission's first
+business, on its own named exception to U6's honest-minute law.
+
+**The unopened-chest rule, exactly:** a banked chest never vanishes.
+It waits in the Rack (persisted) across runs, is named on the end
+screen ("N chests waiting in your Rack — they open at your next
+intermission"), and opens at the next shop — including a run's first,
+prepare shop. A chest still lying UNBANKED on the field belongs to the
+field and ends with the run, like a coin never picked up.
+
+### The Rack — the persistent armory
+
+`gxhub_wotw_rack_v1`, guarded load/save in the CQ pattern: owned set,
+equipped key, waiting-chest list. The starter can never be lost; a
+corrupt store falls back to it. The ARMORY scene (Menu top-left and
+Hero Select top-right) lists owned weapons as cards — glyph, name,
+tier, stats, trait — the Bible's card first and gilt; "Carry it"
+equips. **Duplicates convert to Manna at reveal**: Common 25,
+Uncommon 40, Rare 70, Epic 120, Legendary 200, Mythic 325 — no chest
+is ever wasted. In-run, the carried weapon shows modestly: the range
+ring takes the weapon's reach and its tier's color, and a small
+weapon glyph rides at the hero's shoulder (hidden while he fights
+with his own hand). The run's opening toast names what he carries.
+
+### Faces, tutorial, rooms
+
+Battle circles unchanged (U17); armory and reveal are panels. The
+tutorial is untouched and still passes: it forces the starter (the
+lesson's weapon) whatever the Rack holds, drops no chests, and its
+economy firewall stays sealed. **Rooms (js/net.js) are untouched and
+keep their fixed loadout — weapons are solo-first, like U15 was.**
+js/gxhub.js and js/tokens.js are byte-identical (empty git diff).
+
+### Design forks taken (kennin's to bend)
+
+- **"Elite" defined:** the code had no elite concept; the roster's
+  elite class is the non-champion **Idol Golem** (380 HP, bounty 25 —
+  it already plays that role from wave 5). Pebble Golems and Baal
+  Priests count as ordinary for drops.
+- **Rarity strength:** the ladder above is a first pass inside the
+  brief's bound (see sims). Drop rates (2% / 35% / 100%), grade mixes,
+  tier odds, BIBLE_ODDS (3%) and duplicate Manna are all single-table
+  numbers in main.js (CHEST_DROPS / CHEST_GRADES / WEAPON_TIERS).
+- **Hero scaling of weapons** (dmg × hero-dmg/18, rate × hero-rate/0.7)
+  was chosen over flat weapon stats so mastery and hero identity keep
+  meaning; the alternative flattens every hero to the same gun.
+- The rifle's piercing flight is segment-tested per frame and flies
+  through its mark to flyRange — a coarse-frame artifact found in
+  verification (arrival killing the shot at its first target) was
+  fixed in the shot loop, not papered over in the test.
+
+### Verification (2026-10-31, this machine)
+
+- node --check passes on all JS. tools/verify_upgrade18.js (stubbed
+  Phaser, REAL main.js): **57/57** — statics (tables, the reveal's
+  intermission gate, the two-grant-sites law, rooms clean); rarity
+  monotonic in all seven families with trait steps as named; Rack
+  persistence round-trip, starter invariants, corruption guard;
+  measured family patterns (projectile counts/kinds, eight distinct
+  attack clocks, acquisition-range law, sword arc geometry, spear
+  pierce count, the rifle's through-the-line flight in the real update
+  loop); the starter-as-own-hand proofs for Samson and David; seeded
+  chest mathematics (200k ordinary kills → 1.93%; elite 34.7%;
+  champion guarantee, Gold 43.7%; Bible in Gold 3.00%; Bible from
+  Wood/Iron/once-carried: 0 in 150,000 rolls; Wood never Mythic); the
+  full chain kill → drop → bank → persist across end() → inherit next
+  run → reveal; duplicate conversion (+40 Manna, Uncommon); reveal
+  equip changing the hero's real attack; reveal refused mid-battle;
+  the Word's blast (45 holy inside 130, nothing at 200) and aura
+  (×1.25 inside 175, ×1 outside); the tutorial on the starter.
+- **The balance bound, in the U13 benchmark's own harness conditions**
+  (random held at 0.99, the U13 play script unaltered): starter
+  **32.8s, camp 500/500** — the standing benchmark reproduced. Rare
+  rifle **26.7s** (81% of baseline; the bound was ≥60%). Mythic rifle
+  **22.9s** (70%) — earned strength, still a three-phase fight. The
+  Bible **25.1s** with the camp standing. The enemy curve never moved.
+- All sixteen suites green: **965 checks** (908 prior + 57 new). One
+  prior check re-pointed, not deleted: verify_upgrade16.js's texture
+  count 27 → 35 (the eight wpn_* glyphs join the family at the same
+  120×120 law).
+- NOT verified (no live browser here): gun feel and readability —
+  whether the pistol reads as fast, the scatter as wide, the Bible's
+  blast as weighty; the wpn_bible glyph at shoulder size (0.34 scale);
+  the reveal panel over a live shop. kennin's ears and eyes rule next.

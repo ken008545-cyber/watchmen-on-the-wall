@@ -113,7 +113,7 @@ ok(skillIconKey({ name: 'Three Hundred' }) === 'ico_burst' && skillIconKey({}) =
     make: { graphics: () => { const g = gfxObj(); g.generateTexture = (k, w, h) => { made[k] = [w, h]; }; return g; } } };
   makeIcons(fakeScene);
   const keys = Object.keys(made);
-  ok(keys.length === 27 && keys.every(k => made[k][0] === 120 && made[k][1] === 120), 'makeIcons generates all 27 symbol textures at 120x120 (' + keys.length + ' made)');
+  ok(keys.length === 35 && keys.every(k => made[k][0] === 120 && made[k][1] === 120), 'makeIcons generates all 35 symbol textures at 120x120 — the 27 battle symbols + Upgrade 18\'s 8 weapon glyphs (' + keys.length + ' made)'); // U18 re-point: the count grows by the arsenal's glyphs, the law (every texture 120x120) unchanged
   ok(['ico_psalm', 'ico_stones5', 'ico_stone1', 'ico_dodge', 'ico_block', 'ico_sprint', 'ico_charge', 'ico_hold', 'ico_follow', 'ico_flank', 'ico_fallback', 'ico_shieldwall', 'ico_volley', 'ico_camp', 'ico_rally', 'ico_build', 'ico_auto'].every(k => k in made),
     'every control in the task list has its texture: powers, dodge/block/sprint, the seven commands, CAMP, RALLY, BUILD, AUTO');
   const before = keys.length; makeIcons(fakeScene);
