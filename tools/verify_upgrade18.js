@@ -59,7 +59,9 @@ ok(main.includes("const BIBLE_ODDS=0.03") && main.includes("if(grade==='gold'&&!
   ok(main.includes("if(!this.shopOpen||!this.revealPanel) return false; // intermission only"),
     'the reveal\'s law is written at its gate: it opens only while the shop stands');
   ok(!/weapon|Rack\.|chest/i.test(net), 'rooms stay clean: js/net.js carries no weapon, Rack or chest code — the fixed loadout stands');
-  ok(main.includes("super('Armory')") && main.includes('Unlocks,Armory,BattlePass') && main.includes("'Armory'"),
+  // Re-pointed at Upgrade 21 (comment, not deletion): the GXAccount scene
+  // now stands between Armory and BattlePass in the registration list.
+  ok(main.includes("super('Armory')") && main.includes('Unlocks,Armory,GXAccount,BattlePass') && main.includes("'Armory'"),
     'the Armory scene exists, is registered, and is reachable'); }
 
 // ---------- runtime scaffolding (the U17 pattern) ----------

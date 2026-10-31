@@ -6,8 +6,10 @@
 // Identity comes from the GX Hub parent frame by postMessage, the same
 // channel js/gxhub.js already uses for Grokonians: we ask the parent for
 // a single-use multiplayer ticket and present it ONCE over HTTPS to
-// create or join a room. Standalone play (no hub parent) can never get a
-// ticket, so the multiplayer entry explains itself and offers no socket.
+// create or join a room. Standalone play gets the same ticket through
+// the hub API when the player has signed in inside the game (Upgrade
+// 21); signed-out standalone can get none, and the multiplayer entry
+// explains itself and offers no socket.
 // js/gxhub.js and js/tokens.js are untouched; main.js gained exactly one
 // Menu button ('Play Together').
 //
@@ -66,7 +68,14 @@ function netTicket(){
     let done=false;
     const finish=v=>{ if(done) return; done=true; window.removeEventListener('message',onMsg); resolve(v); };
     let inHub=false; try{ inHub=window.parent!==window; }catch(e){ inHub=true; }
-    if(!inHub){ resolve({ok:false,error:'standalone'}); return; }
+    if(!inHub){ // Upgrade 21: standalone with a GX sign-in gets the same
+      // single-use ticket from the hub API, presented with the game token
+      // (js/gxhub.js) — the accounts-only law (G12) holds identically.
+      if(window.GXHub&&GXHub.fetchTicket){ GXHub.fetchTicket().then(r=>{
+        if(r&&r.ok&&r.ticket) resolve({ok:true,ticket:r.ticket,player:r.player,username:r.username});
+        else resolve({ok:false,error:(r&&r.error)||'standalone'}); }); }
+      else resolve({ok:false,error:'standalone'});
+      return; }
     function onMsg(e){ if(e.source!==window.parent||!e.data) return;
       if(e.data.type!=='multiplayer:ticket') return;
       if(e.data.ok&&e.data.ticket) finish({ok:true,ticket:e.data.ticket,player:e.data.player,username:e.data.username});
@@ -76,8 +85,8 @@ function netTicket(){
     catch(e){ finish({ok:false,error:'standalone'}); return; }
     setTimeout(()=>finish({ok:false,error:'timeout'}),TICKET_TIMEOUT_MS); }); }
 function noTicketText(err){
-  const head='Multiplayer needs a GX Hub account — open the game in the GX Hub and sign in.';
-  if(err==='standalone') return head+'\nThis copy is running standalone, outside the hub, so no ticket can be issued.';
+  const head='Multiplayer needs a GX Hub account.';
+  if(err==='standalone') return head+'\nThis copy is running standalone, outside the hub. Sign in from the menu (GX Account) and multiplayer will open — or open the game in the GX Hub.';
   if(err==='timeout') return head+'\nThe hub did not answer the ticket request — if you are signed in, try again.';
   return head+'\nThe hub reports that you are signed out.'; }
 
@@ -140,7 +149,7 @@ class NetLobby extends Phaser.Scene{ constructor(){ super('NetLobby'); }
       NETS.link.onMsg=m=>this.onNetMsg(m); NETS.link.onStatus=s=>this.onLinkStatus(s);
       this.showRoom(); if(NETS.lobby) this.renderLobby(); }
     else { let inHub=false; try{ inHub=window.parent!==window; }catch(e){ inHub=true; }
-      if(!inHub) this.statusTxt.setText(noTicketText('standalone')); }
+      if(!inHub&&!(window.GXHub&&GXHub.account)) this.statusTxt.setText(noTicketText('standalone')); }
     this.events.once('shutdown',()=>{ /* the link belongs to NETS, not the scene; Leave stops it */ }); }
   eAdd(o){ this.entryItems.push(o); return o; }
   rAdd(o){ this.roomItems.push(o); return o; }

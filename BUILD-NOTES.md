@@ -2890,3 +2890,113 @@ byte-untouched; the scaling law untouched — no enemy number moved.
   fight, the fall banner's weight on a phone, and the CAMP button
   under a real thumb on iOS — the playtest that found the bug is
   the test that closes it.
+
+## Upgrade 21 — GX sign-in inside the game: the account travels (built 2026-10-31)
+
+Kennin's ruling, from Abel's hands (voice call, 2026-10-31 ~01:27 CDT):
+*"you should be able to sign into your GX account into in the game."*
+The defect: the Grokonian bridge only handshakes inside the hub's frame,
+so a standalone (or installed) copy left its own account holder a guest —
+no hub balance, no account-gated multiplayer (G12), no score identity.
+
+### The hub side — a token API for games (tree ~/workspace/gxhub/src-u21/)
+
+- **POST /api/game-login** {username, password, game} verifies with the
+  hub's OWN machinery — the same `account_passwords` PBKDF2-HMAC-SHA-256
+  verification, the same refusal ("wrong username or password", 401) and
+  the same rate limits (`login_user`/`login_ip`, 10/hour → 429) as
+  /api/account/login. Nothing about credential logic was forked. On
+  success it mints a game token: 48 random bytes (96 hex), stored only
+  as its SHA-256 hash in the new **game_tokens** table (account_id,
+  game_id, label, created/expires/last_used), **30-day expiry**.
+- **Bearer door** (`Authorization: Bearer <token>`), all behind a CORS
+  allowlist of exactly three origins (the two game proxies + the hub
+  itself; preflight included, everything else 403): `/api/game/me`,
+  `/api/game/balance`, `/api/game/earn`, `/api/game/spend`,
+  `/api/game/score`, `/api/game/ticket`, `/api/game/logout`.
+- Earn and score do not re-implement anything: the door finds (or opens,
+  via `startSession` itself) the account's normal signed `game_sessions`
+  row and calls the very same `earn()` / `submitScore()` — same chunks,
+  same 1 s gap, same 300/session and 200/game/day caps, same creator
+  share. Spend follows `buy()`'s pattern: one guarded UPDATE that can
+  never take a balance below zero, then a `source='spend'` ledger row.
+  The ticket route performs the same `mp_tickets` insert as the cookie
+  route. One account, one ledger, every door.
+- **Revocation:** changing the password on the hub, or recovering the
+  account, deletes ALL its game tokens (wired into `nativePassword` and
+  `nativeRecover` beside the `auth_sessions` purges). Signing out in the
+  game revokes that one token (per-token revocation = `/api/game/logout`
+  + the account's password change for the nuclear option; a per-token
+  list on the account page was NOT built — stated plainly).
+- Passwords never leave the hub and are never logged; the game never
+  sees a hash. Deployed to both Workers from src-u21 under the snapshot
+  discipline: **bindings identical after (hub 12/12, play 9/9)** and
+  AUTH_GATE untouched ('off' before and after — this upgrade is not the
+  hub-wide gate).
+
+### The game side — a sign-in surface and a direct mode
+
+- **Menu → GX Account** (new scene): in the frame it reports the hub
+  session; standalone and signed in, it shows username + hub balance +
+  Sign out; signed out, it shows the form — username + password fields
+  (password masked), filled by a real keyboard or by an on-screen
+  keyboard in the lobby keypad's tapped pattern (letters, digits, the
+  common password symbols, Shift). "New here?" opens the hub's /login —
+  creation and recovery codes stay on the hub. A standing line in the
+  panel states the rule: the password goes only to GX Hub, once, over
+  HTTPS, and is never stored in the game.
+- **js/gxhub.js direct mode.** Mode law: **frame wins, token second,
+  local third** — one door at a time, so nothing is ever counted twice.
+  Frame path byte-for-byte the old behavior (hello/welcome, postMessage
+  chunks, NOT ONE fetch — proven by suite). Direct: earns chunked at 10
+  and paced at 1.1 s into `/api/game/earn`; spends and scores post to
+  their routes; the stored record is `{token, username, player, exp}`
+  under `gxhub_wotw_gametoken_v1` and nothing else. A hub 401 anywhere
+  clears the token, drops the mode to local, and leaves a **visible
+  note** for the panel (`sessionNote` + `onSessionEnded`) — an account
+  holder is never silently guest-ified.
+- **js/tokens.js** gained exactly two things: `Tokens.syncTo(n)` and a
+  boot reconcile that runs ONLY in direct mode (sign-in also syncs).
+  Frame/local wallet behavior is untouched.
+- **Multiplayer:** `netTicket()` asks the frame first, as ever; in
+  standalone it falls back to `GXHub.fetchTicket()` — the hub issues the
+  same single-use ticket against the game token, so G12 holds
+  identically. Rooms service and room logic untouched.
+
+### Verification
+
+- **Live end-to-end (hub), 35/35**, with throwaway accounts (created,
+  exercised, deleted; every trace removed and the creator share their
+  earns paid the real publisher reversed to the coin — publisher balance
+  == ledger sum, 90 == 90, after cleanup): wrong-password 401 with the
+  hub's message; evil-origin 403 with no CORS grant; preflight 204 from
+  a game origin; token earn/balance; the shared caps refusing exactly
+  like the frame's (an 11-coin earn 400, a too-fast second earn 429
+  "implausible rate"); spend + 402-when-short; score landing on the
+  public board under the account's name; a ticket issued; the FRAME
+  door (cookie session) feeding the SAME balance the token door reads
+  (20 + 10 → 15 after a 5-coin spend, both doors agreeing); password
+  change killing the token; sign-out killing its own token; and the
+  game-login rate limit itself (ten 401s, then 429).
+- **Game suites:** new `tools/verify_upgrade21.js`, **31 checks** —
+  mode law, sign-in storage shape (the password string provably absent
+  from localStorage), chunking/pacing/bearer on the direct door,
+  revocation self-clearing with its visible note, boot reconcile, and
+  the frame path's zero-fetch purity. One prior check re-pointed with
+  its reason recorded in place (U18's scene-list adjacency — GXAccount
+  now stands in it). **Full battery: 1,207 PASS lines, 0 failures**
+  (1,176 standing + 31 new); benchmarks and the scaling law untouched.
+- NOT verified (no live browser here): the panel under real thumbs on
+  iOS (keyboard reach, masked field), and Abel's actual sign-in on his
+  iPhone — his hands close this one, as with the fullscreen fix.
+
+### Flags for kennin
+
+- **30-day token life** is a first pass: long enough that Abel signs in
+  monthly, short enough that a lost phone ages out. One number to bend.
+- In direct mode the wallet reconciles to the hub at boot and at
+  sign-in; mid-session, hub cap refusals (300/session, 200/day) can
+  leave the local shadow briefly ahead of the hub — the next boot or
+  panel visit settles it, and the panel's balance always reads the hub.
+- Game tokens are bound to the game that asked (Watchmen). A second
+  GX game signing in later mints its own; the table already carries it.

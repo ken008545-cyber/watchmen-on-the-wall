@@ -10,12 +10,19 @@ window.Tokens=(function(){
     return Object.assign(base(),o); }catch(e){ return base(); } }
   let s=load();
   function save(){ s.log=s.log.slice(-50); try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){} }
+  // Upgrade 21: in direct mode (standalone, signed in with a GX game
+  // token) the hub balance is the truth this wallet mirrors. Reconcile
+  // once at boot; signing in reconciles too (GXHub.signIn calls syncTo).
+  // Frame and local modes never take this path — their behavior is
+  // exactly what it was.
+  if(window.GXHub&&GXHub.mode==='direct'&&GXHub.fetchMe) GXHub.fetchMe().then(j=>{ if(j&&typeof j.balance==='number'){ s.grokonians=Math.max(0,Math.floor(j.balance)); save(); } });
   return {
     label:'Grokonians', hub:'GX Hub',
     balance:()=>s.grokonians,
     earn(reason,amount){ amount=Math.max(0,Math.floor(amount)); s.grokonians+=amount; s.log.push({t:Date.now(),reason,amount}); save(); if(window.GXHub) GXHub.earn(amount,reason); return s.grokonians; },
     spend(item,cost){ if(cost<0||s.grokonians<cost) return false; s.grokonians-=cost; s.log.push({t:Date.now(),reason:'spend:'+item,amount:-cost}); save(); if(window.GXHub) GXHub.spend(item,cost); return true; },
     get mode(){ return window.GXHub?GXHub.mode:'local'; },
+    syncTo(n){ if(typeof n==='number'&&isFinite(n)){ s.grokonians=Math.max(0,Math.floor(n)); save(); } return s.grokonians; },
     owns:(id)=>!!s.owned[id], grant(id){ s.owned[id]=true; save(); },
     milestone:(k)=>!!s.milestones[k], setMilestone(k){ s.milestones[k]=true; save(); },
     get perk(){return s.perk;}, set perk(v){s.perk=v;save();},

@@ -1087,6 +1087,9 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     // Upgrade 19: the Chests door — the seasons' calendar, seasonal
     // chests for sale in Grokonians, and the road to the card Album.
     button(this,378,42,230,46,'Chests',()=>this.scene.start('Chests',{from:'Menu'}),{size:17});
+    // Upgrade 21: the GX Account door — sign in to GX Hub from inside
+    // the game, so a standalone copy carries the account with it.
+    button(this,824,42,220,46,'GX Account',()=>this.scene.start('GXAccount'),{size:17});
     // Upgrade 11: the tutorial's front door — always here, never locked,
     // replayable any time. It runs the Bible era with David, the hero the
     // lesson is written for (its power step names Psalm and Five Stones).
@@ -1096,8 +1099,103 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     button(this,W/2+160,566,280,38,'Play Together',()=>this.scene.start('NetLobby'),{size:18});
     const L=Progress.level(), T=Progress.state.title;
     txt(this,W/2,612,'Level '+L.lv+'  •  Account '+Progress.accountLevel()+'  •  Battle Pass tier '+Progress.bpTier()+'/30'+(T?'  •  "'+Progress.titleName(T)+'"':''),20).setOrigin(0.5);
-    txt(this,W/2,652,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,694,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':''),18).setOrigin(0.5);
+    txt(this,W/2,652,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,694,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':Tokens.mode==='direct'&&window.GXHub&&GXHub.account?'  (signed in as '+GXHub.account.username+')':''),18).setOrigin(0.5);
   } }
+
+// ---------- GX Account (Upgrade 21) ----------
+// Sign in to GX Hub from inside the game. Inside the hub's frame the
+// hub page holds the session and this panel simply says so. Standalone,
+// the panel takes the hub's own username + password — typed on a real
+// keyboard, or on the on-screen keyboard below (the lobby keypad's
+// pattern, widened to a full keyboard) — and hands them ONCE to the
+// hub's /api/game-login over HTTPS. The game keeps only the 30-day
+// token the hub answers with; the password is never stored, never
+// logged, never written anywhere. Account creation and recovery codes
+// stay on the hub, where they belong ("New here?" opens /login).
+class GXAccount extends Phaser.Scene{ constructor(){super('GXAccount');}
+  create(){ backdrop(this,0.78); Music.play(this,'menu');
+    this.busy=false; this.focus='user'; this.fUser=''; this.fPw=''; this.shift=false;
+    txt(this,W/2,44,'GX Account',38,GOLD).setOrigin(0.5);
+    const mode=Tokens.mode;
+    if(mode==='hub'){
+      txt(this,W/2,150,'Connected through GX Hub',26,'#8fd06a').setOrigin(0.5);
+      txt(this,W/2,196,'You are playing inside the hub, and the hub page holds your sign-in —\nyour Grokonians, friends and multiplayer all ride that session.',16,'#cdbd95',{align:'center'}).setOrigin(0.5);
+      txt(this,W/2,262,'To change accounts, sign out on the GX Hub tab itself.',15,'#a08a6a').setOrigin(0.5);
+    } else if(mode==='direct'&&window.GXHub&&GXHub.account){
+      const a=GXHub.account;
+      txt(this,W/2,150,'Signed in as '+a.username,26,'#8fd06a').setOrigin(0.5);
+      this.balTxt=txt(this,W/2,196,'GX Hub balance: '+(GXHub.hubBalance==null?'…':GXHub.hubBalance)+' Grokonians',19,GOLD).setOrigin(0.5);
+      txt(this,W/2,240,'Your Grokonians, your scores and your multiplayer seat follow this account —\nhere in the standalone game, and in the hub, one balance on both doors.',16,'#cdbd95',{align:'center'}).setOrigin(0.5);
+      GXHub.fetchMe().then(j=>{ if(j&&this.balTxt&&this.balTxt.active) this.balTxt.setText('GX Hub balance: '+j.balance+' Grokonians'); });
+      button(this,W/2,330,260,50,'Sign out',async()=>{ if(this.busy) return; this.busy=true; await GXHub.signOut(); this.scene.restart(); },{size:19});
+      txt(this,W/2,392,'Signing out revokes this game\u2019s token on the hub. Your account and balance stay.',14,'#a08a6a').setOrigin(0.5);
+    } else {
+      txt(this,W/2,120,'Sign in to GX Hub',26,GOLD).setOrigin(0.5);
+      txt(this,W/2,152,'Your account brings your Grokonians, your scores and multiplayer with it — on any door.',15,'#cdbd95').setOrigin(0.5);
+      if(window.GXHub&&GXHub.sessionNote) txt(this,W/2,182,GXHub.sessionNote,15,'#f2c14e',{align:'center',wordWrap:{width:1060}}).setOrigin(0.5);
+      this.fieldBoxes={};
+      this.drawField('user','Username',236); this.drawField('pw','Password',302);
+      this.statusTxt=txt(this,W/2,352,'',16,'#f2c14e').setOrigin(0.5);
+      this.buildKeyboard();
+      button(this,W/2-170,600,320,52,'Sign in',()=>this.submit(),{size:21});
+      button(this,W/2+170,600,320,52,'New here? Join on GX Hub',()=>{ try{ window.open('https://hub.gxhub.workers.dev/login','_blank'); }catch(e){} },{size:16});
+      txt(this,W/2,652,'Your password goes only to GX Hub, once, over HTTPS. It is never stored in the game.',13,'#a08a6a').setOrigin(0.5);
+      if(this.input.keyboard) this.input.keyboard.on('keydown',e=>this.typeKey(e));
+    }
+    button(this,90,680,140,46,'Back',()=>this.scene.start('Menu'));
+  }
+  drawField(id,label,y){ const x0=W/2-320;
+    txt(this,x0,y-24,label,16,GOLD);
+    const g=this.add.graphics(); const draw=()=>{ g.clear(); g.fillStyle(0x140c07,0.95); g.fillRoundedRect(x0,y-14,640,52,8);
+      g.lineStyle(2,this.focus===id?0xf2c14e:0xd9a441,1); g.strokeRoundedRect(x0,y-14,640,52,8); };
+    draw();
+    const v=txt(this,x0+18,y+12,'',21,PARCH); v.setOrigin(0,0.5);
+    const z=this.add.zone(x0+320,y+12,640,52).setInteractive({useHandCursor:true});
+    z.on('pointerup',()=>{ this.focus=id; this.refreshFields(); });
+    this.fieldBoxes[id]={g,v,draw}; this.refreshFields(); }
+  refreshFields(){ if(!this.fieldBoxes) return;
+    const u=this.fieldBoxes.user, p=this.fieldBoxes.pw; if(!u||!p) return;
+    u.g&&u.draw(); p.g&&p.draw();
+    u.v.setText(this.fUser||'');
+    p.v.setText(this.fPw?'•'.repeat(Math.min(24,this.fPw.length)):''); }
+  // The on-screen keyboard: three letter rows over a digit row, in the
+  // lobby keypad's tapped-not-typed pattern, with the handful of symbols
+  // passwords actually use. Shift lifts the letters for one press.
+  buildKeyboard(){ const rows=['1234567890','qwertyuiop','asdfghjkl','zxcvbnm'], kx=W/2-225, ky=404;
+    this.keyBtns=[];
+    rows.forEach((row,ri)=>{ [...row].forEach((ch,ci)=>{ const x=kx+ci*50+(ri===3?25:0);
+      const b=button(this,x,ky+ri*46,44,40,ch,()=>this.pressKey(ch),{size:16}); this.keyBtns.push({b,ch}); }); });
+    const y=ky+4*46;
+    this.shiftBtn=button(this,W/2-200,y,110,40,'Shift',()=>{ this.shift=!this.shift; this.markShift(); },{size:14});
+    button(this,W/2-75,y,110,40,'⌫ Del',()=>this.pressKey('⌫'),{size:14});
+    button(this,W/2+60,y,80,40,'_',()=>this.pressKey('_'),{size:16});
+    button(this,W/2+140,y,60,40,'-',()=>this.pressKey('-'),{size:16});
+    button(this,W/2+205,y,60,40,'.',()=>this.pressKey('.'),{size:16});
+    button(this,W/2+270,y,60,40,'@',()=>this.pressKey('@'),{size:16});
+    txt(this,W/2,ky+4*46+34,'Tap a field, then tap the keys — or just type on a real keyboard.',13,'#a08a6a').setOrigin(0.5); }
+  markShift(){ (this.keyBtns||[]).forEach(k=>{ if(k.b&&k.b.label) k.b.label.setText(this.shift?k.ch.toUpperCase():k.ch); });
+    if(this.shiftBtn&&this.shiftBtn.label) this.shiftBtn.label.setText(this.shift?'SHIFT ✓':'Shift'); }
+  pressKey(ch){ if(this.busy) return;
+    const put=c=>{ if(this.focus==='user'){ if(this.fUser.length<20) this.fUser+=c; } else if(this.fPw.length<128) this.fPw+=c; };
+    if(ch==='⌫'){ if(this.focus==='user') this.fUser=this.fUser.slice(0,-1); else this.fPw=this.fPw.slice(0,-1); }
+    else put(this.shift?ch.toUpperCase():ch);
+    if(this.shift&&/[a-z]/.test(ch)){ this.shift=false; this.markShift(); }
+    this.refreshFields(); }
+  typeKey(e){ if(this.busy||!e) return;
+    if(e.key==='Escape'){ this.scene.start('Menu'); return; }
+    if(e.key==='Tab'){ if(e.preventDefault) e.preventDefault(); this.focus=this.focus==='user'?'pw':'user'; this.refreshFields(); return; }
+    if(e.key==='Enter'){ if(this.focus==='user'){ this.focus='pw'; this.refreshFields(); } else this.submit(); return; }
+    if(e.key==='Backspace'){ this.pressKey('⌫'); return; }
+    if(e.key&&e.key.length===1){ const put=c=>{ if(this.focus==='user'){ if(this.fUser.length<20) this.fUser+=c; } else if(this.fPw.length<128) this.fPw+=c; }; put(e.key); this.refreshFields(); } }
+  async submit(){ if(this.busy) return;
+    const u=this.fUser.trim(), p=this.fPw;
+    if(!u||!p){ this.statusTxt.setText('Type your username and password first.'); return; }
+    this.busy=true; this.statusTxt.setText('Signing in…');
+    const r=await GXHub.signIn(u,p);
+    this.busy=false;
+    if(r.ok){ this.scene.restart(); }
+    else { this.fPw=''; this.focus='pw'; this.refreshFields(); this.statusTxt.setText(r.error); } }
+}
 
 function heroUnlocked(h){ return Progress.heroUnlocked(h); }
 function lockLabel(h){ const u=h.unlock; return u.type==='grokonians'?u.cost+' Grokonians':(u.label||u.type); }
@@ -3893,4 +3991,4 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
 
 window.__game=new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#0d0906',
   scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{activePointers:3},
-  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,Armory,BattlePass,Chests,CardAlbum,Profile,Game,End]});
+  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,Armory,GXAccount,BattlePass,Chests,CardAlbum,Profile,Game,End]});
