@@ -143,10 +143,10 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   // Re-pointed by Upgrade 20: GUARD merges Dodge/Block (17 controls),
   // the defaults are the THUMB ARCS, and in the default FEW face CAMP
   // stands at its rail spot above ORDERS, not at its table seat.
-  ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.every(d => { const en = reg[d[0]]; if (!en) return false;
+  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => { const en = reg[d[0]]; if (!en) return false; // Upgrade 23 re-point: 18 — SHOP joins the table (the market sidebar circle)
       if (d[0] === 'cmd_camp') return en.obj.x === 1178 && en.obj.y === 182; // the Few rail spot (the seat waits for Full)
       return en.obj.x === d[4] && en.obj.y === d[5]; }),
-    'no saved layout: all 17 controls stand at the table\'s defaults');
+    'no saved layout: all 18 controls stand at the table defaults');
   ok(reg.autofire.obj.x === 1178 && reg.autofire.obj.y === 76 && reg.guard.obj.x === 102 && reg.guard.obj.y === 448 && reg.skill2.obj.y === 556 && reg.cmd_charge.obj.x === 130 && reg.cmd_rally.obj.x === 1066 && reg.cmd_rally.obj.y === 665,
     '…and those defaults ARE Upgrade 10: stack x 1178 (toggle y 70, powers to y 496), row from x 130 at y 665'); // Upgrade 20 re-point: the thumb arcs — right rail for toggle/powers, left rail for GUARD/SPRINT, the row as ever
   ok(g.fightRects.length === 6 && g.fightRects.every(r => r.r === r.h / 2) && g.fightRects.some(r => r.x === 102 && r.y === 448) && g.fightRects.some(r => r.x === 1178 && r.y === 556), 'the onTap wall (fightRects) matches the default stack'); // Upgrade 17: the wall carries each circle's radius. Upgrade 20: six rects on the arcs

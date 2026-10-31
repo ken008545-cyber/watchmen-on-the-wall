@@ -146,8 +146,8 @@ const saveFaceChoice = vm.runInContext('saveFaceChoice', ctx);
     'diameters never shrank: powers 76, thumb circles 64, the command rank 56');
   ok(LAYOUT_DEFS.every(d => !(d[4] < 640 && d[5] < 200 && d[0] !== 'autofire')), 'nothing stands top-left or mid-screen — the seats are the two thumb arcs and the bottom row');
   ok(LAYOUT_ICONS.guard === 'ico_guard' && LAYOUT_ICONS.dodge === undefined && LAYOUT_ICONS.block === undefined, 'LAYOUT_ICONS: GUARD wears ico_guard; the dodge/block entries retired with their buttons');
-  ok(DEFAULT_BINDS.guard === 'Space' && DEFAULT_BINDS.dodge === undefined && DEFAULT_BINDS.block === undefined && BIND_ACTIONS.length === 16,
-    'DEFAULT_BINDS: Space is the Guard key; no dodge/block keys remain; 16 bindable actions');
+  ok(DEFAULT_BINDS.guard === 'Space' && DEFAULT_BINDS.dodge === undefined && DEFAULT_BINDS.block === undefined && BIND_ACTIONS.length === 17,
+    'DEFAULT_BINDS: Space is the Guard key; no dodge/block keys remain; 17 bindable actions'); // Upgrade 23 re-point: 17 — the Shop key (KeyM) joins the binds
   cleanStore(); store.gxhub_wotw_binds = JSON.stringify({ dodge: 'KeyQ', block: 'ShiftRight', sprint: 'KeyV' });
   const lb = loadBinds();
   ok(lb.guard === 'KeyQ' && lb.sprint === 'KeyV', 'a pre-U20 binds save migrates: the old Dodge key becomes the Guard key, the rest untouched');

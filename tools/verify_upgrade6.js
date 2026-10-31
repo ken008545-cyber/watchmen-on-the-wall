@@ -24,7 +24,11 @@ ok(/'Next Wave Now ▶',\(\)=>this\.closeShop\(\)/.test(main), 'early-start butt
 ok(main.includes('this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000)'), 'update() derives remaining time from the deadline, not from frame deltas');
 ok(!main.includes('Auto-start') && !main.includes('take your time'), 'old auto-start / take-your-time text is gone from the game');
 ok(!main.includes('shopT=20') && !main.includes("'Next wave ▶'"), 'old 20s timer and old click-to-start label are gone');
-ok(/closeShop\(\)\{ this\.shopOpen=false;/.test(main), 'closeShop closes the shop before starting the wave (auto-start can only fire once)');
+// U23 re-point: closeShop gained a field-market branch at its head
+// (it returns without ever starting a wave); the invariant this check
+// guards lives in the inter path below it and is asserted on the body.
+{ const csBody = main.slice(main.indexOf('closeShop(){'), main.indexOf('// --- Upgrade 18: the intermission reveal ---'));
+  ok(csBody.includes("shopMode==='field'") && csBody.indexOf('this.shopOpen=false;') >= 0 && csBody.indexOf('this.shopOpen=false;') < csBody.indexOf('this.startWave()'), 'closeShop closes the shop before starting the wave (auto-start can only fire once)'); }
 
 // ---------- runtime logic checks (stubbed Phaser, real main.js) ----------
 const store = {};
@@ -156,7 +160,10 @@ function bareShopGame() {
   fakeNow += 120000; g.update(0, 1000);
   ok(g.victoryOpen && g.wave === 10, 'victory choice waits for the player — two minutes pass, nothing auto-starts');
   fire(findBtn(g, t => t === 'Continue Endless'));
-  ok(g.endless && g.shopOpen && g.shopEndsAt - fakeNow === 60000 && g.shopTimerTxt._t === 'Next wave in 1:00', 'Continue Endless: the same 60s intermission arms for wave 11');
+  // U23 re-point: Continue Endless enters the intermission ON THE
+  // FIELD now (no shop pops up — kennin's ruling); the same 60s arms,
+  // and the field bar carries the countdown the shop footer used to.
+  ok(g.endless && !g.shopOpen && g.interField && g.shopEndsAt - fakeNow === 60000 && g.interTxt._t === 'Next wave in 1:00', 'Continue Endless: the same 60s intermission arms for wave 11');
   fakeNow += 60000; g.update(0, 1000);
   ok(!g.shopOpen && g.wave === 11 && g.startCalls === 1, 'endless: wave 11 auto-starts after the intermission'); }
 

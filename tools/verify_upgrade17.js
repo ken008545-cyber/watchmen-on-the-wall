@@ -40,10 +40,10 @@ const main = read('js/main.js');
 ok(main.includes("FACE_KEY='gxhub_wotw_face'"), 'the face joins the settings family: gxhub_wotw_face');
 ok(main.includes('function loadFace()') && main.includes('function saveFaceChoice(f)') && main.includes('FACE_MIG_KEY') && main.includes('function hasPriorControls()'),
   'face derivation: an explicit choice wins; any prior Upgrade-12 customization defaults Full; a new player defaults Simple'); // Upgrade 20 re-point: the derivation is the MIGRATION now — Few for everyone; a stored Full counts only when re-picked after U20 (the stamp), and 'simple' reads as the Few it became. The battery below proves each case.
-ok(main.includes("const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally','build']"),
-  'the fan holds the whole command rank: six orders, Volley, RALLY, BUILD — nothing removed');
-ok(main.includes('Math.hypot(lx||0,ly||0)<=circR') && main.includes('g.fillCircle(0,0,circR)'),
-  'the shared button helper draws circles and gates every press by the radius (corner taps never reach the press)');
+ok(main.includes("const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally']"),
+  'the fan holds the command rank: six orders, Volley, RALLY'); // Upgrade 23 re-point: BUILD left the fan — it is a first-class circle beside the powers now (kennin: there was no build button)
+ok(main.includes("(p&&typeof p.x==='number')?p.x-c.x") && main.includes('Math.hypot(dx,dy)<=circR+(slop||0)') && main.includes('g.fillCircle(0,0,circR)'),
+  'the shared button helper draws circles and gates every press by the radius — measured on the POINTER position since Upgrade 23 (the engine local frame starved the circles; corner taps still never reach the press)');
 { const sweep = main.slice(main.indexOf('drawSkillSweep(b){'), main.indexOf('// --- Upgrade 10: the right-thumb stack'));
   ok(sweep.includes('arcSegs') && sweep.includes('fillCircle') && !sweep.includes('fillRect'), 'the cooldown sweep is a ring + disc now — no rectangular fill remains in drawSkillSweep');
   ok(sweep.includes('strokeCircle(cx,cy,r+3+(1-b.readyPulse)*5)'), 'the power-ready whisper is a ring pulse that swells as it fades'); }
@@ -128,12 +128,12 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
 
 // ---------- the table: circles, hierarchy, seats ----------
 { const D = {}; LAYOUT_DEFS.forEach(d => { D[d[0]] = d; });
-  ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.every(d => d[2] === d[3]), 'LAYOUT_DEFS: 18 controls, every one a circle (w == h == diameter)'); // Upgrade 20 re-point: 17 controls — GUARD merged Dodge and Block into one circle
+  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => d[2] === d[3]), 'LAYOUT_DEFS: 18 controls, every one a circle (w == h == diameter)'); // Upgrade 20 re-point: 17 controls — GUARD merged Dodge and Block into one circle. Upgrade 23 re-point: 18 — SHOP joins
   ok(D.skill0[2] === 76 && D.skill1[2] === 76 && D.skill2[2] === 76, 'the powers are the biggest circles: 76 across');
   ok(['autofire', 'guard', 'sprint', 'build', 'orders'].every(id => D[id][2] === 64), 'the thumb cluster, BUILD and ORDERS: 64 across');
   ok(['cmd_charge', 'cmd_hold', 'cmd_follow', 'cmd_flank', 'cmd_fallback', 'cmd_shieldwall', 'cmd_volley', 'cmd_camp', 'cmd_rally'].every(id => D[id][2] === 56), 'the command rank: 56 across — the fan never shrinks them');
   ok(D.skill2[5] + 38 < 610 && D.autofire[5] - 32 > 0, 'the stack stands clear of the bar (last power rim 594 < 610) and of the top edge');
-  ok(FAN_MEMBERS.length === 9, 'FAN_MEMBERS names all nine behind ORDERS'); }
+  ok(FAN_MEMBERS.length === 8, 'FAN_MEMBERS names all eight behind ORDERS'); } // Upgrade 23 re-point: eight — BUILD stands first-class now
 
 // ---------- circular hit-testing on the built HUD (Full face: all stand) ----------
 { cleanStore(); store.gxhub_wotw_face = 'full'; store.gxhub_wotw_face_u20 = '1'; // Upgrade 20: a Full face in a test must be a STAMPED Full (the migration honors nothing else)
@@ -207,13 +207,13 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   ok(g.face === 'few', 'a new player\'s battle opens on the Simple face'); // Upgrade 20: the Simple face is the Few face now — same soul, fewer circles, deeper presses
   ok(g.ordersBtn._visible === true && g.campBtn._visible === true && g.skillBtns.every(b => b._visible !== false) && g.fightBtns.guard._visible !== false,
     'Simple stands the core: powers, Dodge/Block/Sprint, auto-fire, CAMP — and ORDERS');
-  ok(g.cmdBtns.charge._visible === false && g.cmdBtns.charge._disabled === true && g.buildBtn._visible === false && g.rallyBtn._visible === false,
-    '…and the command rank waits behind ORDERS (hidden, not removed)');
+  ok(g.cmdBtns.charge._visible === false && g.cmdBtns.charge._disabled === true && g.rallyBtn._visible === false && g.buildBtn._visible !== false,
+    '…and the command rank waits behind ORDERS (hidden, not removed) — while BUILD stands first-class, visible in the Few face (Upgrade 23)');
   g.toggleFan();
-  ok(g.fanOpen === true && g.cmdBtns.charge._visible === true && g.cmdBtns.charge.x === 130 && g.cmdBtns.charge.y === 552 && g.buildBtn.x === 806 && g.buildBtn.y === 552,
-    'ORDERS fans the rank open in a row above the bar, anchored on ORDERS\' seat');
-  ok(g.rallyBtnRect.x === 718 && g.rallyBtnRect.y === 552 && g.buildBtnRect.x === 806 && g.cmdBtns.volley.sx === 634,
-    'the active-position records stand on the fan circles (rally ring target, build wall, volley sweep origin)');
+  ok(g.fanOpen === true && g.cmdBtns.charge._visible === true && g.cmdBtns.charge.x === 130 && g.cmdBtns.charge.y === 552 && g.buildBtn.x === 1062 && g.buildBtn.y === 556,
+    'ORDERS fans the rank open in a row above the bar, anchored on ORDERS\' seat — and BUILD does not move with it (Upgrade 23: it stands at its own seat)');
+  ok(g.rallyBtnRect.x === 718 && g.rallyBtnRect.y === 552 && g.buildBtnRect.x === 1062 && g.buildBtnRect.y === 556 && g.cmdBtns.volley.sx === 634,
+    'the active-position records stand on their circles (rally ring target on the fan, build wall on BUILD\'s standing seat, volley sweep origin)');
   // issuing from the fan closes it
   press(g.cmdBtns.charge, 0, 0);
   ok(g.order === 'charge' && g.fanOpen === false && g.cmdBtns.charge._visible === false, 'tap a fanned command: the order issues and the fan closes behind it');
@@ -325,8 +325,8 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   s.faceBtns.few._handlers.pointerup({}, 0, 0, { stopPropagation() {} });
   s.enterGhostEdit();
   const ghost = id => s.ghostObjs[LAYOUT_DEFS.findIndex(d => d[0] === id)];
-  ok(s.ghostObjs.length === 17 && ghost('cmd_charge').y === 552 && ghost('orders').x === 1178 && ghost('orders').y === 268,
-    'Simple ghosts: all 18 stand, the fan\'s ghosts OPEN above the bar at group positions'); // Upgrade 20 re-point: 17 ghosts; ORDERS' ghost stands at its rail seat, the fan's ghosts open on the row
+  ok(s.ghostObjs.length === 18 && ghost('cmd_charge').y === 552 && ghost('orders').x === 1178 && ghost('orders').y === 268,
+    'Simple ghosts: all 18 stand, the fan\'s ghosts OPEN above the bar at group positions'); // Upgrade 20 re-point: 17 ghosts; ORDERS' ghost stands at its rail seat, the fan's ghosts open on the row. Upgrade 23 re-point: 18 ghosts — SHOP joins the table
   const gids = s._ghostEd.items.map(i => i.id);
   ok(gids.includes('orders') && !gids.includes('cmd_charge'), 'ghost editor: ORDERS is the fan\'s one draggable anchor');
   ok(s._ghostEd.down({ x: 1178, y: 268 }) === true, 'the ghost editor takes ORDERS by its centre');

@@ -164,8 +164,11 @@ function holdPast(rec) { rec.t0 -= (HOLD_MS + 20); }
   // waves advance across the fall
   g.wave = 5; g.waveActive = true; g.spawnQ = []; g.enemies = [];
   g.update(0, 50);
-  ok(g.wavesCleared === 5 && g.shopOpen === true, 'the wave still clears after the fall — the intermission opens as it always has');
-  g.closeShop();
+  // U23 re-point: the intermission no longer opens the shop (kennin:
+  // no menu pops up at wave end) — it stands on the FIELD, and the
+  // next wave is begun from the field bar's law (beginInterWave).
+  ok(g.wavesCleared === 5 && g.shopOpen === false && g.interField === true, 'the wave still clears after the fall — the intermission stands on the field, no menu popped up');
+  g.beginInterWave();
   ok(g.wave === 6 && g.waveActive === true, 'the NEXT wave starts on a field whose camp is rubble');
   for (let i = 0; i < 160 && !g.enemies.length; i++) g.update(0, 50);
   ok(g.enemies.length > 0, 'wave 6 spawns and marches — the fight itself never noticed the run "ending"');

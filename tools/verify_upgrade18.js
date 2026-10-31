@@ -284,7 +284,8 @@ function fireOnce(g) { g.hero.cd = 0; g.shots.length = 0; g.heroAutoFire(); retu
   Rack.grant('sling:1');
   const g3 = hudBattle(); g3.manna = 100; g3.pendingChests = ['wood'];
   g3.openShop(false);
-  ok(g3.revealPanel === true && g3.revealQueue.join() === 'wood', 'the intermission opens the reveal over the shop');
+  g3.menuChestEntry(); // U23: the player taps the menu's chest entry — the reveal no longer ambushes at wave end
+  ok(g3.revealPanel === true && g3.revealQueue.join() === 'wood', 'the menu chest entry opens the reveal over the shop (U23: opened by the player, never by ambush)');
   const rseq = [0.0, 0.7]; ctx.Math.random = () => (rseq.length ? rseq.shift() : 0.99); // family: sling; tier roll 0.7 -> Uncommon
   ok(g3.revealOpenChest() === true, 'the chest opens');
   ok(g3.manna === 140 && g3.lootFound.length === 1 && /already held/.test(g3.lootFound[0]),
@@ -292,7 +293,7 @@ function fireOnce(g) { g.hero.cd = 0; g.shots.length = 0; g.heroAutoFire(); retu
   ok(g3.revealQueue.length === 0 && Rack.pending().length === 0, 'the queue drains and the Rack\'s waiting list empties with it');
   // reveal: a new weapon, equipped on the spot, changes the real attack
   cleanStore(); ctx.Math.random = () => 0.99;
-  const g4 = hudBattle(); g4.pendingChests = ['wood']; g4.openShop(false);
+  const g4 = hudBattle(); g4.pendingChests = ['wood']; g4.openShop(false); g4.menuChestEntry(); // U23: the chest entry's tap
   const rseq2 = [0.5, 0.95]; ctx.Math.random = () => (rseq2.length ? rseq2.shift() : 0.99); // family idx 3 = spear; tier roll -> Rare
   g4.revealOpenChest();
   ok(Rack.owns('spear:2'), 'a new weapon lands on the Rack (Rare spear, as rolled)');

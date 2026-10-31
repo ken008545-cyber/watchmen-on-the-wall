@@ -249,13 +249,14 @@ function hudBattle(data) { const g = bareBattle(data); g.buildHUD(); return g; }
   resetWallet(100); purchaseSeasonalChest('hallows');
   const g = hudBattle(); ok(g.pendingChests.join() === 'hallows', 'the next run inherits the bought Hallows chest');
   g.openShop(false);
-  ok(g.revealPanel === true && g.revealQueue.join() === 'hallows', 'the intermission opens the SAME reveal for the bought chest');
+  g.menuChestEntry(); // U23: the player taps the menu's chest entry — the reveal no longer ambushes at wave end
+  ok(g.revealPanel === true && g.revealQueue.join() === 'hallows', 'the menu chest entry opens the SAME reveal for the bought chest (U23: the player opens it)');
   const seq = [0.1, 0.0]; ctx.Math.random = () => (seq.length ? seq.shift() : 0.99); // kind: card; pick: Gideon (first weight band)
   ok(g.revealOpenChest() === true && Album.owns('wit_gideon') && g.lootFound.some(s => /Gideon/.test(s)),
     'the reveal deals a card: Gideon joins the Album, and the run\'s findings name him');
   // a second chest deals the same card -> Manna
   cleanStore(); ctx.Math.random = () => 0.99;
-  const g2 = hudBattle(); g2.manna = 100; g2.pendingChests = ['hallows', 'hallows']; g2.openShop(false);
+  const g2 = hudBattle(); g2.manna = 100; g2.pendingChests = ['hallows', 'hallows']; g2.openShop(false); g2.menuChestEntry(); // U23: the chest entry's tap
   const s1 = [0.1, 0.0]; ctx.Math.random = () => (s1.length ? s1.shift() : 0.99);
   g2.revealOpenChest();
   g2.revealNext();
@@ -265,32 +266,32 @@ function hudBattle(data) { const g = bareBattle(data); g.buildHUD(); return g; }
   // completion: seven held, the reveal deals David (the Mythic band)
   cleanStore(); ctx.Math.random = () => 0.99; resetWallet(1000);
   CARD_SETS.witnesses.cards.slice(0, 7).forEach(c => Album.grantCard(c.id));
-  const g3 = hudBattle(); g3.manna = 0; g3.pendingChests = ['hallows']; g3.openShop(false);
+  const g3 = hudBattle(); g3.manna = 0; g3.pendingChests = ['hallows']; g3.openShop(false); g3.menuChestEntry(); // U23
   const s3 = [0.1, 0.99]; ctx.Math.random = () => (s3.length ? s3.shift() : 0.99); // pick roll 0.99 -> David, the last weight band
   g3.revealOpenChest();
   ok(Album.setComplete('witnesses') && g3.manna === 150 && wallet.earns.some(e => e[0] === 'setgift:witnesses' && e[1] === 25),
     'the completing reveal pays the set gift AT ONCE: +150 Manna in the run, +25 Grokonians on the earn path');
   const earnsAfter = wallet.earns.length;
-  const g4 = hudBattle(); g4.manna = 0; g4.pendingChests = ['hallows']; g4.openShop(false);
+  const g4 = hudBattle(); g4.manna = 0; g4.pendingChests = ['hallows']; g4.openShop(false); g4.menuChestEntry(); // U23
   const s4 = [0.1, 0.0]; ctx.Math.random = () => (s4.length ? s4.shift() : 0.99);
   g4.revealOpenChest(); // a duplicate Gideon now — completion must NOT pay again
   ok(wallet.earns.length === earnsAfter && Album.giftClaimed('witnesses'), 'later openings never re-pay the set gift — once means once');
   // treats: an orb treat banks a free orb; a Grokonian treat earns through Tokens
   cleanStore(); ctx.Math.random = () => 0.99; resetWallet(0);
-  const g5 = hudBattle(); g5.pendingChests = ['hallows']; g5.openShop(false);
+  const g5 = hudBattle(); g5.pendingChests = ['hallows']; g5.openShop(false); g5.menuChestEntry(); // U23
   const s5 = [0.9, 0.65]; ctx.Math.random = () => (s5.length ? s5.shift() : 0.99); // kind: bundle; pick: the orb treat band
   g5.revealOpenChest();
   ok(g5.freeOrbs === 1, 'a treat bundle can be an ORB TREAT: one free orb touch banked for the run');
   const orb = { def: { id: 'strength', name: 'Orb of Strength', cost: 15, dur: 60, color: 0xd83a2a, css: '#ff9a86', fx: 'x' }, cd: 0, x: g5.hero.x, y: g5.hero.y, pending: 0 };
   ok(g5.tryBuyOrb(orb) === 'bought' && g5.freeOrbs === 0 && wallet.spends.length === 0 && g5.buffStrT === 60,
     'the treat pays for the touch: the orb lands, Tokens.spend is never called, the bank empties');
-  const g6 = hudBattle(); g6.pendingChests = ['hallows']; g6.openShop(false);
+  const g6 = hudBattle(); g6.pendingChests = ['hallows']; g6.openShop(false); g6.menuChestEntry(); // U23
   const s6 = [0.9, 0.45]; ctx.Math.random = () => (s6.length ? s6.shift() : 0.99); // bundle: Grokonians 10
   g6.revealOpenChest();
   ok(wallet.earns.some(e => e[0] === 'treat' && e[1] === 10), 'a Grokonian treat is EARNED through Tokens.earn — the hub-capped path, like every earn');
   // a weapon gift from the seasonal chest is a Rack weapon under U18 rules
   cleanStore(); ctx.Math.random = () => 0.99;
-  const g7 = hudBattle(); g7.pendingChests = ['hallows']; g7.openShop(false);
+  const g7 = hudBattle(); g7.pendingChests = ['hallows']; g7.openShop(false); g7.menuChestEntry(); // U23
   const s7 = [0.6, 0.5, 0.5]; ctx.Math.random = () => (s7.length ? s7.shift() : 0.99); // weapon; family idx 3 (spear); tier roll -> Uncommon
   g7.revealOpenChest();
   ok(Rack.owns('spear:1@hallows') && resolveWeapon('spear', 1, 'hallows').type === 'fire' && Rack.list().some(w => w.key === 'spear:1@hallows'),

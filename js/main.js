@@ -723,7 +723,17 @@ const LAYOUT_DEFS=[
   ['cmd_charge','Charge',56,56,130,665],['cmd_hold','Hold',56,56,247,665],['cmd_follow','Follow Me',56,56,364,665],['cmd_flank','Flank',56,56,481,665],
   ['cmd_fallback','Fall Back',56,56,598,665],['cmd_shieldwall','Shield Wall',56,56,715,665],['cmd_volley','Volley',56,56,832,665],
   ['cmd_camp','CAMP',56,56,949,665],['cmd_rally','Rally',56,56,1066,665],
-  ['build','BUILD',64,64,1130,665],['orders','ORDERS',64,64,1178,268]];
+  ['build','BUILD',64,64,1062,556],['orders','ORDERS',64,64,1178,268],['shop','SHOP',64,64,102,348]];
+// Upgrade 23: BUILD leaves the fan and the bottom row — it stands as a
+// first-class circle beside the powers arc's foot (1062,556), and SHOP
+// joins the left rail above GUARD (102,348): the sidebar kennin named.
+// Both seats obey the placement law he laid down the same call — no
+// battle button on the very bottom, very left, or very right; every
+// control stands inside the playable screen with real margins (BUILD:
+// 186px from the right edge, 132 from the bottom; SHOP rides the left
+// rail's standing 70px margin, 316 from the top). Saved layouts keep
+// the player's own seats, as ever — the law governs defaults and the
+// seats this upgrade touches, never a player's dragged arrangement.
 // --- Upgrade 17 → Upgrade 20: the battle faces -----------------------
 // U17 gave the battle two faces: SIMPLE (the core circles plus ORDERS
 // fanning the command rank) and FULL (every circle always visible).
@@ -762,9 +772,13 @@ function saveFaceChoice(f){ saveFace(f); try{ localStorage.setItem(FACE_MIG_KEY,
 // the Few face; individual seats belong to Full). Upgrade 20: ORDERS
 // rides the right rail now, so the fan opens in its row above the bar
 // extending LEFT from the anchor.
-const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally','build'];
+const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally'];
+// Upgrade 23: 'build' is NOT a fan member anymore — BUILD stands on
+// its own circle in both faces (kennin: "there's no build button" —
+// in the Few face it was hiding behind this fan). The fan is the
+// command rank alone now.
 const FAN_OFFSETS={ cmd_charge:{dx:-1048,dy:284}, cmd_hold:{dx:-964,dy:284}, cmd_follow:{dx:-880,dy:284}, cmd_flank:{dx:-796,dy:284},
-  cmd_fallback:{dx:-712,dy:284}, cmd_shieldwall:{dx:-628,dy:284}, cmd_volley:{dx:-544,dy:284}, cmd_rally:{dx:-460,dy:284}, build:{dx:-372,dy:284} };
+  cmd_fallback:{dx:-712,dy:284}, cmd_shieldwall:{dx:-628,dy:284}, cmd_volley:{dx:-544,dy:284}, cmd_rally:{dx:-460,dy:284} };
 // In the Few face CAMP never hides — it rides the right rail directly
 // above ORDERS, a fixed offset from the ORDERS seat, the fan-group
 // pattern: drag ORDERS and CAMP rides with it; its own seat (949,665)
@@ -811,9 +825,9 @@ function layoutPositions(){ return Object.assign(defaultLayoutPos(),(loadLayout(
 const BIND_ACTIONS=[
   ['guard','Guard — tap: Dodge · hold: Block'],['sprint','Sprint'],['skill0','Power 1 (top)'],['skill1','Power 2'],['skill2','Power 3 (ult)'],['autofire','Auto-fire toggle'],['camp','Camp panel'],
   ['volley','Volley'],['rally','Rally'],['charge','Order: Charge'],['hold','Order: Hold'],['follow','Order: Follow Me'],['flank','Order: Flank'],['fallback','Order: Fall Back'],['shieldwall','Order: Shield Wall'],
-  ['build','Build mode']]; // Upgrade 15: C for construction — free among the defaults
+  ['build','Build mode'],['shop','Shop — the market menu']]; // Upgrade 15: C for construction — free among the defaults. Upgrade 23: M for the market
 const DEFAULT_BINDS={ guard:'Space', sprint:'KeyV', skill0:'Digit1', skill1:'Digit2', skill2:'Digit3', autofire:'KeyT', camp:'KeyB',
-  volley:'KeyQ', rally:'KeyE', charge:'KeyZ', hold:'KeyX', follow:'KeyF', flank:'KeyG', fallback:'KeyH', shieldwall:'KeyJ', build:'KeyC' };
+  volley:'KeyQ', rally:'KeyE', charge:'KeyZ', hold:'KeyX', follow:'KeyF', flank:'KeyG', fallback:'KeyH', shieldwall:'KeyJ', build:'KeyC', shop:'KeyM' };
 function loadBinds(){ const b=Object.assign({},DEFAULT_BINDS);
   try{ const v=JSON.parse(localStorage.getItem(BINDS_KEY)||'null'); if(v&&typeof v==='object'){ BIND_ACTIONS.forEach(([id])=>{ if(typeof v[id]==='string'&&v[id]) b[id]=v[id]; });
     if(typeof v.guard!=='string'&&typeof v.dodge==='string'&&v.dodge) b.guard=v.dodge; } }catch(e){}
@@ -890,16 +904,31 @@ const txt=(s,x,y,str,size,col,o)=>s.add.text(x,y,str,Object.assign({},FONT,{font
 function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   const c=s.add.container(x,y); const g=s.add.graphics();
   // Upgrade 17: opt.circle (a diameter) makes the face a CIRCLE. The
-  // hit test is truly circular, enforced HERE from the pointer's own
-  // local coordinates (lx/ly are in the container's centred frame —
-  // the same frame the face is drawn in): a tap in the bounding
+  // hit test is truly circular, enforced HERE: a tap in the bounding
   // square's corner, outside the radius, never reaches the press
   // handlers at all, so it cannot fire, dip, or light the button —
   // it falls through to the field beneath. (The container's Phaser
-  // hit area stays the default rectangle, a harmless superset: the
-  // radius gate is the law, and it is exact under any Phaser version.)
+  // hit area stays the default rectangle, a harmless superset.)
+  // Upgrade 23 — THE FRAME LAW, corrected at the root (kennin's field
+  // report: "the attack buttons... none of them work"): the lx/ly a
+  // handler receives are NOT in the container's centred frame. The
+  // vendored engine (vendor/phaser.min.js, InputPlugin.hitTest ->
+  // pointWithinHitArea) delivers localX = inverseTransform(pointer)
+  // + displayOrigin, and a Container's displayOrigin is half its
+  // size — so a CENTRE tap on a 76px circle arrives as (38,38), and
+  // the old gate, hypot(lx,ly) <= 38, read it as 53.7 and refused:
+  // every circle battle button was dead at its centre and alive only
+  // in a quarter-disc near its top-left corner, while the stub suites
+  // fed centred coords and proved a law the engine never spoke.
+  // The gate now measures the one frame that cannot drift between
+  // engine versions: the POINTER's own position (p.x/p.y, game
+  // coords) against the button's own centre (c.x/c.y) — these pinned
+  // containers ARE their screen position. lx/ly survive only as the
+  // fallback for callers that hand a pointer with no position.
   const circR=opt.circle?opt.circle/2:0; c.circleR=circR;
-  const inCirc=(lx,ly)=>!circR||Math.hypot(lx||0,ly||0)<=circR;
+  const inCirc=(p,lx,ly,slop)=>{ if(!circR) return true;
+    const dx=(p&&typeof p.x==='number')?p.x-c.x:(lx||0), dy=(p&&typeof p.y==='number')?p.y-c.y:(ly||0);
+    return Math.hypot(dx,dy)<=circR+(slop||0); };
   const draw=(hl)=>{g.clear();
     if(circR){ g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95); g.fillCircle(0,0,circR); g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1); g.strokeCircle(0,0,circR); return; }
     g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95);g.fillRoundedRect(-w/2,-h/2,w,h,8);g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1);g.strokeRoundedRect(-w/2,-h/2,w,h,8);};
@@ -923,13 +952,17 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   // same press float, so a mouse player can learn the symbol family
   // by resting on a circle, not only by pressing it (floatBtnName
   // keeps a single float alive, so a sweep across the row cannot stack).
-  c.on('pointerover',(p,lx,ly)=>{ if(inCirc(lx,ly)){ draw(true); if(opt.floatName&&s.floatBtnName) s.floatBtnName(c,opt.floatName); } }); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
+  c.on('pointerover',(p,lx,ly)=>{ if(inCirc(p,lx,ly)){ draw(true); if(opt.floatName&&s.floatBtnName) s.floatBtnName(c,opt.floatName); } }); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
   // Upgrade 8: button weight — every button in the game presses like it has
   // mass: it dips and lights the instant a finger lands, and springs back on
   // release, so a press is felt before the action lands.
-  c.on('pointerdown',(p,lx,ly)=>{ if(opt.disabled||!inCirc(lx,ly)) return; c.setScale(0.93); draw(true);
+  // Upgrade 23: the RELEASE gate carries a 12px grace (slop) the press
+  // gate does not — a press must START on the circle, but a real thumb
+  // drifts as it lifts, and a release a breath past the rim still
+  // belongs to the press that began inside.
+  c.on('pointerdown',(p,lx,ly)=>{ if(opt.disabled||!inCirc(p,lx,ly)) return; c.setScale(0.93); draw(true);
     if(opt.floatName&&s.floatBtnName) s.floatBtnName(c,opt.floatName); });
-  c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); c.setScale(1); draw(false); if(!inCirc(lx,ly)) return; SFX.unlock(); if(!opt.disabled) cb(); });
+  c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); c.setScale(1); draw(false); if(!inCirc(p,lx,ly,12)) return; SFX.unlock(); if(!opt.disabled) cb(); });
   c.label=t; c.redraw=draw; return c; }
 
 // ---------- Upgrade 16: the symbol family ----------
@@ -943,7 +976,7 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
 // faces change.
 const ICON_SIZE=120;
 const CMD_ICONS={charge:'ico_charge',hold:'ico_hold',follow:'ico_follow',flank:'ico_flank',fallback:'ico_fallback',shieldwall:'ico_shieldwall',volley:'ico_volley',camp:'ico_camp',rally:'ico_rally'};
-const LAYOUT_ICONS={autofire:'ico_auto',guard:'ico_guard',sprint:'ico_sprint',skill0:'ico_burst',skill1:'ico_burst',skill2:'ico_burst',cmd_charge:'ico_charge',cmd_hold:'ico_hold',cmd_follow:'ico_follow',cmd_flank:'ico_flank',cmd_fallback:'ico_fallback',cmd_shieldwall:'ico_shieldwall',cmd_volley:'ico_volley',cmd_camp:'ico_camp',cmd_rally:'ico_rally',build:'ico_build',orders:'ico_banner'};
+const LAYOUT_ICONS={autofire:'ico_auto',guard:'ico_guard',sprint:'ico_sprint',skill0:'ico_burst',skill1:'ico_burst',skill2:'ico_burst',cmd_charge:'ico_charge',cmd_hold:'ico_hold',cmd_follow:'ico_follow',cmd_flank:'ico_flank',cmd_fallback:'ico_fallback',cmd_shieldwall:'ico_shieldwall',cmd_volley:'ico_volley',cmd_camp:'ico_camp',cmd_rally:'ico_rally',build:'ico_build',orders:'ico_banner',shop:'ico_shop'};
 // A hero's power wears the symbol of what it IS: David's Psalm is a lyre,
 // Five Stones is five stones in an arc, Smooth Stone one stone ringed.
 // Other heroes resolve by their own names' plain meanings, with the
@@ -1055,6 +1088,11 @@ function makeIcons(scene){ if(!scene||!scene.make||!scene.make.graphics) return;
     g.fillStyle(GOLD,1); g.fillRect(28,60,64,11); g.fillRect(28,76,64,11); // its boards
     g.lineStyle(7,PARCH,1); g.lineBetween(40,50,66,26); // hammer handle
     g.fillStyle(BRIGHT,1); g.fillPoints([{x:58,y:14},{x:84,y:22},{x:78,y:36},{x:54,y:28}],true); }); // hammer head
+  tex('ico_shop',g=>{ g.fillStyle(GOLD,1);
+    g.fillPoints([{x:60,y:34},{x:82,y:52},{x:88,y:78},{x:78,y:98},{x:42,y:98},{x:32,y:78},{x:38,y:52}],true); // the purse, full and tied
+    g.lineStyle(4,PARCH,1); g.lineBetween(46,40,60,26); g.lineBetween(74,40,60,26); // the tie strings
+    g.lineStyle(4,BRIGHT,1); g.lineBetween(40,48,80,48); // the knot band
+    spark(g,60,74,13,INK); spark(g,60,74,8,BRIGHT); }); // the coin-heart, in the field coin's own star
   tex('ico_auto',g=>{ arc(g,60,60,42,-Math.PI*0.35,Math.PI*0.95,6,STONE); head(g,100,44,-0.6,BRIGHT); // the circular arrow
     arc(g,54,60,21,-Math.PI*0.42,Math.PI*0.42,6,GOLD); // the bow
     g.lineStyle(3,PARCH,1); const a=Math.PI*0.42; g.lineBetween(54+Math.cos(-a)*21,60+Math.sin(-a)*21,54+Math.cos(a)*21,60+Math.sin(a)*21); }); // its string
@@ -1118,7 +1156,7 @@ const LOAD_TIPS=[
   'Tip: The camp can be cared for mid-wave — tap the camp or the CAMP button to Fortify, Repair, and light the Watch Fire without leaving the fight. HOLD CAMP and the Repair is bought at once.',
   'Tip: Seasons bring their own chests — the Hallows Chest stands open Oct 25 – Nov 7. Elites and champions drop it in season, and the Chests panel sells it for Grokonians. Its gift cards fill the Album; finish a set and it pays.',
   'Tip: Tap an orb once and your hero will walk up and buy it — watch for the banner: it names the power and what it does.',
-  'Tip: Between waves, step out of the shop: gather wood from trees and stone from rocks, and BUILD fences and walls around the camp. Worn pieces can be mended; the enemy road can be funneled, never sealed.'
+  'Tip: Between waves the field is yours — no menu pops up on its own. Gather wood from trees and stone from rocks, BUILD fences and walls around the camp (the hammer circle, or the Build button on the bar), and open the market with the SHOP circle when YOU choose. Worn pieces can be mended; the enemy road can be funneled, never sealed.'
 ];
 class Boot extends Phaser.Scene{ constructor(){super('Boot');}
   preload(){ this.load.image('logo','assets/logo.png'); }
@@ -1440,10 +1478,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.twist=(!this.tutorial&&this.eraId==='bible')?currentTwist().id:null; this.seventhT=0; this.seventhAcc=0;
     // Upgrade 15: gather & build state — the run's wood/stone purse, the
     // field's resource nodes, the pieces built from them, build mode and
-    // its bar, and the intermission spent on the field (the shop's other
-    // room, on the shop's own deadline).
+    // its bar. (Upgrade 23: the intermission is its own standing state
+    // on the field now, on its own deadline — no longer the shop's
+    // other room.)
     this.wood=0; this.stone=0; this.builds=[]; this.nodes=[]; this.buildMode=false; this.buildTool='fence'; this.gatherT=0;
     this.interField=false; this.buildItems=[]; this.interItems=[]; this.buildBarRect=null; this.interBtnRects=[]; this.buildBtnRect=null;
+    // Upgrade 23: the market's state — shopMode is null while the menu
+    // is shut, 'inter' while it stands on the intermission's clock,
+    // 'field' while it stands mid-wave as a field market. menuSeen
+    // remembers that the player has opened the menu once this run
+    // (the first opening carries the first-visit teaching line).
+    this.shopMode=null; this.menuSeen=false; this.shopBtnRect=null;
     // Upgrade 18: the carried weapon — the Rack's equipped piece,
     // resolved. The tutorial always teaches the starter sling (the
     // lesson's weapon), whatever the Rack holds. pendingChests are the
@@ -1483,7 +1528,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.campPos={x:150,y:600}; this.campSpr=this.add.image(this.campPos.x,this.campPos.y,'camp').setDepth(2);
     this.campBar=this.add.graphics().setDepth(12);
     this.manna=ERAS.startManna; this.speed=1; this.time.timeScale=1;
-    this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.victoryOpen=false; this.shopT=0; this.shopEndsAt=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
+    this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.shopMode=null; this.victoryOpen=false; this.shopT=0; this.shopEndsAt=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
     this.fx=this.add.graphics().setDepth(20);
     this.selFx=this.add.graphics().setDepth(6); // Upgrade 9: the selection ring (world layer, under the fight furniture)
     this.rallyFx=this.add.graphics().setDepth(5); // Upgrade 10: rally banners (world layer, under the selection ring)
@@ -1509,7 +1554,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // shop — no wave ever starts here (waveActive never turns on), so no
     // shop, no victory screen and no end() can ever fire in the tutorial.
     if(this.tutorial){ this.startTutorial(); }
-    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:'')+(this.twist?'\nThis week\'s law: '+this.twistDef().name+' — '+this.twistDef().blurb:'')+'\nCarrying: '+this.weapon.name,4200); this.openShop(true); }
+    else { this.toast(this.era.name+' — Goal: survive wave '+this.goalWave+(this.era.verse?'\n'+this.era.verse:'')+(this.twist?'\nThis week\'s law: '+this.twistDef().name+' — '+this.twistDef().blurb:'')+'\nCarrying: '+this.weapon.name,4200); this.enterIntermission(true); }
   }
   // HUD, command bar, toasts, shop and overlays are screen furniture: anything
   // at depth >= 30 is pinned to the camera so the world can scroll beneath it.
@@ -1592,20 +1637,34 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // CAMP button's: a tap on it is a button press, never a march order.
     this.pauseBtn=button(this,1246,20,40,40,'⚙',()=>this.openPause(),{size:16,circle:40}); this.pauseBtn.setDepth(31);
     this.pauseBtnRect={x:1246,y:20,w:40,h:40};
-    // Upgrade 15: the BUILD button — the right column's eighth seat,
-    // directly under the power stack in the same 196x56 family (its
-    // bottom edge, 596, still clears the command bar). It is command
-    // furniture, not a fight input: it does NOT join fightRects (the
-    // Upgrade-10 stack wall stays exactly seven), it keeps its own
-    // onTap wall like CAMP and ⚙, and it registers in the layout
-    // system like every other battle control.
-    // Upgrade 17: BUILD is a 64 circle at the row's right end — its old
-    // seat under the stack belongs to the grown power circles now. In
-    // the Simple face it is the fan's last member; buildBtnRect always
-    // names its ACTIVE circle (fan position while the fan stands).
-    this.buildBtn=button(this,1130,HUD_Y+55,64,64,'',()=>this.fanPress(()=>this.toggleBuildMode()),{size:16,icon:'ico_build',floatName:'Build',circle:64}); this.buildBtn.setDepth(31);
-    this.buildBtnRect={x:1130,y:HUD_Y+55,w:64,h:64};
+    // Upgrade 15: the BUILD button. It is command furniture, not a
+    // fight input: it does NOT join fightRects (the Upgrade-10 stack
+    // wall stays exactly seven), it keeps its own onTap wall like
+    // CAMP and ⚙, and it registers in the layout system like every
+    // other battle control.
+    // Upgrade 17: BUILD became a 64 circle at the row's right end —
+    // and in the Few face U17/U20 hid it inside the ORDERS fan, which
+    // is why a player on the default face met NO build button at all.
+    // Upgrade 23 (kennin: "there's no build button... you actually
+    // need to build the build mechanic inside of the game"): BUILD is
+    // a first-class circle now, standing in BOTH faces at its own
+    // seat beside the powers arc's foot (1062,556 — inside the
+    // playable screen with real margins, per his placement law);
+    // buildBtnRect always names that standing circle.
+    this.buildBtn=button(this,1062,556,64,64,'',()=>this.toggleBuildMode(),{size:16,icon:'ico_build',floatName:'Build',circle:64}); this.buildBtn.setDepth(31);
+    this.buildBtnRect={x:1062,y:556,w:64,h:64};
     this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:64,h:64}; });
+    // Upgrade 23: the SHOP button — the market the player opens by
+    // choice (kennin: no menu pops up at wave end; "I want there to
+    // be a menu where you can buy soldiers" — one that exists for HIM
+    // to open). It stands on the left rail above GUARD — the sidebar
+    // he named — in both faces, with its own onTap wall like BUILD's.
+    // Its press opens the SAME shop the intermission always held
+    // (toggleShopMenu): between waves on the intermission's clock,
+    // mid-wave as a field market under the camp panel's rules.
+    this.shopBtn=button(this,102,348,64,64,'',()=>this.toggleShopMenu(),{size:16,icon:'ico_shop',floatName:'Shop',circle:64}); this.shopBtn.setDepth(31);
+    this.shopBtnRect={x:102,y:348,w:64,h:64};
+    this.regLayout('shop',this.shopBtn,(x,y)=>{ this.shopBtnRect={x,y,w:64,h:64}; });
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave>0&&this.isNightWave(this.wave)?'Night':'Day'; }
@@ -1651,7 +1710,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // toggle. The walls are circles now, like the buttons.
     if(this.fanIsOpen()){ const onFan=FAN_MEMBERS.some(id=>{ const b=this.fanBtn(id); return b&&Math.hypot(p.x-b.x,p.y-b.y)<=(b.circleR||28); });
       const onOrders=this.ordersBtn&&Math.hypot(p.x-this.ordersBtn.x,p.y-this.ordersBtn.y)<=(this.ordersBtn.circleR||32);
-      if(onFan||onOrders) return;
+      // Upgrade 23: BUILD and SHOP stand OUTSIDE the fan now — a tap
+      // on either is its own press, never the fan's closing tap.
+      const onBuild=this.buildBtnRect&&Math.hypot(p.x-this.buildBtnRect.x,p.y-this.buildBtnRect.y)<=(this.buildBtnRect.w/2+4);
+      const onShop=this.shopBtnRect&&Math.hypot(p.x-this.shopBtnRect.x,p.y-this.shopBtnRect.y)<=(this.shopBtnRect.w/2+4);
+      if(onFan||onOrders||onBuild||onShop) return;
       this.closeFan(); return; }
     // Upgrade 8: a tap on the fight cluster is a fight input, never a
     // march order — the two hands stay separate.
@@ -1666,6 +1729,9 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // mode stands open, the build bar's own ground belongs to its tools;
     // while the intermission field bar stands, its buttons own their taps.
     if(this.buildBtnRect&&Math.hypot(p.x-this.buildBtnRect.x,p.y-this.buildBtnRect.y)<=this.buildBtnRect.w/2+4) return;
+    // Upgrade 23: the same wall for the SHOP button — opening the
+    // market is a button press, never a march order under it.
+    if(this.shopBtnRect&&Math.hypot(p.x-this.shopBtnRect.x,p.y-this.shopBtnRect.y)<=this.shopBtnRect.w/2+4) return;
     if(this.buildMode&&this.buildBarRect&&Math.abs(p.x-this.buildBarRect.x)<=this.buildBarRect.w/2&&Math.abs(p.y-this.buildBarRect.y)<=this.buildBarRect.h/2) return;
     if(this.interField&&(this.interBtnRects||[]).some(r=>Math.abs(p.x-r.x)<=r.w/2+4&&Math.abs(p.y-r.y)<=r.h/2+4)) return;
     // Upgrade 12: under STICK or FOLLOW, a field press is not yet a tap —
@@ -2127,9 +2193,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // idempotent (it clears what it resolves), so the scene path
     // still serving field releases costs nothing.
     btn.on('pointerup',p=>this.endPresses(p));
-    btn.on('pointerdown',(p,lx,ly)=>{ if(Math.hypot(lx||0,ly||0)>(btn.circleR||32)) return; // the circle is the law, as everywhere
+    btn.on('pointerdown',(p,lx,ly)=>{ // Upgrade 23: the circle is the law, measured in the pointer's own frame
+      // (see the frame law at button()): the engine's lx/ly for a
+      // container arrive shifted by half the button's size, and the
+      // old hypot(lx,ly) gate refused every centre press — no record
+      // was ever opened, so no release could resolve a verb. The
+      // pointer's position against the button's centre is the truth;
+      // lx/ly are only the fallback for a position-less pointer.
+      const dx=(p&&typeof p.x==='number')?p.x-btn.x:(lx||0), dy=(p&&typeof p.y==='number')?p.y-btn.y:(ly||0);
+      if(Math.hypot(dx,dy)>(btn.circleR||32)) return; // the circle is the law, as everywhere
       if(!this.pressGatesOpen()) return;
-      const rec={t0:performance.now(),held:false,id:p&&p.id};
+      const rec={t0:performance.now(),held:false,id:p&&p.id,ptr:p};
       if(kind==='guard'){ if(this.hero&&this.hero.down>0) return; this.guardPress=rec; }
       else if(kind==='skill'){ const b=this.skillBtns&&this.skillBtns[idx];
         if(!b) return;
@@ -2145,6 +2219,15 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(t) return {x:t.x,y:t.y};
     return {x:h.x+(h.faceX||1)*130,y:h.y+(h.faceY||0)*130}; }
   tickPresses(){ const now=performance.now();
+    // Upgrade 23 — the drift sweep: a release the engine ATE (the
+    // thumb lifted over a neighbouring button, whose helper release
+    // cancels the scene pointerup — the camp-falls suppression) must
+    // not leave the press record standing to fire late on some later,
+    // unrelated release. A record whose pointer is no longer down is
+    // resolved NOW, as the release it always was: a tap if the hold
+    // never came, the held verb's release if it did.
+    ['guardPress','skillPress','ordersPress','campPress','afPress'].forEach(k=>{ const rec=this[k];
+      if(rec&&rec.ptr&&rec.ptr.isDown===false) this.endPresses(rec.ptr); });
     const cross=(rec,fn)=>{ if(rec&&!rec.held&&now-rec.t0>=HOLD_MS){ rec.held=true; fn(); } };
     cross(this.guardPress,()=>this.setBlock(true)); // GUARD hold: the guard rises and stays until the release
     cross(this.skillPress,()=>{}); // a power's hold is the reticle itself — drawn from skillPress.held; the cast waits for the release
@@ -2277,8 +2360,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const act=id=>(few&&showFan)?this.fanSpot(id):this.seatOf(id);
     const vb=this.cmdBtns.volley; if(vb){ const a=act('cmd_volley'); vb.sx=a.x; vb.sy=a.y; }
     if(this.rallyBtn){ const a=act('cmd_rally'); this.rallyBtnRect={x:a.x,y:a.y,w:56,h:56}; }
-    if(this.buildBtn){ if(few&&!showFan) this.buildBtnRect={x:-9999,y:-9999,w:64,h:64};
-      else { const a=act('build'); this.buildBtnRect={x:a.x,y:a.y,w:64,h:64}; } } }
+    // Upgrade 23: BUILD is no longer the fan's to hide — it stands at
+    // its own seat in both faces, fan open or shut; applyFace keeps
+    // its container and its wall on that seat like any standing
+    // control's.
+    if(this.buildBtn){ this.btnShow(this.buildBtn,true); const s=this.seatOf('build'); this.buildBtn.setPosition(s.x,s.y); this.buildBtnRect={x:s.x,y:s.y,w:64,h:64}; } }
   fanIsOpen(){ return this.face==='few'&&!!this.fanOpen; }
   toggleFan(){ if(this.face!=='few') return;
     this.fanOpen=!this.fanOpen; this.applyFace();
@@ -2369,6 +2455,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'rally': this.pressRally(); break;
       case 'camp': this.toggleCampPanel(); break;
       case 'build': this.toggleBuildMode(); break;
+      case 'shop': this.toggleShopMenu(); break;
       default: if(ORDER_NAMES[act]) this.giveOrder(act); } }
   // --- Upgrade 12: the pause overlay + the in-battle layout editor ---
   openPause(){ if(this.over||this.shopOpen||this.victoryOpen||this.paused||this.layoutEdit) return;
@@ -2641,7 +2728,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     campBtn(CAMP_UPGRADES[3],colX[1],rowY[0]); campBtn(CAMP_UPGRADES[4],colX[1],rowY[1]);
     const full=this.campHp>=this.campMax;
     const rb=button(this,colX[1],rowY[2],268,46,'Repair +'+CAMP_REPAIR.heal+' · '+CAMP_REPAIR.cost,()=>this.buyCampRepair(),{size:15,disabled:full||this.manna<CAMP_REPAIR.cost}); rb.setDepth(51); this.campAdd(rb);
-    const cb=button(this,px+pw/2,py+ph-40,220,46,'Close',()=>this.closeCampPanel(),{size:16}); cb.setDepth(51); this.campAdd(cb);
+    // Upgrade 23: the market is reachable from the camp panel too —
+    // the buy-soldiers menu stands one tap from the camp's own care.
+    const mb=button(this,px+pw/2-118,py+ph-40,224,46,'Market — soldiers & gear',()=>{ this.closeCampPanel(); this.toggleShopMenu(); },{size:14}); mb.setDepth(51); this.campAdd(mb);
+    const cb=button(this,px+pw/2+118,py+ph-40,224,46,'Close',()=>this.closeCampPanel(),{size:16}); cb.setDepth(51); this.campAdd(cb);
     this.fixUI(); }
   // Watch Fire: a camp that has bought its fire fights back — an ember at the
   // nearest enemy in range every CAMP_FIRE.rate seconds, with a gold spark at
@@ -2714,7 +2804,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const g=this.add.graphics().setDepth(55); g.fillStyle(0x140c07,0.94); g.fillRoundedRect(W/2-430,cy-40,860,80,10); g.lineStyle(2,0xd9a441,1); g.strokeRoundedRect(W/2-430,cy-40,860,80,10); items.push(g);
     items.push(txt(this,W/2,cy-24,'Wood '+Math.floor(this.wood||0)+'  ·  Stone '+Math.floor(this.stone||0)+'  —  tap the field to use the tool in hand',13,'#cdbd95').setOrigin(0.5).setDepth(56));
     const mendCost=Math.max(1,Math.ceil(BUILD.pieces.fence.cost/BUILD.mendCostDiv));
-    const tool=(id,label,x,w,afford)=>{ const b=button(this,x,cy+14,w,40,label,()=>{ this.buildTool=id; this.renderBuildBar(); },{size:14,disabled:!afford}); b.setDepth(56); if(this.buildTool===id) b.redraw(true); items.push(b); };
+    // Upgrade 23 (kennin's exact requirement): a tool the purse cannot
+    // afford is still SELECTABLE — a greyed, silent button was how the
+    // build mechanic hid. Taking it in hand speaks the shortage at
+    // once, in plain words, and the placement tap speaks it again
+    // (tryPlace's 'funds' answer); nothing is placed, nothing charged.
+    const tool=(id,label,x,w,afford)=>{ const b=button(this,x,cy+14,w,40,label,()=>{ this.buildTool=id;
+      if(!afford){ const def=BUILD.pieces[id]; this.toast('Not enough '+def.res+' — a '+(id==='fence'?'Fence':'Wall')+' needs '+def.cost+' '+def.res+', you have '+Math.floor(this[def.res]||0)+'. Gather more from '+(def.res==='wood'?'trees':'rocks')+'.'); }
+      this.renderBuildBar(); },{size:14}); b.setDepth(56); if(this.buildTool===id) b.redraw(true); items.push(b); };
     tool('fence','Fence · '+BUILD.pieces.fence.cost+' wood',W/2-330,180,(this.wood||0)>=BUILD.pieces.fence.cost);
     tool('wall','Wall · '+BUILD.pieces.wall.cost+' stone',W/2-140,180,(this.stone||0)>=BUILD.pieces.wall.cost);
     tool('mend','Mend · '+mendCost,W/2+40,140,true);
@@ -2801,16 +2898,21 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // shopEndsAt deadline keeps running in update(), the field bar below
   // carries the same countdown, and the wave starts from the field at
   // zero exactly once (beginInterWave), or early by its button.
-  leaveShopToField(){ if(!this.shopOpen||this.revealPanel) return; this.shopOpen=false; this.shopFirst=false; this.clearShop();
+  leaveShopToField(){ if(!this.shopOpen||this.revealPanel) return; this.shopOpen=false; this.shopMode=null; this.shopFirst=false; this.clearShop();
     this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
     this.interField=true; this.renderInterBar(); }
   renderInterBar(){ this.clearInterBar(); const items=[]; this.interItems=items;
     const g=this.add.graphics().setDepth(55); g.fillStyle(0x140c07,0.94); g.fillRoundedRect(W/2-340,76,680,56,10); g.lineStyle(2,0xd9a441,1); g.strokeRoundedRect(W/2-340,76,680,56,10); items.push(g);
-    this.interTxt=txt(this,478,104,this.shopTimerLabel(),16,GOLD).setOrigin(0.5).setDepth(56); items.push(this.interTxt);
+    this.interTxt=txt(this,430,104,this.shopTimerLabel(),16,GOLD).setOrigin(0.5).setDepth(56); items.push(this.interTxt);
+    // Upgrade 23: the bar is the intermission's standing furniture
+    // now (not the shop's other room): the market by choice (Shop),
+    // the build by choice (Build), the wave by choice or by the clock
+    // (Next Wave). Nothing on it opens itself.
+    const bb=button(this,600,104,110,40,'Build',()=>this.toggleBuildMode(),{size:15}); bb.setDepth(56); items.push(bb);
     const sb=button(this,740,104,120,40,'Shop',()=>this.openShop(false,true),{size:15}); sb.setDepth(56); items.push(sb);
     const nb=button(this,890,104,150,40,'Next Wave ▶',()=>this.beginInterWave(),{size:15}); nb.setDepth(56); items.push(nb);
     items.push(txt(this,W/2,152,'Between waves: gather wood and stone — BUILD fences and walls around the camp.',13,'#cdbd95').setOrigin(0.5).setDepth(56));
-    this.interBtnRects=[{x:740,y:104,w:120,h:40},{x:890,y:104,w:150,h:40}];
+    this.interBtnRects=[{x:600,y:104,w:110,h:40},{x:740,y:104,w:120,h:40},{x:890,y:104,w:150,h:40}];
     this.fixUI(); }
   clearInterBar(){ (this.interItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.interItems=[]; this.interTxt=null; this.interBtnRects=[]; }
   beginInterWave(){ if(!this.interField) return; this.interField=false; this.clearInterBar(); this.startWave(); }
@@ -3168,7 +3270,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   collectChests(){ if(!this.fieldChests||!this.fieldChests.length||!this.hero||this.hero.down>0) return; const h=this.hero;
     this.fieldChests=this.fieldChests.filter(c=>{ if(Math.hypot(c.x-h.x,c.y-h.y)>=30) return true;
       if(c.spr) c.spr.destroy(); this.pendingChests.push(c.grade); Rack.setPending(this.pendingChests);
-      this.floatText(c.x,c.y-18,'Chest banked — it opens after the wave',GOLD); SFX.chest(); return false; }); }
+      this.floatText(c.x,c.y-18,'Chest banked — open it from the menu between waves',GOLD); SFX.chest(); return false; }); }
   shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); const sh={s,target,opt,speed:speed||560,lx:target.x,ly:target.y};
     // Upgrade 18: a piercing shot (the rifle) remembers where it was
     // fired from, whom it has already struck, and how far it may fly.
@@ -3260,25 +3362,60 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 8: the cast spends the charge and is tallied at its tier.
     this.heldSpent[tier]++; b.held=0; b._tierShown=0; b.buffered=false; b.cd=k.cd; b.cdMax=k.cd;
     if(this.tutorial){ this.tutEvent('power'); if(aimPt) this.tutEvent('aimed'); } } // Upgrade 11: a real cast — reached only past every 'No target' return, so it always counts. Upgrade 20: an aimed cast also proves the aim
-  // --- between-wave shop ---
-  // Upgrade 6: the intermission deadline is a wall-clock moment, set ONCE
-  // here. It lives on the scene, not on any shop widget, so buying, paging
-  // and the re-renders they cause never reset or pause it. shopT is the
-  // remaining-seconds mirror update() maintains from that deadline.
-  // Upgrade 15: openShop takes an optional second word — keepT. From the
-  // field bar's Shop button, the intermission's deadline is KEPT, not
-  // re-armed: the minute belongs to the intermission, not to whichever
-  // room the player is standing in, so stepping in and out of the shop
-  // can never farm time. Every other caller arms the full minute, as ever.
-  openShop(first,keepT){ if(this.campPanelOpen) this.closeCampPanel(); this.closeFan(); this.exitBuildMode(); this.interField=false; this.clearInterBar(); this.shopOpen=true; this.shopFirst=!!first; this.shopPage=0;
-    if(keepT&&this.shopEndsAt>Date.now()) this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
-    else { this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; }
-    // squads and hero mend between waves
-    this.squads.forEach(s=>{ s.hp=s.max; }); this.hero.hp=this.heroDef.hp;
-    this.renderShop(first);
-    // Upgrade 18: banked chests open HERE, in the intermission, on the
-    // reveal panel — on this same honest clock, never in the fight.
-    this.openRevealIfAny(); }
+  // --- the market menu (Upgrade 23: the shop is a door, not a popup) ---
+  // Kennin's ruling (2026-10-31): "when a wave ends I don't want a menu
+  // to pop up. But I want there to be a menu where you can buy
+  // soldiers" — and, refined on the same call, at wave end the player
+  // must still be able to walk around: the intermission never seizes
+  // control. So the wave's end now enters the INTERMISSION (below) —
+  // the field, a slim bar, the same honest 60-second clock, and full
+  // freedom to walk, gather and build — and the shop is a menu the
+  // player opens by choice: the SHOP circle on the left rail (the
+  // sidebar he named), the intermission bar's Shop button, or the
+  // camp panel's Market button.
+  // Upgrade 6's law survives intact: the intermission deadline is a
+  // wall-clock moment, set ONCE by enterIntermission. It lives on the
+  // scene, not on any shop widget, so opening, buying, paging and
+  // leaving never reset or pause it. keepT (Upgrade 15) is how the
+  // menu steps onto that standing deadline without re-arming it.
+  // The menu has TWO modes on one render:
+  //  - 'inter': opened during the intermission — the clock runs (in
+  //    the menu and on the field bar alike), Next Wave starts the
+  //    wave, and banked chests open here (the U18 law: loot never
+  //    interrupts a battle; the reveal now waits for the player's own
+  //    tap on the menu's chest entry instead of ambushing him).
+  //  - 'field': opened mid-wave — a field market under the CAMP
+  //    PANEL's rules (Upgrade 9): the fight does NOT pause behind it,
+  //    field taps are walled, purchases land instantly at the same
+  //    prices through the same paths. No clock, no Next Wave button,
+  //    and chest reveals stay an intermission rite — the entry says
+  //    so in plain words.
+  enterIntermission(first){ if(this.revealPanel) this.closeReveal();
+    if(this.shopOpen){ this.shopOpen=false; this.shopMode=null; this.clearShop(); }
+    if(this.campPanelOpen) this.closeCampPanel(); this.closeFan(); this.exitBuildMode();
+    this.shopFirst=!!first;
+    // The between-wave mend belongs to the WAVE's end, not to the
+    // menu: it happens here, once, whether or not the player ever
+    // opens the market (it rode openShop only because the shop was
+    // the intermission's only room).
+    this.squads.forEach(s=>{ s.hp=s.max; }); if(this.hero) this.hero.hp=this.heroDef.hp;
+    this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000;
+    this.interField=true; this.renderInterBar(); this.refreshHUD(); }
+  toggleShopMenu(){ if(this.over||this.victoryOpen||this.paused||this.layoutEdit) return;
+    if(this.tutorial){ this.toast('The market waits for the real wall — the lesson stays as it is.'); return; }
+    if(this.shopOpen){ if(this.revealPanel){ this.toast('The chest first — what it holds may change your plans'); return; }
+      if(this.shopMode==='field') this.closeShop(); else this.leaveShopToField(); return; }
+    if(this.interField) this.openShop(!this.menuSeen,true,'inter');
+    else this.openShop(false,false,'field');
+    this.menuSeen=true; }
+  openShop(first,keepT,mode){ if(this.campPanelOpen) this.closeCampPanel(); this.closeFan(); this.exitBuildMode();
+    this.shopOpen=true; this.shopFirst=!!first; this.shopPage=0;
+    this.shopMode=(mode==='field')?'field':'inter';
+    if(this.shopMode==='field'){ this.shopT=0; } // no clock: the fight goes on behind the market
+    else { this.interField=false; this.clearInterBar();
+      if(keepT&&this.shopEndsAt>Date.now()) this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
+      else { this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; } }
+    this.renderShop(first); }
   shopTimerLabel(){ const s=Math.max(0,Math.ceil(this.shopT)); return 'Next wave in '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
   shopAdd(o){ this.shopItems.push(o); return o; }
   clearShop(){ this.shopItems.forEach(o=>{ try{o.destroy();}catch(e){} }); this.shopItems=[]; }
@@ -3300,7 +3437,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const full=this.campHp>=this.campMax;
     const rb=button(this,1140,sy+21,142,34,'Repair +'+CAMP_REPAIR.heal+' · '+CAMP_REPAIR.cost,()=>this.buyCampRepair(),{size:13,disabled:full||this.manna<CAMP_REPAIR.cost}); rb.setDepth(52); this.shopAdd(rb); }
   renderShop(first){ this.clearShop();
-    const units=this.roster.player, pages=Math.ceil(units.length/6), pageUnits=units.slice(this.shopPage*6,this.shopPage*6+6);
+    // Upgrade 23: the pager gains one last page — THE RACK — where
+    // the found weapons (with Equip), the season's chest (while it
+    // stands) and the banked chests live inside the menu.
+    const units=this.roster.player, pages=Math.ceil(units.length/6), totalPages=pages+1, pageUnits=units.slice(this.shopPage*6,this.shopPage*6+6);
     // Panel starts at y=38, below the HUD stat line, so the header is never clipped behind the shop.
     const bg=this.add.graphics().setDepth(50); bg.fillStyle(0x140c07,0.92); bg.fillRect(24,38,W-48,H-62); bg.lineStyle(3,0xd9a441); bg.strokeRect(24,38,W-48,H-62); this.shopAdd(bg);
     // Camp-Falls rider (2026-10-31): the head reads the RUN's own count,
@@ -3312,14 +3452,21 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // rest of the intermission gathering and building. The deadline
     // keeps running out there (update's interField branch); the bar
     // that appears carries the same countdown and the way back in.
-    const fb=button(this,1085,50,170,42,'To the Field ▶',()=>this.leaveShopToField(),{size:15}); fb.setDepth(52); this.shopAdd(fb);
+    // Upgrade 23: the door stands in 'inter' mode only — in the field
+    // market the player never left the field.
+    if(this.shopMode!=='field'){ const fb=button(this,1085,50,170,42,'To the Field ▶',()=>this.leaveShopToField(),{size:15}); fb.setDepth(52); this.shopAdd(fb); }
+    // Upgrade 23: the chest entry — banked chests open HERE, by the
+    // player's own tap, never by ambush at wave end (the reveal's old
+    // auto-open is retired with the popup). The count rides the label.
+    const pendN=(this.pendingChests||[]).length;
+    const chb=button(this,168,50,196,42,'Chests'+(pendN?' · '+pendN+' waiting':''),()=>this.menuChestEntry(),{size:14}); chb.setDepth(52); this.shopAdd(chb);
     this.shopHead2=this.shopAdd(txt(this,W/2,76,'',19,PARCH).setOrigin(0.5).setDepth(51)); this.updateShopHead();
     // Upgrade 4: the camp strip lives on page 1 only, and pushes that page's
     // unit grid down by 24px; pages 2+ keep the original geometry untouched.
     const gridY=this.shopPage===0?136:112;
     if(this.shopPage===0) this.renderCampStrip();
-    if(this.shopFirst) this.shopAdd(txt(this,W/2,635,'While the camp stands, the fallen hero returns to it. If the camp falls, the fight goes on — but then the hero must not fall.',13,'#cdbd95').setOrigin(0.5).setDepth(51));
-    pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=gridY+row*252,cx=x+190;
+    if(this.shopFirst&&this.shopPage<pages) this.shopAdd(txt(this,W/2,635,'While the camp stands, the fallen hero returns to it. If the camp falls, the fight goes on — but then the hero must not fall.',13,'#cdbd95').setOrigin(0.5).setDepth(51));
+    if(this.shopPage<pages) pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=gridY+row*252,cx=x+190;
       const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(x,y,380,238,10); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(x,y,380,238,10); this.shopAdd(g);
       const im=uspr(this,x+42,y+44,def,58).setDepth(52); applyTint(im,def); this.shopAdd(im);
       const owned=this.ownedSquad(def.id);
@@ -3349,21 +3496,71 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         if(!(def.upgrades||[]).length) this.shopAdd(txt(this,x+20,y+114,'Max tier',16,'#8fd06a').setDepth(52));
       }
     });
+    if(this.shopPage>=pages) this.renderRackPage();
     const quit=button(this,120,668,180,48,'Quit run',()=>this.end(false),{size:17}); quit.setDepth(52); this.shopAdd(quit);
-    if(pages>1){ const pv=button(this,420,668,60,48,'◀',()=>{ this.shopPage=(this.shopPage+pages-1)%pages; this.renderShop(false); },{size:18}); pv.setDepth(52); this.shopAdd(pv);
-      this.shopAdd(txt(this,490,668,(this.shopPage+1)+'/'+pages,18,PARCH).setOrigin(0.5).setDepth(52));
-      const nx=button(this,560,668,60,48,'▶',()=>{ this.shopPage=(this.shopPage+1)%pages; this.renderShop(false); },{size:18}); nx.setDepth(52); this.shopAdd(nx); }
-    const go=button(this,820,668,300,54,'Next Wave Now ▶',()=>this.closeShop(),{size:22}); go.setDepth(52); this.shopAdd(go);
-    this.shopTimerTxt=this.shopAdd(txt(this,1090,668,this.shopTimerLabel(),18,GOLD).setOrigin(0.5).setDepth(52));
+    if(totalPages>1){ const pv=button(this,420,668,60,48,'◀',()=>{ this.shopPage=(this.shopPage+totalPages-1)%totalPages; this.renderShop(false); },{size:18}); pv.setDepth(52); this.shopAdd(pv);
+      this.shopAdd(txt(this,490,668,(this.shopPage+1)+'/'+totalPages,18,PARCH).setOrigin(0.5).setDepth(52));
+      const nx=button(this,560,668,60,48,'▶',()=>{ this.shopPage=(this.shopPage+1)%totalPages; this.renderShop(false); },{size:18}); nx.setDepth(52); this.shopAdd(nx); }
+    const go=button(this,820,668,300,54,this.shopMode==='field'?'Back to the fight':'Next Wave Now ▶',()=>this.closeShop(),{size:22}); go.setDepth(52); this.shopAdd(go);
+    this.shopTimerTxt=this.shopAdd(txt(this,1090,668,this.shopMode==='field'?'The fight goes on':this.shopTimerLabel(),18,GOLD).setOrigin(0.5).setDepth(52));
     this.fixUI();
   }
+  // Upgrade 23: the menu's Rack page — the Armory's keeping, reachable
+  // without leaving the run: every found weapon with its Equip, the
+  // season's chest for sale while its season stands (the same
+  // purchaseSeasonalChest path the Chests panel sells through — same
+  // price, same spend, same pending queue), and the banked chests
+  // with their opening entry.
+  renderRackPage(){ let y=148;
+    this.shopAdd(txt(this,W/2,y,'THE RACK — what the field gave up',22,GOLD).setOrigin(0.5).setDepth(51)); y+=36;
+    const list=Rack.list();
+    list.slice(0,5).forEach(w=>{ const carried=this.weaponKey===w.key;
+      this.shopAdd(txt(this,120,y,w.tierName+' '+w.familyName+' — '+w.name,16,carried?'#ffe98a':PARCH).setDepth(51));
+      this.shopAdd(txt(this,120,y+22,'DMG '+w.dmg+'  ·  every '+w.rate+'s  ·  range '+w.range,13,'#cdbd95').setDepth(51));
+      if(carried) this.shopAdd(txt(this,1030,y+12,'Carried ✓',15,'#8fd06a').setOrigin(0.5).setDepth(51));
+      else { const eb=button(this,1030,y+12,190,40,'Equip',()=>this.equipFromRack(w.key),{size:15}); eb.setDepth(52); this.shopAdd(eb); }
+      y+=54; });
+    if(list.length>5){ this.shopAdd(txt(this,W/2,y+6,'…and '+(list.length-5)+' more on the Rack — the Armory at the menu holds them all',13,'#a08a6a').setOrigin(0.5).setDepth(51)); y+=34; }
+    const sv=liveSeason();
+    if(sv){ const afford=Tokens.balance()>=sv.price;
+      this.shopAdd(txt(this,120,y+10,'The '+sv.name+' — '+sv.price+' Grokonians, while its season stands',15,sv.css).setDepth(51));
+      const bb=button(this,1030,y+12,190,40,afford?'Buy the chest':'Short — '+sv.price+' G',()=>this.buySeasonalFromMenu(sv),{size:14,disabled:!afford}); bb.setDepth(52); this.shopAdd(bb); y+=52; }
+    const n=(this.pendingChests||[]).length;
+    this.shopAdd(txt(this,120,y+10,n?('Banked chests: '+n+' waiting in your Rack'):'Banked chests: none waiting',15,PARCH).setDepth(51));
+    const ob=button(this,1030,y+12,190,40,'Open a chest',()=>this.menuChestEntry(),{size:14,disabled:!n}); ob.setDepth(52); this.shopAdd(ob); }
+  // The chest entry's one voice, from the header button and the Rack
+  // page alike: nothing waiting speaks its nothing; mid-wave speaks
+  // the U18 law (loot never interrupts a battle); between waves the
+  // reveal opens — by this tap, the player's own.
+  menuChestEntry(){ const n=(this.pendingChests||[]).length;
+    if(!n){ this.toast('No chests waiting — they fall from the field\'s foes, and bank when you walk over them'); return; }
+    if(this.shopMode==='field'){ this.toast('Chests open between waves — '+n+' waiting in your Rack'); return; }
+    this.openRevealIfAny(); }
+  buySeasonalFromMenu(sv){ const r=purchaseSeasonalChest(sv.id);
+    if(r==='ok'){ this.pendingChests=Rack.pending(); this.toast('The '+sv.name+' waits in your Rack — open it from this menu, between waves'); this.renderShop(false); }
+    else if(r==='funds') this.toast('Not enough Grokonians — the '+sv.name+' costs '+sv.price+' G');
+    else if(r==='season-over') this.toast('Its season has passed');
+    else this.toast('That chest cannot be bought'); }
+  // Equipping from the Rack, in the shop or at a reveal, is ONE act:
+  // the Rack's equip, the hero's hand re-resolved, his ring and shown
+  // weapon re-drawn. revealEquip rides this and adds only its panel's
+  // next step.
+  applyEquippedWeapon(key){ if(!Rack.equip(key)) return false; const p=parseWeaponKey(key); this.weaponKey=key; this.weapon=resolveWeapon(p.family,p.tier,p.variant); this.bibleT=null;
+    if(this.hero){ if(this.hero.ring&&this.hero.ring.setRadius) this.hero.ring.setRadius(this.weapon.range);
+      if(this.hero.wpn){ this.hero.wpnShown=true; if(this.hero.wpn.setVisible) this.hero.wpn.setVisible(true); if(this.hero.wpn.setTexture) this.hero.wpn.setTexture('wpn_'+this.weapon.family);
+        if(this.hero.wpn.setTint){ if(this.weapon.flame) this.hero.wpn.setTint(0xf28c3c); else if(this.hero.wpn.clearTint) this.hero.wpn.clearTint(); } } }
+    return true; }
+  equipFromRack(key){ if(this.applyEquippedWeapon(key)){ this.toast('Carrying: '+this.weapon.name); this.renderShop(false); } }
   updateShopHead(){ if(this.shopHead2) this.shopHead2.setText('Manna '+Math.floor(this.manna)+'  •  Squads '+this.squads.length+'/'+this.squadCap+'  •  Next: wave '+(this.wave+1)+' ('+((this.wave+1)%2===0?'night':'day')+')  •  Goal: wave '+this.goalWave+(this.endless?' (cleared — Endless)':'')); }
-  closeShop(){ this.shopOpen=false;
+  closeShop(){ // Upgrade 23: the field market closes back into the
+    // fight it never paused — no wave starts from its closing.
+    if(this.shopMode==='field'){ this.shopOpen=false; this.shopMode=null; this.shopFirst=false; this.clearShop(); return; }
+    this.shopOpen=false;
     // Upgrade 18: a chest mid-reveal holds the wave — the shop simply
     // stays open behind the reveal panel (its deadline is held by
     // update() while the panel stands; see the shop branch there).
     if(this.revealPanel){ this.shopOpen=true; this.toast('The chest first — what it holds may change your plans'); return; }
-    this.shopFirst=false; this.shopEndsAt=0; this.clearShop(); this.startWave(); }
+    this.shopFirst=false; this.shopMode=null; this.shopEndsAt=0; this.clearShop(); this.startWave(); }
   // --- Upgrade 18: the intermission reveal ---
   // The reveal is a panel (panels stay panels, U17) standing over the
   // shop at depth 60/61. Its law is one line: a chest opens only while
@@ -3415,11 +3612,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       const kb=button(this,W/2+150,506,270,46,'Keep in the Rack',()=>this.revealNext(),{size:17}); kb.setDepth(61); this.revealAdd(kb); }
     else { const cb=button(this,W/2,506,270,46,'Continue',()=>this.revealNext(),{size:17}); cb.setDepth(61); this.revealAdd(cb); }
     this.fixUI(); }
-  revealEquip(key){ if(Rack.equip(key)){ const p=parseWeaponKey(key); this.weaponKey=key; this.weapon=resolveWeapon(p.family,p.tier,p.variant); this.bibleT=null;
-      if(this.hero){ if(this.hero.ring&&this.hero.ring.setRadius) this.hero.ring.setRadius(this.weapon.range);
-        if(this.hero.wpn){ this.hero.wpnShown=true; if(this.hero.wpn.setVisible) this.hero.wpn.setVisible(true); if(this.hero.wpn.setTexture) this.hero.wpn.setTexture('wpn_'+this.weapon.family);
-          if(this.hero.wpn.setTint){ if(this.weapon.flame) this.hero.wpn.setTint(0xf28c3c); else if(this.hero.wpn.clearTint) this.hero.wpn.clearTint(); } } }
-      this.toast('Carrying: '+this.weapon.name); }
+  revealEquip(key){ if(this.applyEquippedWeapon(key)) this.toast('Carrying: '+this.weapon.name); // Upgrade 23: the equip act itself lives in applyEquippedWeapon now — the shop's Rack page rides the same road
     this.revealNext(); }
   revealNext(){ if(this.revealQueue&&this.revealQueue.length) this.renderRevealCard(); else this.closeReveal(); }
   closeReveal(){ this.revealPanel=false; this.revealQueue=[]; this.clearReveal(); Rack.setPending(this.pendingChests||[]); }
@@ -3482,7 +3675,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.earn('wave',DATA.grokonians.perWave+(perfect?DATA.grokonians.perfectWaveBonus:0));
     SFX.win();
     if(this.wave>=this.goalWave&&!this.endless){ this.cleared=true; this.showVictory(); }
-    else { this.toast('Wave '+this.wave+' cleared  +'+bonus+' Manna'+(perfect?'  (perfect)':'')); this.flush(); this.openShop(false); }
+    else { this.toast('Wave '+this.wave+' cleared  +'+bonus+' Manna'+(perfect?'  (perfect)':'')); this.flush(); this.enterIntermission(false); }
     this.refreshHUD(); }
   showVictory(){ this.victoryOpen=true; const s=[];
     const campFrac=Math.max(0,this.campHp/this.campMax);
@@ -3496,12 +3689,16 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     s.push(txt(this,W/2,275,'★'.repeat(stars)+'☆'.repeat(3-stars),36,GOLD).setOrigin(0.5).setDepth(56));
     s.push(txt(this,W/2,325,'Goal wave '+this.goalWave+' survived. Endless waves go on from here —\nhow deep can your squads march?',18,PARCH,{align:'center'}).setOrigin(0.5).setDepth(56));
     if(this.campDown()) s.push(txt(this,W/2,378,'The field was held, but the camp was lost — one star.',15,'#cdbd95',{align:'center'}).setOrigin(0.5).setDepth(56));
-    const c=button(this,W/2-160,440,290,56,'Continue Endless',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.endless=true; this.flush(); this.openShop(false); },{size:19}); c.setDepth(56); s.push(c);
+    const c=button(this,W/2-160,440,290,56,'Continue Endless',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.endless=true; this.flush(); this.enterIntermission(false); },{size:19}); c.setDepth(56); s.push(c);
     const f=button(this,W/2+160,440,290,56,'Finish run',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.end(true); },{size:19}); f.setDepth(56); s.push(f); this.fixUI(); }
   // --- main loop ---
   update(time,delta){ if(this.over) return;
     this.syncCampRubble(); // Camp-Falls: the rubble read follows campHp wherever it changed — including a Repair bought in the shop below
-    if(this.shopOpen){ // Upgrade 6: every shop counts the same honest minute
+    if(this.shopOpen&&this.shopMode!=='field'){ // Upgrade 6: every shop counts the same honest minute
+      // Upgrade 23: the FIELD market is the one exception to this
+      // branch's early return — opened mid-wave, it does not hold the
+      // battle: update() falls through and the fight goes on behind
+      // it, exactly as it does behind the camp panel (Upgrade 9).
       // down from the wall-clock deadline set in openShop. Phaser stops
       // calling update() while the tab is hidden, so a returning player
       // simply finds the minute elapsed and the wave beginning — the timer
@@ -3754,7 +3951,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.waveActive&&!this.spawnQ.length&&!this.enemies.length) this.waveClear();
     this.refreshHUD();
   }
-  end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.closeCampPanel(); this.closeFan();
+  end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.shopMode=null; this.closeCampPanel(); this.closeFan();
     // Upgrade 18: unopened chests are never lost with the run — what
     // was banked (or mid-reveal) waits in the Rack for the next
     // intermission, and the end screen says so.
@@ -3853,7 +4050,7 @@ class Chests extends Phaser.Scene{ constructor(){super('Chests');}
   init(d){ this.from=(d&&d.from)||'Menu'; this.fromData=(d&&d.fromData)||null; this.msg=(d&&d.msg)||null; }
   create(){ backdrop(this,0.78); Music.play(this,'menu');
     txt(this,W/2,40,'Chests & Seasons',38,GOLD).setOrigin(0.5);
-    txt(this,W/2,76,'Grokonians: '+Tokens.balance()+'   •   Seasonal chests open at your next intermission — never mid-battle',16,GOLD).setOrigin(0.5);
+    txt(this,W/2,76,'Grokonians: '+Tokens.balance()+'   •   Seasonal chests open from the battle menu between waves — never mid-battle',16,GOLD).setOrigin(0.5);
     const now=new Date(), live=liveSeason(now);
     const pend=Rack.pending().filter(g=>SEASON_BY_ID[g]).length;
     if(pend) txt(this,W/2,104,pend+' seasonal chest'+(pend>1?'s':'')+' waiting in your Rack',14,'#f2c14e').setOrigin(0.5);
@@ -3867,7 +4064,7 @@ class Chests extends Phaser.Scene{ constructor(){super('Chests');}
       txt(this,336,y+52,'Gift cards, arms and treats inside  •  ends in '+st.daysLeft+' day'+(st.daysLeft===1?'':'s'),14,'#cdbd95');
       const afford=Tokens.balance()>=live.price;
       button(this,995,y+16,190,54,afford?('Buy — '+live.price+' G'):('Short — '+live.price+' G'),()=>{ const r=purchaseSeasonalChest(live.id);
-        const m=r==='ok'?('A '+live.name+' waits in your Rack — it opens at your next intermission.'):r==='funds'?('Not enough Grokonians — the chest costs '+live.price+'.'):('The season has turned — the chest is gone until it returns.');
+        const m=r==='ok'?('A '+live.name+' waits in your Rack — open it from the battle menu, between waves.'):r==='funds'?('Not enough Grokonians — the chest costs '+live.price+'.'):('The season has turned — the chest is gone until it returns.');
         this.scene.restart({from:this.from,fromData:this.fromData,msg:m}); },{size:16,disabled:!afford});
       y+=136;
     } else { txt(this,W/2,y,'No seasonal chest stands open today — the year turns, and each returns in its season.',16,PARCH).setOrigin(0.5); y+=30; }

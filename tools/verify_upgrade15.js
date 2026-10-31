@@ -26,12 +26,12 @@ const art = read('js/art.js');
 ok(main.includes('const GATHER='), 'GATHER table named in main.js');
 ok(main.includes('const BUILD='), 'BUILD table named in main.js');
 ok(main.includes('const NODE_SPOTS='), 'NODE_SPOTS named in main.js');
-ok(main.includes("['build','BUILD',64,64,1130,665]"), 'BUILD joins LAYOUT_DEFS at the seat under the stack'); // Upgrade 17 re-point: BUILD is a 64 circle at the command row's right end — the grown power circles took its old seat under the stack
+ok(main.includes("['build','BUILD',64,64,1062,556]"), 'BUILD joins LAYOUT_DEFS at its standing seat'); // Upgrade 17 re-point: BUILD is a 64 circle at the command row's right end. Upgrade 23 re-point: BUILD is first-class now — it leaves the fan and stands at (1062,556), beside the powers arc foot, inside the placement law's margins
 ok(main.includes("build:'KeyC'"), 'build keybind defaults to KeyC');
-ok(/gather wood from trees and stone from rocks/.test(main), 'a loading tip teaches gather & build');
+ok(/[Gg]ather wood from trees and stone from rocks/.test(main), 'a loading tip teaches gather & build'); // Upgrade 23 re-point: the tip was rewritten to teach the on-demand doors (no popup; SHOP opens the market) — the gather & build teaching it guards stands inside it
 ok(art.includes("tex('tree'") && art.includes("tex('rock'") && art.includes("tex('fence'") && art.includes("tex('stonewall'"), 'art.js draws the tree, rock, fence and stonewall textures');
 ok(main.includes("kind:'build'") && main.includes('this.damageBuild(def.pc,e.dmg)'), 'pieces join the enemy blocker scan and take its blows');
-ok(main.includes('leaveShopToField') && main.includes('openShop(first,keepT)'), 'the field door and the keep-deadline shop path exist');
+ok(main.includes('leaveShopToField') && main.includes('openShop(first,keepT,mode)'), 'the field door and the keep-deadline shop path exist'); // Upgrade 23 re-point: openShop gained its mode (inter/field) — the keep-deadline path is the same call
 ok(!main.includes('friends-only') && read('js/net.js').length > 0, 'netcode file present (untouched by this suite — verified by git at ship)');
 
 // ---------- runtime scaffolding (the U14 pattern) ----------
@@ -107,9 +107,9 @@ ok(GATHER.range === 80 && GATHER.tick === 0.55 && GATHER.woodYield === 2 && GATH
 ok(BUILD.pieces.fence.cost === 6 && BUILD.pieces.fence.hp === 120 && BUILD.pieces.wall.cost === 6 && BUILD.pieces.wall.hp === 320,
   'BUILD pieces: Wooden Fence 6 wood / 120 HP, Stone Wall 6 stone / 320 HP');
 ok(BUILD.grid === 64 && BUILD.campClear === 118 && BUILD.spawnBand === 150, 'BUILD placement: 64px grid, 118 camp clearance, 150 spawn-mouth band');
-ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.some(d => d[0] === 'build'), 'LAYOUT_DEFS carries 17 controls, BUILD among them'); // Upgrade 17 re-point: 18 — ORDERS joins the table. Upgrade 20 re-point: 17 — Dodge and Block merge into GUARD
-ok(BIND_ACTIONS.length === 16 && DEFAULT_BINDS.build === 'KeyC' && new Set(Object.values(DEFAULT_BINDS)).size === Object.keys(DEFAULT_BINDS).length,
-  '16 bindable actions; KeyC is build\'s default and no two defaults collide'); // Upgrade 20 re-point: 16 — the dodge/block binds merge into the Guard key
+ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.some(d => d[0] === 'build'), 'LAYOUT_DEFS carries 18 controls, BUILD among them'); // Upgrade 17 re-point: 18 — ORDERS joins the table. Upgrade 20 re-point: 17 — Dodge and Block merge into GUARD. Upgrade 23 re-point: 18 — SHOP joins
+ok(BIND_ACTIONS.length === 17 && DEFAULT_BINDS.build === 'KeyC' && new Set(Object.values(DEFAULT_BINDS)).size === Object.keys(DEFAULT_BINDS).length,
+  '17 bindable actions; KeyC is build\'s default and no two defaults collide'); // Upgrade 20 re-point: 16 — the dodge/block binds merge into the Guard key. Upgrade 23 re-point: 17 — the Shop key (KeyM) joins
 
 // ---------- the node field ----------
 {

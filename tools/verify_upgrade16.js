@@ -97,7 +97,7 @@ function bareBattle(heroId) {
 
 // ---------- the maps ----------
 ok(Object.keys(CMD_ICONS).length === 9 && new Set(Object.values(CMD_ICONS)).size === 9, 'CMD_ICONS: nine commands, nine distinct symbols');
-ok(LAYOUT_DEFS.every(d => LAYOUT_ICONS[d[0]]) && LAYOUT_DEFS.length === 17, 'LAYOUT_ICONS covers all 17 movable battle controls'); // Upgrade 17 re-point: 18 controls — ORDERS wears the banner glyph (ico_banner, already in the family). Upgrade 20 re-point: 17 controls — GUARD (ico_guard) covers the dodge and block seats it merged
+ok(LAYOUT_DEFS.every(d => LAYOUT_ICONS[d[0]]) && LAYOUT_DEFS.length === 18, 'LAYOUT_ICONS covers all 18 movable battle controls'); // Upgrade 23 re-point: 18 — SHOP wears ico_shop (the market purse) // Upgrade 17 re-point: 18 controls — ORDERS wears the banner glyph (ico_banner, already in the family). Upgrade 20 re-point: 17 controls — GUARD (ico_guard) covers the dodge and block seats it merged
 ok(ICON_SIZE === 120, 'the family is drawn on one 120px canvas');
 
 // ---------- the resolver: symbols from the powers' own names ----------
@@ -113,7 +113,7 @@ ok(skillIconKey({ name: 'Three Hundred' }) === 'ico_burst' && skillIconKey({}) =
     make: { graphics: () => { const g = gfxObj(); g.generateTexture = (k, w, h) => { made[k] = [w, h]; }; return g; } } };
   makeIcons(fakeScene);
   const keys = Object.keys(made);
-  ok(keys.length === 36 && keys.every(k => made[k][0] === 120 && made[k][1] === 120), 'makeIcons generates all 35 symbol textures at 120x120 — the 27 battle symbols + Upgrade 18\'s 8 weapon glyphs (' + keys.length + ' made)'); // U18 re-point: the count grows by the arsenal's glyphs, the law (every texture 120x120) unchanged. Upgrade 20 re-point: 36 — ico_guard (shield + cross + swoosh) joins; ico_dodge/ico_block are still generated, unassigned, so nothing naming them breaks
+  ok(keys.length === 37 && keys.every(k => made[k][0] === 120 && made[k][1] === 120), 'makeIcons generates all 37 symbol textures at 120x120 — the 27 battle symbols + Upgrade 18\'s 8 weapon glyphs (' + keys.length + ' made)'); // U18 re-point: the count grows by the arsenal's glyphs, the law (every texture 120x120) unchanged. Upgrade 20 re-point: 36 — ico_guard (shield + cross + swoosh) joins; ico_dodge/ico_block are still generated, unassigned, so nothing naming them breaks
   ok(['ico_psalm', 'ico_stones5', 'ico_stone1', 'ico_dodge', 'ico_block', 'ico_sprint', 'ico_charge', 'ico_hold', 'ico_follow', 'ico_flank', 'ico_fallback', 'ico_shieldwall', 'ico_volley', 'ico_camp', 'ico_rally', 'ico_build', 'ico_auto'].every(k => k in made),
     'every control in the task list has its texture: powers, dodge/block/sprint, the seven commands, CAMP, RALLY, BUILD, AUTO');
   const before = keys.length; makeIcons(fakeScene);
@@ -182,7 +182,7 @@ ok(skillIconKey({ name: 'Three Hundred' }) === 'ico_burst' && skillIconKey({}) =
   ok(s.bindItems.some(o => /Guard/.test(o._t || '')) && s.bindItems.some(o => o._t === 'Auto-fire toggle') && s.bindItems.some(o => o._t === 'Build mode'),
     'the Controls keybind list still names every action in words (Dodge, Auto-fire toggle, Build mode, ...)'); // Upgrade 20 re-point: the row is Guard's — "Guard — tap: Dodge · hold: Block" names both verbs in words
   s.enterGhostEdit();
-  ok(s.ghostObjs.length === 17 && s.ghostObjs.every(b => b.iconKey), 'the layout ghosts wear the same 17 symbols'); // Upgrade 17 re-point: a fresh store defaults to the Simple face, whose ghost editor shows all 18 (ORDERS + the open fan); the Full face shows 17. Upgrade 20 re-point: 17 ghosts — GUARD's is the 17th seat
+  ok(s.ghostObjs.length === 18 && s.ghostObjs.every(b => b.iconKey), 'the layout ghosts wear the same 18 symbols'); // Upgrade 23 re-point: 18 — the SHOP ghost joins // Upgrade 17 re-point: a fresh store defaults to the Simple face, whose ghost editor shows all 18 (ORDERS + the open fan); the Full face shows 17. Upgrade 20 re-point: 17 ghosts — GUARD's is the 17th seat
   ok(s.ghostObjs.every(b => b.label._t && b.label._visible !== false), 'and every ghost keeps its NAME as a caption beside the symbol — symbol and name learned together');
   const gd = s.ghostObjs[LAYOUT_DEFS.findIndex(d => d[0] === 'guard')];
   ok(gd && gd.iconKey === 'ico_guard' && gd.label._t === 'GUARD', 'the DODGE ghost: swoosh symbol, "DODGE" caption'); // Upgrade 20 re-point: the ghost is GUARD's — shield-and-swoosh symbol, "GUARD" caption
