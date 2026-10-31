@@ -26,7 +26,7 @@ const art = read('js/art.js');
 ok(main.includes('const GATHER='), 'GATHER table named in main.js');
 ok(main.includes('const BUILD='), 'BUILD table named in main.js');
 ok(main.includes('const NODE_SPOTS='), 'NODE_SPOTS named in main.js');
-ok(main.includes("['build','BUILD',64,64,1062,556]"), 'BUILD joins LAYOUT_DEFS at its standing seat'); // Upgrade 17 re-point: BUILD is a 64 circle at the command row's right end. Upgrade 23 re-point: BUILD is first-class now — it leaves the fan and stands at (1062,556), beside the powers arc foot, inside the placement law's margins
+ok(main.includes("['build','BUILD',56,120,52,344]"), 'BUILD joins LAYOUT_DEFS at its standing seat'); // Upgrade 17 re-point: BUILD is a 64 circle at the command row's right end. Upgrade 23 re-point: BUILD is first-class — it leaves the fan. AMENDMENT re-point (kennin, minutes later): BUILD is a SIDEBAR TAB — a 56x120 plate at (52,344) on the left rail, under the placement law's 24px inset
 ok(main.includes("build:'KeyC'"), 'build keybind defaults to KeyC');
 ok(/[Gg]ather wood from trees and stone from rocks/.test(main), 'a loading tip teaches gather & build'); // Upgrade 23 re-point: the tip was rewritten to teach the on-demand doors (no popup; SHOP opens the market) — the gather & build teaching it guards stands inside it
 ok(art.includes("tex('tree'") && art.includes("tex('rock'") && art.includes("tex('fence'") && art.includes("tex('stonewall'"), 'art.js draws the tree, rock, fence and stonewall textures');

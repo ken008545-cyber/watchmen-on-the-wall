@@ -723,17 +723,26 @@ const LAYOUT_DEFS=[
   ['cmd_charge','Charge',56,56,130,665],['cmd_hold','Hold',56,56,247,665],['cmd_follow','Follow Me',56,56,364,665],['cmd_flank','Flank',56,56,481,665],
   ['cmd_fallback','Fall Back',56,56,598,665],['cmd_shieldwall','Shield Wall',56,56,715,665],['cmd_volley','Volley',56,56,832,665],
   ['cmd_camp','CAMP',56,56,949,665],['cmd_rally','Rally',56,56,1066,665],
-  ['build','BUILD',64,64,1062,556],['orders','ORDERS',64,64,1178,268],['shop','SHOP',64,64,102,348]];
-// Upgrade 23: BUILD leaves the fan and the bottom row — it stands as a
-// first-class circle beside the powers arc's foot (1062,556), and SHOP
-// joins the left rail above GUARD (102,348): the sidebar kennin named.
-// Both seats obey the placement law he laid down the same call — no
-// battle button on the very bottom, very left, or very right; every
-// control stands inside the playable screen with real margins (BUILD:
-// 186px from the right edge, 132 from the bottom; SHOP rides the left
-// rail's standing 70px margin, 316 from the top). Saved layouts keep
-// the player's own seats, as ever — the law governs defaults and the
-// seats this upgrade touches, never a player's dragged arrangement.
+  ['build','BUILD',56,120,52,344],['orders','ORDERS',64,64,1178,268],['shop','SHOP',56,120,52,212]];
+// Upgrade 23, as amended by kennin minutes after the commission
+// (2026-10-31 ~12:22): BUILD and SHOP are SIDEBAR TABS — slim plates
+// (56x120) down the left side of the screen, SHOP at (52,212) above
+// BUILD at (52,344), glyph over word. Not circles in the command
+// cluster: the cluster is for combat controls only. Their left edges
+// stand exactly at the PLACEMENT LAW's inset (below), and the pair
+// clears GUARD/SPRINT beneath them. The layout editor may move them
+// like any control — their defaults are the rail.
+// THE PLACEMENT LAW (kennin, same call, standing): no battle-face
+// button on the very bottom, the very left, or the very right of the
+// screen — every control stands inside the playable screen with a
+// real margin. Stated concretely: every default control's bounds
+// keep at least 24px from every screen edge. The standing layout was
+// audited against it and already obeys (the tightest margin in the
+// house is the command row's 27px at the bottom; the powers keep
+// 64px from the right; GUARD/SPRINT 70px from the left) — the law's
+// bite fell on the new furniture, which is inset, never flush. Saved
+// layouts keep the player's own seats, as ever: the law governs
+// defaults and the seats an upgrade touches.
 // --- Upgrade 17 → Upgrade 20: the battle faces -----------------------
 // U17 gave the battle two faces: SIMPLE (the core circles plus ORDERS
 // fanning the command rank) and FULL (every circle always visible).
@@ -1637,34 +1646,26 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // CAMP button's: a tap on it is a button press, never a march order.
     this.pauseBtn=button(this,1246,20,40,40,'⚙',()=>this.openPause(),{size:16,circle:40}); this.pauseBtn.setDepth(31);
     this.pauseBtnRect={x:1246,y:20,w:40,h:40};
-    // Upgrade 15: the BUILD button. It is command furniture, not a
-    // fight input: it does NOT join fightRects (the Upgrade-10 stack
-    // wall stays exactly seven), it keeps its own onTap wall like
-    // CAMP and ⚙, and it registers in the layout system like every
-    // other battle control.
-    // Upgrade 17: BUILD became a 64 circle at the row's right end —
-    // and in the Few face U17/U20 hid it inside the ORDERS fan, which
-    // is why a player on the default face met NO build button at all.
-    // Upgrade 23 (kennin: "there's no build button... you actually
-    // need to build the build mechanic inside of the game"): BUILD is
-    // a first-class circle now, standing in BOTH faces at its own
-    // seat beside the powers arc's foot (1062,556 — inside the
-    // playable screen with real margins, per his placement law);
-    // buildBtnRect always names that standing circle.
-    this.buildBtn=button(this,1062,556,64,64,'',()=>this.toggleBuildMode(),{size:16,icon:'ico_build',floatName:'Build',circle:64}); this.buildBtn.setDepth(31);
-    this.buildBtnRect={x:1062,y:556,w:64,h:64};
-    this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:64,h:64}; });
-    // Upgrade 23: the SHOP button — the market the player opens by
-    // choice (kennin: no menu pops up at wave end; "I want there to
-    // be a menu where you can buy soldiers" — one that exists for HIM
-    // to open). It stands on the left rail above GUARD — the sidebar
-    // he named — in both faces, with its own onTap wall like BUILD's.
-    // Its press opens the SAME shop the intermission always held
-    // (toggleShopMenu): between waves on the intermission's clock,
-    // mid-wave as a field market under the camp panel's rules.
-    this.shopBtn=button(this,102,348,64,64,'',()=>this.toggleShopMenu(),{size:16,icon:'ico_shop',floatName:'Shop',circle:64}); this.shopBtn.setDepth(31);
-    this.shopBtnRect={x:102,y:348,w:64,h:64};
-    this.regLayout('shop',this.shopBtn,(x,y)=>{ this.shopBtnRect={x,y,w:64,h:64}; });
+    // The SIDEBAR (Upgrade 23 as amended — kennin, 2026-10-31 ~12:22:
+    // "you can tap a menu on a sidebar to buy more soldiers"; if more
+    // buttons are needed "they need to be in precise areas on the
+    // screen... buttons inside of the screen where you can actually
+    // play"). BUILD's road here: a U15 layout control, hidden inside
+    // the ORDERS fan by U17/U20 (why a Few-face player met no build
+    // button at all), made a first-class circle by U23's first pass —
+    // and set on the sidebar by his refinement, with the market
+    // beside it. The command cluster keeps combat controls only.
+    // A sidebar tab is furniture, not a battle circle: a tall plate,
+    // its glyph above its word, its own onTap wall (a rectangle now),
+    // registered in the layout system like every other control.
+    const sidebarTab=(x,y,word,icon,cb)=>{ const t=button(this,x,y,56,120,word,cb,{size:13,floatName:word});
+      const im=this.add.image(0,-32,icon); im.setScale(40/ICON_SIZE); t.add(im); if(t.label) t.label.setPosition(0,34); t.setDepth(31); return t; };
+    this.shopBtn=sidebarTab(52,212,'SHOP','ico_shop',()=>this.toggleShopMenu());
+    this.shopBtnRect={x:52,y:212,w:56,h:120};
+    this.regLayout('shop',this.shopBtn,(x,y)=>{ this.shopBtnRect={x,y,w:56,h:120}; });
+    this.buildBtn=sidebarTab(52,344,'BUILD','ico_build',()=>this.toggleBuildMode());
+    this.buildBtnRect={x:52,y:344,w:56,h:120};
+    this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:56,h:120}; });
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave>0&&this.isNightWave(this.wave)?'Night':'Day'; }
@@ -1712,8 +1713,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       const onOrders=this.ordersBtn&&Math.hypot(p.x-this.ordersBtn.x,p.y-this.ordersBtn.y)<=(this.ordersBtn.circleR||32);
       // Upgrade 23: BUILD and SHOP stand OUTSIDE the fan now — a tap
       // on either is its own press, never the fan's closing tap.
-      const onBuild=this.buildBtnRect&&Math.hypot(p.x-this.buildBtnRect.x,p.y-this.buildBtnRect.y)<=(this.buildBtnRect.w/2+4);
-      const onShop=this.shopBtnRect&&Math.hypot(p.x-this.shopBtnRect.x,p.y-this.shopBtnRect.y)<=(this.shopBtnRect.w/2+4);
+      const onBuild=this.buildBtnRect&&Math.abs(p.x-this.buildBtnRect.x)<=this.buildBtnRect.w/2+4&&Math.abs(p.y-this.buildBtnRect.y)<=this.buildBtnRect.h/2+4; // the sidebar tabs are rectangles — their wall is their plate, not a circle
+      const onShop=this.shopBtnRect&&Math.abs(p.x-this.shopBtnRect.x)<=this.shopBtnRect.w/2+4&&Math.abs(p.y-this.shopBtnRect.y)<=this.shopBtnRect.h/2+4;
       if(onFan||onOrders||onBuild||onShop) return;
       this.closeFan(); return; }
     // Upgrade 8: a tap on the fight cluster is a fight input, never a
@@ -1728,10 +1729,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 15: the same wall for the BUILD button — and while build
     // mode stands open, the build bar's own ground belongs to its tools;
     // while the intermission field bar stands, its buttons own their taps.
-    if(this.buildBtnRect&&Math.hypot(p.x-this.buildBtnRect.x,p.y-this.buildBtnRect.y)<=this.buildBtnRect.w/2+4) return;
+    if(this.buildBtnRect&&Math.abs(p.x-this.buildBtnRect.x)<=this.buildBtnRect.w/2+4&&Math.abs(p.y-this.buildBtnRect.y)<=this.buildBtnRect.h/2+4) return;
     // Upgrade 23: the same wall for the SHOP button — opening the
     // market is a button press, never a march order under it.
-    if(this.shopBtnRect&&Math.hypot(p.x-this.shopBtnRect.x,p.y-this.shopBtnRect.y)<=this.shopBtnRect.w/2+4) return;
+    if(this.shopBtnRect&&Math.abs(p.x-this.shopBtnRect.x)<=this.shopBtnRect.w/2+4&&Math.abs(p.y-this.shopBtnRect.y)<=this.shopBtnRect.h/2+4) return;
     if(this.buildMode&&this.buildBarRect&&Math.abs(p.x-this.buildBarRect.x)<=this.buildBarRect.w/2&&Math.abs(p.y-this.buildBarRect.y)<=this.buildBarRect.h/2) return;
     if(this.interField&&(this.interBtnRects||[]).some(r=>Math.abs(p.x-r.x)<=r.w/2+4&&Math.abs(p.y-r.y)<=r.h/2+4)) return;
     // Upgrade 12: under STICK or FOLLOW, a field press is not yet a tap —
@@ -2364,7 +2365,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // its own seat in both faces, fan open or shut; applyFace keeps
     // its container and its wall on that seat like any standing
     // control's.
-    if(this.buildBtn){ this.btnShow(this.buildBtn,true); const s=this.seatOf('build'); this.buildBtn.setPosition(s.x,s.y); this.buildBtnRect={x:s.x,y:s.y,w:64,h:64}; } }
+    if(this.buildBtn){ this.btnShow(this.buildBtn,true); const s=this.seatOf('build'); this.buildBtn.setPosition(s.x,s.y); this.buildBtnRect={x:s.x,y:s.y,w:56,h:120}; } }
   fanIsOpen(){ return this.face==='few'&&!!this.fanOpen; }
   toggleFan(){ if(this.face!=='few') return;
     this.fanOpen=!this.fanOpen; this.applyFace();

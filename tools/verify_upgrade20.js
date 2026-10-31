@@ -142,8 +142,8 @@ const saveFaceChoice = vm.runInContext('saveFaceChoice', ctx);
     'the right rail: auto-fire top (1178,76), the powers arc beneath it (368 / 462 / 556) — the ult nearest the corner');
   ok(D.guard[4] === 102 && D.guard[5] === 448 && D.sprint[4] === 102 && D.sprint[5] === 548, 'the left rail: GUARD (102,448) over SPRINT (102,548) — the left thumb\'s arc');
   ok(D.orders[4] === 1178 && D.orders[5] === 268, 'ORDERS rides the right rail above the powers arc (1178,268); CAMP\'s Few spot rides above it');
-  ok(D.skill0[2] === 76 && D.guard[2] === 64 && D.sprint[2] === 64 && D.orders[2] === 64 && D.build[2] === 64 && D.cmd_charge[2] === 56,
-    'diameters never shrank: powers 76, thumb circles 64, the command rank 56');
+  ok(D.skill0[2] === 76 && D.guard[2] === 64 && D.sprint[2] === 64 && D.orders[2] === 64 && D.cmd_charge[2] === 56 && D.build[2] === 56 && D.build[3] === 120,
+    'diameters never shrank: powers 76, thumb circles 64, the command rank 56'); // Amendment re-point: BUILD is a 56x120 sidebar TAB now — a bigger touch plate than the 64 circle it replaces, not a shrunk diameter
   ok(LAYOUT_DEFS.every(d => !(d[4] < 640 && d[5] < 200 && d[0] !== 'autofire')), 'nothing stands top-left or mid-screen — the seats are the two thumb arcs and the bottom row');
   ok(LAYOUT_ICONS.guard === 'ico_guard' && LAYOUT_ICONS.dodge === undefined && LAYOUT_ICONS.block === undefined, 'LAYOUT_ICONS: GUARD wears ico_guard; the dodge/block entries retired with their buttons');
   ok(DEFAULT_BINDS.guard === 'Space' && DEFAULT_BINDS.dodge === undefined && DEFAULT_BINDS.block === undefined && BIND_ACTIONS.length === 17,

@@ -128,9 +128,9 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
 
 // ---------- the table: circles, hierarchy, seats ----------
 { const D = {}; LAYOUT_DEFS.forEach(d => { D[d[0]] = d; });
-  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => d[2] === d[3]), 'LAYOUT_DEFS: 18 controls, every one a circle (w == h == diameter)'); // Upgrade 20 re-point: 17 controls — GUARD merged Dodge and Block into one circle. Upgrade 23 re-point: 18 — SHOP joins
+  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => d[2] === d[3] || d[0] === 'build' || d[0] === 'shop'), 'LAYOUT_DEFS: 18 controls — every battle control a circle (w == h == diameter), except the two sidebar tabs'); // Upgrade 20 re-point: 17 controls — GUARD merged. Upgrade 23 re-point: 18 — SHOP joins. AMENDMENT re-point: BUILD and SHOP are sidebar TABS (56x120 plates), furniture rather than circles, by kennin's sidebar ruling
   ok(D.skill0[2] === 76 && D.skill1[2] === 76 && D.skill2[2] === 76, 'the powers are the biggest circles: 76 across');
-  ok(['autofire', 'guard', 'sprint', 'build', 'orders'].every(id => D[id][2] === 64), 'the thumb cluster, BUILD and ORDERS: 64 across');
+  ok(['autofire', 'guard', 'sprint', 'orders'].every(id => D[id][2] === 64) && D.build[2] === 56 && D.build[3] === 120 && D.shop[2] === 56 && D.shop[3] === 120, 'the thumb cluster and ORDERS: 64 across; the sidebar tabs are 56x120 plates'); // Amendment re-point: BUILD is a tab now, not a 64 circle
   ok(['cmd_charge', 'cmd_hold', 'cmd_follow', 'cmd_flank', 'cmd_fallback', 'cmd_shieldwall', 'cmd_volley', 'cmd_camp', 'cmd_rally'].every(id => D[id][2] === 56), 'the command rank: 56 across — the fan never shrinks them');
   ok(D.skill2[5] + 38 < 610 && D.autofire[5] - 32 > 0, 'the stack stands clear of the bar (last power rim 594 < 610) and of the top edge');
   ok(FAN_MEMBERS.length === 8, 'FAN_MEMBERS names all eight behind ORDERS'); } // Upgrade 23 re-point: eight — BUILD stands first-class now
@@ -142,8 +142,8 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   const all = [];
   Object.values(g.fightBtns).forEach(b => all.push(b));
   Object.values(g.cmdBtns).forEach(b => all.push(b));
-  all.push(g.campBtn, g.rallyBtn, g.buildBtn, g.pauseBtn, g.spdBtn);
-  ok(all.length === 18 && all.every(b => b.circleR > 0), 'all 19 standing battle buttons are circles (7 stack + 7 row + CAMP, RALLY, BUILD, pause, speed)'); // Upgrade 20 re-point: 18 stand in Full now (6 stack incl. the three powers + 7 row + CAMP, RALLY, BUILD, pause, speed) — GUARD is one circle where Dodge and Block were two
+  all.push(g.campBtn, g.rallyBtn, g.pauseBtn, g.spdBtn);
+  ok(all.length === 17 && all.every(b => b.circleR > 0), 'all 17 standing battle CIRCLES are circles (6 stack + 7 row + CAMP, RALLY, pause, speed)'); // Upgrade 20 re-point: 18 stood in Full. AMENDMENT re-point: BUILD is not among them — it is a sidebar tab (asserted at the radii check below)
   let centersFire = 0, cornersDead = 0, pressesBegan = 0;
   const anyPress = () => !!(g.guardPress || g.skillPress || g.campPress || g.afPress || g.ordersPress);
   all.forEach(b => { const r = b.circleR;
@@ -177,8 +177,8 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   ok(g.overFight({ x: 1178 + 27, y: 368 + 27 }) === false, 'overFight: the power\'s bounding corner is NOT walled — the tap falls through to the field');
   ok(g.overFight({ x: 1178 + 38, y: 368 }) === true, 'overFight: the rim itself is walled (radius inclusive)');
   // glyphs + radii
-  ok(g.skillBtns.every(b => b.circleR === 38) && g.fightBtns.guard.circleR === 32 && g.cmdBtns.charge.circleR === 28 && g.buildBtn.circleR === 32 && g.pauseBtn.circleR === 20 && g.spdBtn.circleR === 22,
-    'radii on the built HUD: powers 38, thumb 32, commands 28, BUILD 32, pause 20, speed 22');
+  ok(g.skillBtns.every(b => b.circleR === 38) && g.fightBtns.guard.circleR === 32 && g.cmdBtns.charge.circleR === 28 && g.pauseBtn.circleR === 20 && g.spdBtn.circleR === 22 && !g.buildBtn.circleR && g.buildBtnRect.x === 52 && g.buildBtnRect.y === 344 && g.buildBtnRect.w === 56 && g.buildBtnRect.h === 120,
+    'radii on the built HUD: powers 38, thumb 32, commands 28, pause 20, speed 22 — and BUILD wears NO radius: it is the 56x120 sidebar tab at (52,344)'); // Amendment re-point
   ok(g.ordersBtn.iconKey === 'ico_banner', 'ORDERS wears the banner glyph from the existing family (no new texture)');
   cleanStore(); }
 
@@ -210,10 +210,10 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   ok(g.cmdBtns.charge._visible === false && g.cmdBtns.charge._disabled === true && g.rallyBtn._visible === false && g.buildBtn._visible !== false,
     '…and the command rank waits behind ORDERS (hidden, not removed) — while BUILD stands first-class, visible in the Few face (Upgrade 23)');
   g.toggleFan();
-  ok(g.fanOpen === true && g.cmdBtns.charge._visible === true && g.cmdBtns.charge.x === 130 && g.cmdBtns.charge.y === 552 && g.buildBtn.x === 1062 && g.buildBtn.y === 556,
-    'ORDERS fans the rank open in a row above the bar, anchored on ORDERS\' seat — and BUILD does not move with it (Upgrade 23: it stands at its own seat)');
-  ok(g.rallyBtnRect.x === 718 && g.rallyBtnRect.y === 552 && g.buildBtnRect.x === 1062 && g.buildBtnRect.y === 556 && g.cmdBtns.volley.sx === 634,
-    'the active-position records stand on their circles (rally ring target on the fan, build wall on BUILD\'s standing seat, volley sweep origin)');
+  ok(g.fanOpen === true && g.cmdBtns.charge._visible === true && g.cmdBtns.charge.x === 130 && g.cmdBtns.charge.y === 552 && g.buildBtn.x === 52 && g.buildBtn.y === 344,
+    'ORDERS fans the rank open in a row above the bar, anchored on ORDERS\' seat — and BUILD does not move with it (Amendment: it stands on the sidebar)');
+  ok(g.rallyBtnRect.x === 718 && g.rallyBtnRect.y === 552 && g.buildBtnRect.x === 52 && g.buildBtnRect.y === 344 && g.cmdBtns.volley.sx === 634,
+    'the active-position records stand on their places (rally ring target on the fan, build wall on the sidebar tab, volley sweep origin)');
   // issuing from the fan closes it
   press(g.cmdBtns.charge, 0, 0);
   ok(g.order === 'charge' && g.fanOpen === false && g.cmdBtns.charge._visible === false, 'tap a fanned command: the order issues and the fan closes behind it');

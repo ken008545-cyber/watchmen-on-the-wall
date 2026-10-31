@@ -22,7 +22,7 @@ function read(p) { return fs.readFileSync(path.join(ROOT, p), 'utf8'); }
 // ---------- static checks ----------
 const main = read('js/main.js');
 ok(main.includes('function makeIcons(scene)') && main.includes('makeArt(this); makeArt2(this); makeIcons(this);'), 'the symbol family is drawn in code at Boot, beside makeArt/makeArt2');
-ok(main.includes("floatName:label") && main.includes("floatName:'Volley'") && main.includes("floatName:'Camp'") && main.includes("floatName:'Rally'") && main.includes("floatName:'Build'"), 'every battle button carries its name as a press float, not a face');
+ok(main.includes("floatName:label") && main.includes("floatName:'Volley'") && main.includes("floatName:'Camp'") && main.includes("floatName:'Rally'") && main.includes('floatName:word'), 'every battle button carries its name as a press float, not a face'); // Amendment re-point: the sidebar tabs float their word too (floatName:word in sidebarTab) — 'Build' the float became BUILD the tab's own word
 ok(!main.includes("b.label.setText(b.def.name"), 'the per-frame skill loop no longer writes power names onto button faces');
 ok(main.includes('caption:true') && main.includes('LAYOUT_ICONS[d[0]]'), 'the Controls ghosts wear the symbols with name captions');
 ok(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(main.slice(main.indexOf('function makeIcons'), main.indexOf('// ---------- Boot'))), 'no emoji anywhere in the icon family — vector shapes only');
@@ -126,13 +126,14 @@ ok(skillIconKey({ name: 'Three Hundred' }) === 'ico_burst' && skillIconKey({}) =
   const faces = [];
   Object.values(g.fightBtns).forEach(b => faces.push(b));
   Object.values(g.cmdBtns).forEach(b => faces.push(b));
-  faces.push(g.campBtn, g.rallyBtn, g.buildBtn);
-  ok(faces.length === 16 && faces.every(b => b && b.icon && b.iconKey), 'all 17 battle controls carry a symbol image'); // Upgrade 20 re-point: 16 faces stand in this list — the 17th symbol is ORDERS (below), which stands in the Few face this battle opened on
+  faces.push(g.campBtn, g.rallyBtn);
+  ok(faces.length === 15 && faces.every(b => b && b.icon && b.iconKey), 'all 15 battle CIRCLES carry a symbol image'); // Upgrade 20 re-point: 16 faces stood in this list. AMENDMENT re-point: BUILD left the circles — it is a sidebar TAB now (menu furniture: glyph above its word, like the intermission bar's worded buttons), asserted separately below; the symbol law governs the battle circles
   ok(g.ordersBtn && g.ordersBtn.iconKey === 'ico_banner', '…and ORDERS carries the banner symbol — the 17th face');
-  ok(faces.every(b => b.label._t === '' && b.label._visible === false), 'NO battle button carries a word on its face (labels empty and hidden)');
-  ok(new Set(faces.map(b => b.iconKey)).size === 16, 'all 17 faces are DISTINCT symbols');
-  ok(g.cmdBtns.charge.iconKey === 'ico_charge' && g.cmdBtns.shieldwall.iconKey === 'ico_shieldwall' && g.cmdBtns.volley.iconKey === 'ico_volley' && g.campBtn.iconKey === 'ico_camp' && g.rallyBtn.iconKey === 'ico_rally' && g.buildBtn.iconKey === 'ico_build',
-    'command faces: crossed swords, three shields, arrow fan, tent, flag-and-ring, hammer-and-fence');
+  ok(faces.every(b => b.label._t === '' && b.label._visible === false), 'NO battle CIRCLE carries a word on its face (labels empty and hidden)');
+  ok(new Set(faces.map(b => b.iconKey)).size === 15, 'all 15 faces are DISTINCT symbols');
+  ok(g.cmdBtns.charge.iconKey === 'ico_charge' && g.cmdBtns.shieldwall.iconKey === 'ico_shieldwall' && g.cmdBtns.volley.iconKey === 'ico_volley' && g.campBtn.iconKey === 'ico_camp' && g.rallyBtn.iconKey === 'ico_rally',
+    'command faces: crossed swords, three shields, arrow fan, tent, flag-and-ring');
+  ok(g.buildBtn.label._t === 'BUILD' && g.shopBtn.label._t === 'SHOP' && main.includes("'BUILD','ico_build'") && main.includes("'SHOP','ico_shop'"), 'the sidebar tabs are furniture with their words on them — BUILD (hammer glyph) and SHOP (purse glyph), the same family, worn the menu way'); // Amendment: kennin's sidebar carries menu tabs; menu furniture has always carried words (the intermission bar's Shop/Build buttons)
   ok(g.fightBtns.guard.iconKey === 'ico_guard' && g.fightBtns.sprint.iconKey === 'ico_sprint' && g.fightBtns.autofire.iconKey === 'ico_auto',
     'fight faces: swoosh, shield, boot, bow-and-circular-arrow'); // Upgrade 20 re-point: GUARD wears the merged glyph — shield and swoosh on one face
   ok(g.skillBtns.map(b => b.iconKey).join(',') === 'ico_stone1,ico_psalm,ico_stones5', "David's powers wear stone, lyre, five stones — from his data");
@@ -153,7 +154,7 @@ ok(skillIconKey({ name: 'Three Hundred' }) === 'ico_burst' && skillIconKey({}) =
   fireDown(g.cmdBtns.hold); ok(g._nf && g._nf._t === 'Hold', 'pressing the planted flag floats its name: "Hold"');
   fireDown(g.skillBtns[2]); ok(g.skillPress && g.skillPress.i === 2, 'pressing the five stones begins its press'); g.skillPress = null;
   g.floatBtnName(g.skillBtns[2], 'Five Stones'); ok(g._nf && g._nf._t === 'Five Stones', 'pressing the five stones floats "Five Stones"'); // the float itself rides button()'s pointerdown in the real game (both handlers fire there); the stub keeps one, so the float is proven on its own function
-  fireDown(g.buildBtn); ok(g._nf && g._nf._t === 'Build', 'pressing the hammer floats "Build"');
+  fireDown(g.buildBtn); ok(g._nf && g._nf._t === 'BUILD', 'pressing the BUILD tab floats its name'); // Amendment re-point: the tab floats its own word, BUILD
 
   // AUTO-FIRE face follows state
   ok(g.autoFire === true && g.fightBtns.autofire.icon._tint === 0xffffff, 'AUTO-FIRE ON: the bow lit full-gold');

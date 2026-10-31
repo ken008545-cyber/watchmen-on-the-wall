@@ -58,14 +58,28 @@
 // (4) WAVE END — nothing opens: no shop state, no reveal, banked
 //     chests untouched, the mend rides the wave's end, the hero walks
 //     the intermission, the deadline still starts the next wave;
-// (5) THE MENU — opens only by the player's tap (SHOP circle, CAMP
-//     panel's Market button, the intermission bar), keeps the standing
+// (5) THE MENU — opens only by the player's tap (SHOP sidebar tab,
+//     CAMP panel's Market button, the intermission bar), keeps the standing
 //     deadline between waves, fights on behind itself mid-wave, sells
 //     at the standing prices, closes without starting a wave; chests
 //     open only from inside it, between waves; the season's chest
 //     buys through the same spend; the Rack page equips a found
 //     weapon. The starter benchmark (Common-sling champion ~32.8s,
 //     camp 500/500) stands in U18's suite, green beside this one.
+//
+// AMENDMENTS (kennin, same call, minutes later, ~12:22 CDT — recorded
+// in BUILD-NOTES with his words): (A) wave end leaves the field fully
+// alive — walk, gather, build through the whole intermission
+// (battery 4b: the audit found update()'s intermission branch falls
+// through into the full simulation; the checks now hold it);
+// (B) the menu and the build palette hang on a SIDEBAR — slim tabs
+// down the left side, inset, not circles in the command cluster;
+// (C) the PLACEMENT LAW stands: every battle-face control's bounds
+// keep at least 24px from every screen edge, on the table and on the
+// live positions in both faces (asserted above); the standing U20
+// seats were audited and already obey — the law's bite fell on the
+// new furniture. Job 1 (battery 2) covers attack buttons AND power
+// moves, as he repeated in the amendment turn.
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -84,8 +98,8 @@ ok(main.includes('rec.ptr&&rec.ptr.isDown===false') && main.includes("['guardPre
   'tickPresses sweeps records whose pointer already lifted — an eaten release resolves as itself, never late on a stranger\'s release');
 ok(main.includes("const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally']") && !main.includes("'cmd_rally','build']"),
   'BUILD has left the ORDERS fan — the fan is the command rank alone');
-ok(main.includes("['build','BUILD',64,64,1062,556]") && main.includes("['shop','SHOP',64,64,102,348]"),
-  'BUILD stands at (1062,556) beside the powers arc foot; SHOP stands at (102,348) on the left rail — the sidebar kennin named');
+ok(main.includes("['build','BUILD',56,120,52,344]") && main.includes("['shop','SHOP',56,120,52,212]") && main.includes('sidebarTab'),
+  'the SIDEBAR (Amendment, kennin ~12:22): BUILD and SHOP are slim tabs on the left rail — SHOP (52,212) above BUILD (52,344), 56x120 plates, glyph over word, left edges at the placement law inset of 24px; the command cluster keeps combat controls only');
 ok(main.includes("['shop','Shop — the market menu']") && main.includes("shop:'KeyM'") && main.includes("case 'shop': this.toggleShopMenu(); break;"),
   'the market has a key of its own (M), listed with the binds');
 ok(main.includes('enterIntermission(first){') && main.includes('this.enterIntermission(false); }') && main.includes('this.enterIntermission(true); }'),
@@ -226,8 +240,18 @@ function engineUp(g, btn, ptr, pt) { if (pt) { ptr.x = pt.x; ptr.y = pt.y; ptr.w
 function centre(btn) { return { x: btn.x, y: btn.y }; }
 
 // ---------- the placement law, on the table itself ----------
-{ const bad = LAYOUT_DEFS.filter(d => { const r = d[2] / 2; return d[4] - r < 24 || d[4] + r > W - 24 || d[5] - r < 24 || d[5] + r > H - 24; });
-  ok(bad.length === 0, 'the placement law holds on every seat in the table: no circle within 24px of any screen edge (offenders: ' + bad.map(d => d[0]).join(',') + ')'); }
+// The law's scope, stated as kennin stated it: the battle-face
+// controls — everything in the layout table, sidebar included. (The
+// top-corner system chrome — pause, speed, fullscreen — is Menu-row
+// furniture that predates the law and is not in the table; it is
+// named as out of scope in BUILD-NOTES, not silently swept in.)
+{ const bad = LAYOUT_DEFS.filter(d => { const hw = d[2] / 2, hh = d[3] / 2; return d[4] - hw < 24 || d[4] + hw > W - 24 || d[5] - hh < 24 || d[5] + hh > H - 24; });
+  ok(bad.length === 0, 'the placement law holds on every seat in the table: no control within 24px of any screen edge (offenders: ' + bad.map(d => d[0]).join(',') + ')'); }
+// …and on the LIVE positions, in both faces, after applyFace has had
+// its say (rail spots, fan seats and all):
+for (const face of ['few', 'full']) { const g = faceGame(face);
+  const bad = (g.layoutReg || []).filter(en => { const hw = en.w / 2, hh = en.h / 2, x = en.obj.x, y = en.obj.y; return x - hw < 24 || x + hw > W - 24 || y - hh < 24 || y + hh > H - 24; });
+  ok(bad.length === 0, face + ': every standing control\'s live bounds sit inside the 24px margins (offenders: ' + bad.map(e => e.id).join(',') + ')'); }
 
 // ---------- (2) THE ENGINE BATTERY: every control answers a real thumb ----------
 for (const face of ['few', 'full']) {
@@ -321,11 +345,26 @@ for (const face of ['few', 'full']) {
     ok(g.shopOpen === false && g.shopMode === null, face + ': SHOP tapped again closes it — no wave started, nothing else moved'); }
   // BUILD: visible without the fan, and its tap opens build mode
   { const g = faceGame(face);
-    ok(g.buildBtn._visible !== false && g.buildBtnRect.x === 1062 && g.buildBtnRect.y === 556, face + ': BUILD stands visible at its seat with the fan shut — a player meets it without opening anything');
+    ok(g.buildBtn._visible !== false && g.buildBtnRect.x === 52 && g.buildBtnRect.y === 344 && g.buildBtnRect.w === 56 && g.buildBtnRect.h === 120, face + ': the BUILD tab stands visible on the sidebar with the fan shut — a player meets it without opening anything');
     const bb = g.buildBtn, c = centre(bb);
     const ptr = engineDown(g, bb, c); engineUp(g, bb, ptr, c);
     ok(g.buildMode === true, face + ': BUILD centre tap opens build mode through the engine path'); }
 }
+// ---------- the SIDEBAR as a sidebar (Amendment B) ----------
+{ const g = faceGame('few');
+  ok(g.shopBtn.label._t === 'SHOP' && g.buildBtn.label._t === 'BUILD', 'the tabs carry their words on their faces — menu furniture, read at a glance (SHOP above BUILD)');
+  ok(g.buildBtnRect.y + g.buildBtnRect.h / 2 < 448 - 32, 'the sidebar pair clears the combat cluster beneath it: BUILD\'s plate ends at y ' + (g.buildBtnRect.y + g.buildBtnRect.h / 2) + ', GUARD\'s circle begins at 416 — no overlap, no shared ground');
+  // the plate is a plate along its whole length: a press at its far
+  // end (52,399) — far outside any circle the tab could be mistaken
+  // for — opens build mode, and the scene tap is walled by the whole
+  // rectangle, so the hero does NOT march from a tab press.
+  g.hero.tx = g.hero.x; g.hero.ty = g.hero.y;
+  const end = { x: 52, y: 399 };
+  const ptr = engineDown(g, g.buildBtn, end);
+  ok(g.hero.tx === g.hero.x && g.hero.ty === g.hero.y, 'a press on the BUILD tab\'s far end is walled as a button press — no march order leaks under the plate');
+  engineUp(g, g.buildBtn, ptr, end);
+  ok(g.buildMode === true, 'and the far-end press OPENS build mode — the whole plate answers, not a circle hiding inside it'); }
+
 // ORDERS in the Few face (its grammar is Few-only by U20's law)
 { const g = faceGame('few');
   const ob = g.ordersBtn, c = centre(ob);
@@ -396,13 +435,37 @@ for (const face of ['few', 'full']) {
   CLOCK.now += 60001; g.update(0, 16);
   ok(startCalls === 1 && g.waveActive === true && g.interField === false, 'at the deadline the next wave begins — once, as it always has'); }
 
+// ---------- (4b) AMENDMENT A: the field stays ALIVE all intermission ----------
+// Kennin's refinement: removing the popup is not enough — "I want you
+// to still be able to walk around when the wave ends." The audit
+// (BUILD-NOTES) found no seizure to remove: update()'s intermission
+// branch ticks the clock and falls through into the full simulation.
+// These checks hold the whole of it: walk (above), GATHER, and BUILD,
+// all between waves, all through the real update() loop.
+{ cleanStore(); const g = hudBattle(); g.buildNodes();
+  g.wave = 2; g.waveActive = true; g.waveClear();
+  ok(g.interField === true && !g.campPanelOpen && !g.fanOpen && g.buildMode === false, 'after the clear: the field, the bar, and nothing else — no panel of any kind stands open');
+  const tree = g.nodes.find(n => n.kind === 'tree');
+  g.hero.x = tree.x; g.hero.y = tree.y; g.hero.tx = tree.x; g.hero.ty = tree.y;
+  for (let i = 0; i < 60; i++) g.update(0, 100);
+  ok(g.wood >= 6, 'GATHER lives between waves: a full minute of update() ticks at a tree fills the purse (' + g.wood + ' wood) — the intermission branch reaches gatherTick, it does not seize it');
+  ok(g.interField === true, 'and the intermission still stands — gathering spent none of its welcome (the clock is wall-time, not frames)');
+  const ptr = engineDown(g, g.buildBtn, centre(g.buildBtn)); engineUp(g, g.buildBtn, ptr, centre(g.buildBtn));
+  ok(g.buildMode === true, 'BUILD opens between waves, from the sidebar tab, through the engine path');
+  fireBtn(findBtn(g.buildItems, 'Fence · 6 wood'));
+  let cell = null;
+  for (let cx = 256; cx <= 1152 && !cell; cx += 64) for (let cy = 192; cy <= 576 && !cell; cy += 64) if (!g.canPlace(cx, cy)) cell = { x: cx, y: cy };
+  const w0 = g.wood;
+  ok(g.buildTap(cell.x, cell.y) === 'placed' && g.builds.length === 1 && g.wood === w0 - 6, 'a fence is PLACED between waves at the exact debit — the whole build loop runs inside the intermission');
+  g.exitBuildMode(); }
+
 // ---------- (5) THE MENU: his to open, his to close ----------
 { // between waves: the deadline is KEPT, the chest opens from inside
   cleanStore(); Rack.setPending(['wood']);
   const g = hudBattle(); g.enterIntermission(false);
   const armed = g.shopEndsAt;
   g.toggleShopMenu();
-  ok(g.shopOpen === true && g.shopMode === 'inter' && g.shopEndsAt === armed && g.menuSeen === true, 'the SHOP circle opens the market between waves — and the standing deadline does not move');
+  ok(g.shopOpen === true && g.shopMode === 'inter' && g.shopEndsAt === armed && g.menuSeen === true, 'the SHOP tab opens the market between waves — and the standing deadline does not move');
   g.menuChestEntry();
   ok(g.revealPanel === true && g.revealQueue.join() === 'wood', 'the chest entry INSIDE the menu opens the reveal — the only door it has now');
   ok(g.revealOpenChest() === true, 'the chest opens from inside the menu');
@@ -415,7 +478,7 @@ for (const face of ['few', 'full']) {
   g3.wave = 2; g3.waveActive = true;
   const foe = spawnFoe(g3, 900, 300, 5000); const fx = foe.x;
   g3.toggleShopMenu();
-  ok(g3.shopOpen === true && g3.shopMode === 'field', 'mid-wave, the SHOP circle opens the market in field mode');
+  ok(g3.shopOpen === true && g3.shopMode === 'field', 'mid-wave, the SHOP tab opens the market in field mode');
   for (let i = 0; i < 3; i++) g3.update(0, 100);
   ok(foe.x < fx, 'the fight goes ON behind the field market — the foe kept marching while the menu stood (the camp panel\'s Upgrade 9 rule, scaled)');
   g3.manna = 1000;
