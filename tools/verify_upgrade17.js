@@ -142,8 +142,8 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   const all = [];
   Object.values(g.fightBtns).forEach(b => all.push(b));
   Object.values(g.cmdBtns).forEach(b => all.push(b));
-  all.push(g.campBtn, g.rallyBtn, g.pauseBtn, g.spdBtn);
-  ok(all.length === 17 && all.every(b => b.circleR > 0), 'all 17 standing battle CIRCLES are circles (6 stack + 7 row + CAMP, RALLY, pause, speed)'); // Upgrade 20 re-point: 18 stood in Full. AMENDMENT re-point: BUILD is not among them — it is a sidebar tab (asserted at the radii check below)
+  all.push(g.campBtn, g.rallyBtn, g.pauseBtn); // Upgrade 24 re-point: the speed circle stood in this push until kennin removed the control of speed entirely
+  ok(all.length === 16 && all.every(b => b.circleR > 0), 'all 16 standing battle CIRCLES are circles (6 stack + 7 row + CAMP, RALLY, pause)'); // Upgrade 20 re-point: 18 stood in Full. AMENDMENT re-point: BUILD is not among them — it is a sidebar tab (asserted at the radii check below). Upgrade 24 re-point: 17 -> 16 — the speed circle is gone by kennin's ruling; there is no speed control left to stand
   let centersFire = 0, cornersDead = 0, pressesBegan = 0;
   const anyPress = () => !!(g.guardPress || g.skillPress || g.campPress || g.afPress || g.ordersPress);
   all.forEach(b => { const r = b.circleR;
@@ -177,8 +177,8 @@ function tutBattle(data) { const g = hudBattle(Object.assign({ hero: 'david', le
   ok(g.overFight({ x: 1178 + 27, y: 368 + 27 }) === false, 'overFight: the power\'s bounding corner is NOT walled — the tap falls through to the field');
   ok(g.overFight({ x: 1178 + 38, y: 368 }) === true, 'overFight: the rim itself is walled (radius inclusive)');
   // glyphs + radii
-  ok(g.skillBtns.every(b => b.circleR === 38) && g.fightBtns.guard.circleR === 32 && g.cmdBtns.charge.circleR === 28 && g.pauseBtn.circleR === 20 && g.spdBtn.circleR === 22 && !g.buildBtn.circleR && g.buildBtnRect.x === 52 && g.buildBtnRect.y === 344 && g.buildBtnRect.w === 56 && g.buildBtnRect.h === 120,
-    'radii on the built HUD: powers 38, thumb 32, commands 28, pause 20, speed 22 — and BUILD wears NO radius: it is the 56x120 sidebar tab at (52,344)'); // Amendment re-point
+  ok(g.skillBtns.every(b => b.circleR === 38) && g.fightBtns.guard.circleR === 32 && g.cmdBtns.charge.circleR === 28 && g.pauseBtn.circleR === 20 && !g.buildBtn.circleR && g.buildBtnRect.x === 52 && g.buildBtnRect.y === 344 && g.buildBtnRect.w === 56 && g.buildBtnRect.h === 120,
+    'radii on the built HUD: powers 38, thumb 32, commands 28, pause 20 — and BUILD wears NO radius: it is the 56x120 sidebar tab at (52,344)'); // Amendment re-point. Upgrade 24 re-point: the speed radius (22) left with the control itself
   ok(g.ordersBtn.iconKey === 'ico_banner', 'ORDERS wears the banner glyph from the existing family (no new texture)');
   cleanStore(); }
 

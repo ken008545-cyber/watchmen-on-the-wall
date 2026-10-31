@@ -1536,7 +1536,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.add.rectangle(this.worldW/2,this.worldH/2,this.worldW,this.worldH,0x0d0906,0.15).setDepth(1);
     this.campPos={x:150,y:600}; this.campSpr=this.add.image(this.campPos.x,this.campPos.y,'camp').setDepth(2);
     this.campBar=this.add.graphics().setDepth(12);
-    this.manna=ERAS.startManna; this.speed=1; this.time.timeScale=1;
+    this.manna=ERAS.startManna; this.time.timeScale=1; // Upgrade 24: no speed state exists — the battle runs at base speed always (kennin: "take away control of speed")
     this.enemies=[]; this.squads=[]; this.shots=[]; this.spawnQ=[]; this.waveActive=false; this.shopOpen=false; this.shopMode=null; this.victoryOpen=false; this.shopT=0; this.shopEndsAt=0; this.shopPage=0; this.shopItems=[]; this.nightRect=null;
     this.fx=this.add.graphics().setDepth(20);
     this.selFx=this.add.graphics().setDepth(6); // Upgrade 9: the selection ring (world layer, under the fight furniture)
@@ -1632,12 +1632,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 10: the hero's power buttons are built in
     // buildFightControls() now — they ride the right-thumb stack under
     // the AUTO-FIRE toggle, as the approved sketch draws them.
-    // Upgrade 17: the speed toggle is a battle control, so it joins the
-    // circles (44 across, its word shrunk to the 'x1' it always showed).
+    // Upgrade 24 (kennin, 2026-10-31: "I think you should take away
+    // control of speed"): the speed toggle that stood here — a 44
+    // circle under Fullscreen, 'x1' <-> 'x2', doubling the battle's
+    // dt — is REMOVED, button and state together. The game runs at
+    // base speed at all times; nothing may raise or lower it.
     // Fullscreen stays a rectangle by exception: it is a display
     // utility whose whole word is its meaning, and no circle that fits
     // the corner could carry it — noted in BUILD-NOTES, not hidden.
-    this.spdBtn=button(this,1221,HUD_Y+80,44,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:15,circle:44}).setDepth(31);
     const fsb=button(this,1221,HUD_Y+26,110,36,fsActive()?'Exit full':'Fullscreen',()=>fsPress(this),{size:13}); fsb.setDepth(31); this.fsb=fsb;
     // Upgrade 22: the standalone hide is gone — the button stands in every face and every mode; fsPress answers truthfully instead.
     // Upgrade 12: the pause/settings entry — a small ⚙ above the fight
@@ -3720,7 +3722,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 12: the pause (and the layout editing inside it) holds the
     // whole battle — no timer, no timer's cousin, runs behind it.
     if(this.paused||this.layoutEdit) return;
-    const dt=Math.min(0.05,delta/1000)*this.speed; if(this.shieldT>0) this.shieldT-=delta/1000*this.speed;
+    const dt=Math.min(0.05,delta/1000); if(this.shieldT>0) this.shieldT-=delta/1000; // Upgrade 24: base speed, always — no multiplier is read here anymore
     // Upgrade 15: the intermission can also be spent ON THE FIELD — the
     // shop's "To the Field" door steps out with the shop's OWN deadline
     // still running. One clock, two rooms: leaving and returning never
