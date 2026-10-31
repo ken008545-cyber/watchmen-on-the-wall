@@ -36,7 +36,7 @@ const approx = (a, b, eps) => Math.abs(a - b) <= (eps || 0.01);
 const main = read('js/main.js');
 ok(main.includes("const LAYOUT_KEY='gxhub_wotw_layout', BINDS_KEY='gxhub_wotw_binds', MOVE_KEY='gxhub_wotw_move'"), 'one settings family: gxhub_wotw_layout / gxhub_wotw_binds / gxhub_wotw_move');
 ok(main.includes("'Controls',()=>this.scene.start('Settings')") && main.includes('scene:[Boot,Menu,Settings,'), 'the Controls door on the menu opens the Settings scene, and the scene is in the game config');
-ok(main.includes("this.pauseBtn=button(this,1246,20,56,34,'⚙'") && main.includes('this.pauseBtnRect={x:1246,y:20,w:56,h:34};'), 'the ⚙ pause/settings entry rides the battle HUD, with its onTap wall beside it');
+ok(main.includes("this.pauseBtn=button(this,1246,20,40,40,'⚙'") && main.includes('this.pauseBtnRect={x:1246,y:20,w:40,h:40};'), 'the ⚙ pause/settings entry rides the battle HUD, with its onTap wall beside it'); // Upgrade 17 re-point: the ⚙ is a 40 circle now
 ok(main.includes('if(this.paused||this.layoutEdit) return;') && main.includes('if(this.paused||this.layoutEdit) return;\n    const dt='), 'pause and layout editing wall both the marching hand (onTap) and the battle loop (update)');
 ok(main.includes('EDITING LAYOUT — drag any button into place') && main.includes('function layoutEditor(scene,onSave)'), 'the EDITING state is unmistakable, and one editor serves the battle and the menu ghosts');
 ok(main.includes('enter(){ ed.active=true; ed.items.forEach(it=>{ if(it.obj.disableInteractive) it.obj.disableInteractive(); }); }'), 'while editing, the buttons are NOT interactive — a drag can never fire an action');
@@ -137,11 +137,14 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   const reg = {}; g.layoutReg.forEach(en => { reg[en.id] = en; });
   // Re-pointed by Upgrade 15 (documented, the house custom): BUILD is
   // the 17th control in the table — the count moves with the table.
-  ok(LAYOUT_DEFS.length === 17 && LAYOUT_DEFS.every(d => reg[d[0]] && reg[d[0]].obj.x === d[4] && reg[d[0]].obj.y === d[5]),
+  // Re-pointed by Upgrade 17 (documented, the house custom): ORDERS is
+  // the 18th control, and the defaults are the circular geometry —
+  // stack x 1178 (toggle y 76, powers to y 556), row from x 130 at y 665.
+  ok(LAYOUT_DEFS.length === 18 && LAYOUT_DEFS.every(d => reg[d[0]] && reg[d[0]].obj.x === d[4] && reg[d[0]].obj.y === d[5]),
     'no saved layout: all 17 controls stand at the table\'s defaults');
-  ok(reg.autofire.obj.x === 1178 && reg.autofire.obj.y === 70 && reg.skill2.obj.y === 496 && reg.cmd_charge.obj.x === 130 && reg.cmd_rally.obj.x === 1066 && reg.cmd_rally.obj.y === 665,
+  ok(reg.autofire.obj.x === 1178 && reg.autofire.obj.y === 76 && reg.skill2.obj.y === 556 && reg.cmd_charge.obj.x === 130 && reg.cmd_rally.obj.x === 1066 && reg.cmd_rally.obj.y === 665,
     '…and those defaults ARE Upgrade 10: stack x 1178 (toggle y 70, powers to y 496), row from x 130 at y 665');
-  ok(g.fightRects.length === 7 && g.fightRects.every(r => r.x === 1178 && r.h === 56), 'the onTap wall (fightRects) matches the default stack');
+  ok(g.fightRects.length === 7 && g.fightRects.every(r => r.x === 1178 && r.r === r.h / 2), 'the onTap wall (fightRects) matches the default stack'); // Upgrade 17: the wall carries each circle's radius
   ok(g.campBtnRect.x === 949 && g.campBtnRect.y === 665 && g.rallyBtnRect.x === 1066, 'the CAMP / RALLY tap walls sit on their buttons'); }
 
 // ---------- layout: the round-trip ----------
@@ -154,11 +157,11 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   ok(g.fightRects.some(r => r.x === 900 && r.y === 200) && g.fightRects.some(r => r.x === 1000 && r.y === 120),
     '…and the onTap wall moved with it (a press there is a fight press, not a march)');
   ok(g.campBtnRect.x === 300 && g.campBtnRect.y === 665, '…and the CAMP wall moved with the CAMP button');
-  ok(reg.sprint.obj.x === 1178 && reg.sprint.obj.y === 304, 'buttons the save does not name keep their defaults');
+  ok(reg.sprint.obj.x === 1178 && reg.sprint.obj.y === 302, 'buttons the save does not name keep their defaults'); // Upgrade 17 re-point: sprint's circular seat is y 302
   resetLayout();
   const g2 = hudBattle();
   const reg2 = {}; g2.layoutReg.forEach(en => { reg2[en.id] = en; });
-  ok(reg2.skill1.obj.x === 1178 && reg2.skill1.obj.y === 432 && g2.campBtnRect.x === 949, 'RESET: a fresh battle stands at the exact U10 default again'); }
+  ok(reg2.skill1.obj.x === 1178 && reg2.skill1.obj.y === 470 && g2.campBtnRect.x === 949, 'RESET: a fresh battle stands at the exact U10 default again'); } // Upgrade 17 re-point: power 2's circular seat is y 470
 
 // ---------- layout: a real editor drag in battle ----------
 { cleanSettings();
@@ -170,7 +173,7 @@ function cleanSettings() { delete store.gxhub_wotw_layout; delete store.gxhub_wo
   const tx0 = g.hero.tx;
   g.onTap({ x: 500, y: 300, worldX: 500, worldY: 300, id: 1 });
   ok(g.hero.tx === tx0, '…and a field tap while editing never becomes a march order');
-  g.input.fire('pointerdown', { x: 1178, y: 176, id: 1 }); // on DODGE
+  g.input.fire('pointerdown', { x: 1178, y: 166, id: 1 }); // on DODGE (Upgrade 17: its circle's centre is y 166 now)
   g.input.fire('pointermove', { x: 800, y: 300, id: 1 });
   ok(g.fightBtns.dodge.x === 800 && g.fightBtns.dodge.y === 300 && g.fightBtns.dodge.sx === 800,
     'the drag moves DODGE — container and sweep origin together');

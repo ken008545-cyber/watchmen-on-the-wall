@@ -97,7 +97,7 @@ function bareBattle(heroId) {
 
 // ---------- the maps ----------
 ok(Object.keys(CMD_ICONS).length === 9 && new Set(Object.values(CMD_ICONS)).size === 9, 'CMD_ICONS: nine commands, nine distinct symbols');
-ok(LAYOUT_DEFS.every(d => LAYOUT_ICONS[d[0]]) && LAYOUT_DEFS.length === 17, 'LAYOUT_ICONS covers all 17 movable battle controls');
+ok(LAYOUT_DEFS.every(d => LAYOUT_ICONS[d[0]]) && LAYOUT_DEFS.length === 18, 'LAYOUT_ICONS covers all 17 movable battle controls'); // Upgrade 17 re-point: 18 controls — ORDERS wears the banner glyph (ico_banner, already in the family)
 ok(ICON_SIZE === 120, 'the family is drawn on one 120px canvas');
 
 // ---------- the resolver: symbols from the powers' own names ----------
@@ -172,7 +172,7 @@ ok(skillIconKey({ name: 'Three Hundred' }) === 'ico_burst' && skillIconKey({}) =
   ok(s.bindItems.some(o => o._t === 'Dodge') && s.bindItems.some(o => o._t === 'Auto-fire toggle') && s.bindItems.some(o => o._t === 'Build mode'),
     'the Controls keybind list still names every action in words (Dodge, Auto-fire toggle, Build mode, ...)');
   s.enterGhostEdit();
-  ok(s.ghostObjs.length === 17 && s.ghostObjs.every(b => b.iconKey), 'the layout ghosts wear the same 17 symbols');
+  ok(s.ghostObjs.length === 18 && s.ghostObjs.every(b => b.iconKey), 'the layout ghosts wear the same 17 symbols'); // Upgrade 17 re-point: a fresh store defaults to the Simple face, whose ghost editor shows all 18 (ORDERS + the open fan); the Full face shows 17
   ok(s.ghostObjs.every(b => b.label._t && b.label._visible !== false), 'and every ghost keeps its NAME as a caption beside the symbol — symbol and name learned together');
   const gd = s.ghostObjs[LAYOUT_DEFS.findIndex(d => d[0] === 'dodge')];
   ok(gd && gd.iconKey === 'ico_dodge' && gd.label._t === 'DODGE', 'the DODGE ghost: swoosh symbol, "DODGE" caption');

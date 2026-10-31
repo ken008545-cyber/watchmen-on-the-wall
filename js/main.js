@@ -229,20 +229,55 @@ function saveAutoFire(on){ try{ localStorage.setItem(AUTOFIRE_KEY,on?'1':'0'); }
 // button scaling in this upgrade (a container's hit area does not scale
 // as simply as its face, and an honest hit area matters more than the
 // extra knob; size stays the approved 110x56 / 196x56 family).
-const LAYOUT_KEY='gxhub_wotw_layout', BINDS_KEY='gxhub_wotw_binds', MOVE_KEY='gxhub_wotw_move';
+const LAYOUT_KEY='gxhub_wotw_layout', BINDS_KEY='gxhub_wotw_binds', MOVE_KEY='gxhub_wotw_move', FACE_KEY='gxhub_wotw_face';
 // The movable battle controls: [id, editor label, w, h, default x, default y].
-// The defaults ARE the Upgrade-10 geometry (stack x 1178; row from x 130,
-// pitch 117, y HUD_Y+55=665).
+// Upgrade 17: the faces are CIRCLES now, so w==h==diameter for every
+// battle control. The hierarchy kennin approved stands in the diameters:
+// powers 76, the thumb cluster (auto-fire, dodge, block, sprint) and
+// BUILD/ORDERS 64, the command rank 56. The stack keeps x 1178 with
+// wider pitch so the bigger circles never touch (auto 76, dodge 166,
+// block 234, sprint 302, powers 384/470/556 — the last power's rim
+// lands at 594, still clear of the bar at HUD_Y=610); the command row
+// keeps its seats (x from 130, pitch 117, y 665). BUILD's old seat
+// under the stack no longer exists — the power circles grew into it —
+// so BUILD takes the row's right end (1130,665); ORDERS, the Simple
+// face's fan anchor, takes the row's left end (130,665), the seat
+// Charge holds in the Full face (the two never stand together).
 const LAYOUT_DEFS=[
-  ['autofire','AUTO-FIRE',196,56,1178,70],['dodge','DODGE',196,56,1178,176],['block','BLOCK',196,56,1178,240],['sprint','SPRINT',196,56,1178,304],
-  ['skill0','Power 1',196,56,1178,368],['skill1','Power 2',196,56,1178,432],['skill2','Power 3',196,56,1178,496],
-  ['cmd_charge','Charge',110,56,130,665],['cmd_hold','Hold',110,56,247,665],['cmd_follow','Follow Me',110,56,364,665],['cmd_flank','Flank',110,56,481,665],
-  ['cmd_fallback','Fall Back',110,56,598,665],['cmd_shieldwall','Shield Wall',110,56,715,665],['cmd_volley','Volley',110,56,832,665],
-  ['cmd_camp','CAMP',110,56,949,665],['cmd_rally','Rally',110,56,1066,665],
-  // Upgrade 15: BUILD takes the seat directly under the power stack
-  // (y 568, its bottom edge at 596 — still clear of the command bar at
-  // HUD_Y=610, the margin the Upgrade-10 stack law keeps).
-  ['build','BUILD',196,56,1178,568]];
+  ['autofire','AUTO-FIRE',64,64,1178,76],['dodge','DODGE',64,64,1178,166],['block','BLOCK',64,64,1178,234],['sprint','SPRINT',64,64,1178,302],
+  ['skill0','Power 1',76,76,1178,384],['skill1','Power 2',76,76,1178,470],['skill2','Power 3',76,76,1178,556],
+  ['cmd_charge','Charge',56,56,130,665],['cmd_hold','Hold',56,56,247,665],['cmd_follow','Follow Me',56,56,364,665],['cmd_flank','Flank',56,56,481,665],
+  ['cmd_fallback','Fall Back',56,56,598,665],['cmd_shieldwall','Shield Wall',56,56,715,665],['cmd_volley','Volley',56,56,832,665],
+  ['cmd_camp','CAMP',56,56,949,665],['cmd_rally','Rally',56,56,1066,665],
+  ['build','BUILD',64,64,1130,665],['orders','ORDERS',64,64,130,665]];
+// --- Upgrade 17: the two battle faces --------------------------------
+// SIMPLE (the new player's default): only the core circles stand —
+// the three powers, Dodge, Block, Sprint, the auto-fire toggle, CAMP,
+// and ORDERS. The full command rank lives behind ORDERS as a fan that
+// opens in a row above the bar; nothing is removed, every command is
+// two taps away at most. FULL: every circle always visible — kennin's
+// previously approved layout, preserved. A player who already
+// customized anything under Upgrade 12 (layout, binds, or movement)
+// defaults to FULL: their learned layout is never taken away. A new
+// player starts SIMPLE. The tutorial always teaches SIMPLE.
+function hasPriorControls(){ try{ return !!(localStorage.getItem(LAYOUT_KEY)||localStorage.getItem(BINDS_KEY)||localStorage.getItem(MOVE_KEY)); }catch(e){ return false; } }
+function loadFace(){ try{ const v=localStorage.getItem(FACE_KEY); if(v==='simple'||v==='full') return v; }catch(e){}
+  return hasPriorControls()?'full':'simple'; }
+function saveFace(f){ try{ localStorage.setItem(FACE_KEY,f); }catch(e){} }
+// The fan's members, in fan order, and where each stands relative to
+// the ORDERS anchor (offsets from the anchor's default seat, so the
+// whole fan follows ORDERS wherever the player drags it — the fan is
+// a GROUP in the Simple face; individual seats belong to Full).
+const FAN_MEMBERS=['cmd_charge','cmd_hold','cmd_follow','cmd_flank','cmd_fallback','cmd_shieldwall','cmd_volley','cmd_rally','build'];
+const FAN_OFFSETS={ cmd_charge:{dx:0,dy:-113}, cmd_hold:{dx:84,dy:-113}, cmd_follow:{dx:168,dy:-113}, cmd_flank:{dx:252,dy:-113},
+  cmd_fallback:{dx:336,dy:-113}, cmd_shieldwall:{dx:420,dy:-113}, cmd_volley:{dx:504,dy:-113}, cmd_rally:{dx:588,dy:-113}, build:{dx:676,dy:-113} };
+// A radial arc drawn from line segments only (the one graphics verb
+// every surface in the game already trusts): the cooldown/charge
+// language of the circular UI — sweeps and rings around the glyphs.
+function arcSegs(g,cx,cy,r,a0,a1,w,col,alpha){ if(!g||a1<=a0) return; const steps=Math.max(2,Math.ceil((a1-a0)/0.24));
+  g.lineStyle(w,col,alpha===undefined?1:alpha);
+  for(let i=0;i<steps;i++){ const t0=a0+(a1-a0)*i/steps, t1=a0+(a1-a0)*(i+1)/steps;
+    g.lineBetween(cx+Math.cos(t0)*r,cy+Math.sin(t0)*r,cx+Math.cos(t1)*r,cy+Math.sin(t1)*r); } }
 function defaultLayoutPos(){ const o={}; LAYOUT_DEFS.forEach(d=>{ o[d[0]]={x:d[4],y:d[5]}; }); return o; }
 function loadLayout(){ try{ const v=JSON.parse(localStorage.getItem(LAYOUT_KEY)||'null'); if(v&&v.pos&&typeof v.pos==='object') return v; }catch(e){} return null; }
 function saveLayout(pos){ try{ localStorage.setItem(LAYOUT_KEY,JSON.stringify({pos})); }catch(e){} }
@@ -282,7 +317,11 @@ function layoutEditor(scene,onSave){ const ed={ active:false, drag:null, items:[
   exit(){ ed.active=false; ed.drag=null; ed.items.forEach(it=>{ if(it.obj.setInteractive) it.obj.setInteractive({useHandCursor:true}); }); },
   down(p){ if(!ed.active||!p) return false;
     for(let i=ed.items.length-1;i>=0;i--){ const it=ed.items[i];
-      if(Math.abs(p.x-it.obj.x)<=it.w/2&&Math.abs(p.y-it.obj.y)<=it.h/2){ ed.drag={it,dx:p.x-it.obj.x,dy:p.y-it.obj.y}; return true; } }
+      // Upgrade 17: circle buttons are picked by their circle, panels by
+      // their rectangle — the editor's hand obeys the same shape as the
+      // player's. Either way the drag takes the button by its centre.
+      const hit=(it.obj.circleR)?Math.hypot(p.x-it.obj.x,p.y-it.obj.y)<=it.obj.circleR:(Math.abs(p.x-it.obj.x)<=it.w/2&&Math.abs(p.y-it.obj.y)<=it.h/2);
+      if(hit){ ed.drag={it,dx:p.x-it.obj.x,dy:p.y-it.obj.y}; return true; } }
     return false; },
   move(p){ if(!ed.active||!ed.drag||!p) return; const it=ed.drag.it;
     const nx=Math.max(it.w/2,Math.min(W-it.w/2,p.x-ed.drag.dx)), ny=Math.max(it.h/2,Math.min(H-it.h/2,p.y-ed.drag.dy));
@@ -330,7 +369,20 @@ let DATA=null; const DATA_P=()=>Progress.data;
 const txt=(s,x,y,str,size,col,o)=>s.add.text(x,y,str,Object.assign({},FONT,{fontSize:size+'px',color:col||PARCH,stroke:'#140c07',strokeThickness:4},o||{}));
 function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   const c=s.add.container(x,y); const g=s.add.graphics();
-  const draw=(hl)=>{g.clear();g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95);g.fillRoundedRect(-w/2,-h/2,w,h,8);g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1);g.strokeRoundedRect(-w/2,-h/2,w,h,8);};
+  // Upgrade 17: opt.circle (a diameter) makes the face a CIRCLE. The
+  // hit test is truly circular, enforced HERE from the pointer's own
+  // local coordinates (lx/ly are in the container's centred frame —
+  // the same frame the face is drawn in): a tap in the bounding
+  // square's corner, outside the radius, never reaches the press
+  // handlers at all, so it cannot fire, dip, or light the button —
+  // it falls through to the field beneath. (The container's Phaser
+  // hit area stays the default rectangle, a harmless superset: the
+  // radius gate is the law, and it is exact under any Phaser version.)
+  const circR=opt.circle?opt.circle/2:0; c.circleR=circR;
+  const inCirc=(lx,ly)=>!circR||Math.hypot(lx||0,ly||0)<=circR;
+  const draw=(hl)=>{g.clear();
+    if(circR){ g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95); g.fillCircle(0,0,circR); g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1); g.strokeCircle(0,0,circR); return; }
+    g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95);g.fillRoundedRect(-w/2,-h/2,w,h,8);g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1);g.strokeRoundedRect(-w/2,-h/2,w,h,8);};
   draw(false);
   // Upgrade 16: a button may wear a SYMBOL instead of its name — opt.icon
   // names a texture drawn by makeIcons(). The word survives only where it
@@ -342,18 +394,18 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   // the moment. With an icon and no caption the label text is EMPTY and
   // hidden: no word stands on the button's face.
   let t;
-  if(opt.icon){ const im=s.add.image(0,opt.caption?-8:0,opt.icon); const disp=Math.min(h*0.64,w*0.42); im.setScale(disp/ICON_SIZE); c.icon=im; c.iconKey=opt.icon;
+  if(opt.icon){ const im=s.add.image(0,opt.caption?(circR?-9:-8):0,opt.icon); const disp=circR?opt.circle*0.64:Math.min(h*0.64,w*0.42); im.setScale(disp/ICON_SIZE); c.icon=im; c.iconKey=opt.icon;
     t=txt(s,0,opt.caption?h/2-12:0,opt.caption?label:'',opt.caption?11:(opt.size||20),opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
     if(!opt.caption) t.setVisible(false); }
   else t=txt(s,0,0,label,opt.size||20,opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
   c.add(c.icon?[g,c.icon,t]:[g,t]); c.setSize(w,h).setInteractive({useHandCursor:true});
-  c.on('pointerover',()=>draw(true)); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
+  c.on('pointerover',(p,lx,ly)=>{ if(inCirc(lx,ly)) draw(true); }); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
   // Upgrade 8: button weight — every button in the game presses like it has
   // mass: it dips and lights the instant a finger lands, and springs back on
   // release, so a press is felt before the action lands.
-  c.on('pointerdown',()=>{ if(opt.disabled) return; c.setScale(0.93); draw(true);
+  c.on('pointerdown',(p,lx,ly)=>{ if(opt.disabled||!inCirc(lx,ly)) return; c.setScale(0.93); draw(true);
     if(opt.floatName&&s.floatBtnName) s.floatBtnName(c,opt.floatName); });
-  c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); c.setScale(1); draw(false); SFX.unlock(); if(!opt.disabled) cb(); });
+  c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); c.setScale(1); draw(false); if(!inCirc(lx,ly)) return; SFX.unlock(); if(!opt.disabled) cb(); });
   c.label=t; c.redraw=draw; return c; }
 
 // ---------- Upgrade 16: the symbol family ----------
@@ -367,7 +419,7 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
 // faces change.
 const ICON_SIZE=120;
 const CMD_ICONS={charge:'ico_charge',hold:'ico_hold',follow:'ico_follow',flank:'ico_flank',fallback:'ico_fallback',shieldwall:'ico_shieldwall',volley:'ico_volley',camp:'ico_camp',rally:'ico_rally'};
-const LAYOUT_ICONS={autofire:'ico_auto',dodge:'ico_dodge',block:'ico_block',sprint:'ico_sprint',skill0:'ico_burst',skill1:'ico_burst',skill2:'ico_burst',cmd_charge:'ico_charge',cmd_hold:'ico_hold',cmd_follow:'ico_follow',cmd_flank:'ico_flank',cmd_fallback:'ico_fallback',cmd_shieldwall:'ico_shieldwall',cmd_volley:'ico_volley',cmd_camp:'ico_camp',cmd_rally:'ico_rally',build:'ico_build'};
+const LAYOUT_ICONS={autofire:'ico_auto',dodge:'ico_dodge',block:'ico_block',sprint:'ico_sprint',skill0:'ico_burst',skill1:'ico_burst',skill2:'ico_burst',cmd_charge:'ico_charge',cmd_hold:'ico_hold',cmd_follow:'ico_follow',cmd_flank:'ico_flank',cmd_fallback:'ico_fallback',cmd_shieldwall:'ico_shieldwall',cmd_volley:'ico_volley',cmd_camp:'ico_camp',cmd_rally:'ico_rally',build:'ico_build',orders:'ico_banner'};
 // A hero's power wears the symbol of what it IS: David's Psalm is a lyre,
 // Five Stones is five stones in an arc, Smooth Stone one stone ringed.
 // Other heroes resolve by their own names' plain meanings, with the
@@ -690,6 +742,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.binds=loadBinds();
     this.stick=null; this.followOn=false; this.followPt=null; this.pendTap=null;
     this.paused=false; this.layoutEdit=false; this.layoutReg=[]; this.pauseItems=[]; this.editItems=[];
+    // Upgrade 17: the battle face. The tutorial always teaches SIMPLE
+    // (the fan is part of the lesson); a real run takes the player's
+    // own face — the saved choice, else Full for a player who already
+    // customized under Upgrade 12, else Simple for a new player. The
+    // fan starts closed; seatPos remembers every control's layout seat
+    // apart from where the fan may be standing it right now.
+    this.face=this.tutorial?'simple':loadFace(); this.fanOpen=false; this._fanShown=false; this.seatPos={};
     // Upgrade 14: the week's law rides a Bible run (null in other eras,
     // and null in the tutorial, whose economy firewall stays sealed).
     // seventhT/seventhAcc are the Seventh Day's rest clock and its manna
@@ -759,10 +818,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Fullscreen keep the far right.
     const cmds=[['charge','Charge'],['hold','Hold'],['follow','Follow Me'],['flank','Flank'],['fallback','Fall Back'],['shieldwall','Shield Wall']];
     this.cmdBtns={};
-    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,'',()=>this.giveOrder(id),{size:16,icon:CMD_ICONS[id],floatName:label}); b.setDepth(31); this.cmdBtns[id]=b; this.regLayout('cmd_'+id,b,null); });
-    const vb=button(this,130+6*117,HUD_Y+55,110,56,'',()=>this.pressVolley(),{size:16,icon:CMD_ICONS.volley,floatName:'Volley'}); vb.setDepth(31); this.cmdBtns.volley=vb; this.regLayout('cmd_volley',vb,(x,y)=>{ vb.sx=x; vb.sy=y; });
-    // Upgrade 8: Volley carries a cooldown sweep like the skill buttons.
-    vb.sx=130+6*117; vb.sy=HUD_Y+55; vb.sw=110; vb.sh=56; vb.sweep=this.add.graphics().setDepth(32);
+    // Upgrade 17: the row is a rank of CIRCLES now (56 across, same
+    // seats). In the Simple face these buttons are fan members: their
+    // presses arrive wrapped so issuing from the fan closes it behind
+    // the order (fanPress) — the action itself is the same function
+    // the Full face and the keyboard have always called.
+    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,56,56,'',()=>this.fanPress(()=>this.giveOrder(id)),{size:16,icon:CMD_ICONS[id],floatName:label,circle:56}); b.setDepth(31); this.cmdBtns[id]=b; this.regLayout('cmd_'+id,b,null); });
+    const vb=button(this,130+6*117,HUD_Y+55,56,56,'',()=>this.fanPress(()=>this.pressVolley()),{size:16,icon:CMD_ICONS.volley,floatName:'Volley',circle:56}); vb.setDepth(31); this.cmdBtns.volley=vb; this.regLayout('cmd_volley',vb,(x,y)=>{ vb.sx=x; vb.sy=y; });
+    // Upgrade 8: Volley carries a cooldown sweep like the skill buttons
+    // (Upgrade 17: the sweep is a ring around the circle now — vb.sx/sy
+    // follow the button's ACTIVE centre, kept by applyFace).
+    vb.sx=130+6*117; vb.sy=HUD_Y+55; vb.sw=56; vb.sh=56; vb.sweep=this.add.graphics().setDepth(32);
     // Upgrade 9: the active-buff chips — each live orb power wears a labeled
     // chip (color disc + name + seconds) under the stat lines, so what the
     // hero is carrying is readable at a glance, not just a timer line.
@@ -772,29 +838,40 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 10: it rides the command row now, as the approved sketch
     // draws it — camp care sits with the army's orders. Same panel, same
     // CAMP_UPGRADES / CAMP_REPAIR state and prices behind it.
-    this.campBtn=button(this,130+7*117,HUD_Y+55,110,56,'',()=>this.toggleCampPanel(),{size:16,icon:CMD_ICONS.camp,floatName:'Camp'}); this.campBtn.setDepth(31);
-    this.campBtnRect={x:130+7*117,y:HUD_Y+55,w:110,h:56};
-    this.regLayout('cmd_camp',this.campBtn,(x,y)=>{ this.campBtnRect={x,y,w:110,h:56}; });
+    this.campBtn=button(this,130+7*117,HUD_Y+55,56,56,'',()=>this.toggleCampPanel(),{size:16,icon:CMD_ICONS.camp,floatName:'Camp',circle:56}); this.campBtn.setDepth(31);
+    this.campBtnRect={x:130+7*117,y:HUD_Y+55,w:56,h:56};
+    this.regLayout('cmd_camp',this.campBtn,(x,y)=>{ this.campBtnRect={x,y,w:56,h:56}; });
     // Upgrade 10 (approved addition): RALLY — the ninth seat on the row.
     // The whole row shifted left (start x 130) so Rally sits at the same
     // 110x56 as every other seat instead of shrinking any button. Tap
     // Rally, then tap the ground: the banner is planted there and the
     // selected squad — or the whole army, hero selected — moves to it
     // and holds (plantRally).
-    this.rallyBtn=button(this,130+8*117,HUD_Y+55,110,56,'',()=>this.pressRally(),{size:16,icon:CMD_ICONS.rally,floatName:'Rally'}); this.rallyBtn.setDepth(31);
-    this.rallyBtnRect={x:130+8*117,y:HUD_Y+55,w:110,h:56}; // Upgrade 11: where the tutorial's ring finds Rally
-    this.regLayout('cmd_rally',this.rallyBtn,(x,y)=>{ this.rallyBtnRect={x,y,w:110,h:56}; });
+    this.rallyBtn=button(this,130+8*117,HUD_Y+55,56,56,'',()=>this.fanPress(()=>this.pressRally()),{size:16,icon:CMD_ICONS.rally,floatName:'Rally',circle:56}); this.rallyBtn.setDepth(31);
+    this.rallyBtnRect={x:130+8*117,y:HUD_Y+55,w:56,h:56}; // Upgrade 11: where the tutorial's ring finds Rally (applyFace keeps it on the ACTIVE circle)
+    this.regLayout('cmd_rally',this.rallyBtn,(x,y)=>{ this.rallyBtnRect={x,y,w:56,h:56}; });
+    // Upgrade 17: ORDERS — the Simple face's one new circle, a banner.
+    // It stands at the row's left end and fans the command rank open
+    // above the bar; in the Full face it is hidden (every command
+    // already stands). Its seat is a layout seat like any other.
+    this.ordersBtn=button(this,130,HUD_Y+55,64,64,'',()=>this.toggleFan(),{size:16,icon:'ico_banner',floatName:'Orders',circle:64}); this.ordersBtn.setDepth(31);
+    this.regLayout('orders',this.ordersBtn,(x,y)=>{ if(this.face==='simple'&&(this.fanOpen||this._fanShown)) this.applyFace(); });
     // Upgrade 10: the hero's power buttons are built in
     // buildFightControls() now — they ride the right-thumb stack under
     // the AUTO-FIRE toggle, as the approved sketch draws them.
-    this.spdBtn=button(this,1221,HUD_Y+80,110,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:18}).setDepth(31);
+    // Upgrade 17: the speed toggle is a battle control, so it joins the
+    // circles (44 across, its word shrunk to the 'x1' it always showed).
+    // Fullscreen stays a rectangle by exception: it is a display
+    // utility whose whole word is its meaning, and no circle that fits
+    // the corner could carry it — noted in BUILD-NOTES, not hidden.
+    this.spdBtn=button(this,1221,HUD_Y+80,44,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:15,circle:44}).setDepth(31);
     const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ try{ this.scale.startFullscreen(); }catch(e){} },{size:13}); fsb.setDepth(31);
     // Upgrade 12: the pause/settings entry — a small ⚙ above the fight
     // stack. It opens the pause overlay (movement scheme, the layout
     // editor, resume, quit), and its rect is walled in onTap like the
     // CAMP button's: a tap on it is a button press, never a march order.
-    this.pauseBtn=button(this,1246,20,56,34,'⚙',()=>this.openPause(),{size:16}); this.pauseBtn.setDepth(31);
-    this.pauseBtnRect={x:1246,y:20,w:56,h:34};
+    this.pauseBtn=button(this,1246,20,40,40,'⚙',()=>this.openPause(),{size:16,circle:40}); this.pauseBtn.setDepth(31);
+    this.pauseBtnRect={x:1246,y:20,w:40,h:40};
     // Upgrade 15: the BUILD button — the right column's eighth seat,
     // directly under the power stack in the same 196x56 family (its
     // bottom edge, 596, still clears the command bar). It is command
@@ -802,9 +879,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade-10 stack wall stays exactly seven), it keeps its own
     // onTap wall like CAMP and ⚙, and it registers in the layout
     // system like every other battle control.
-    this.buildBtn=button(this,1178,568,196,56,'',()=>this.toggleBuildMode(),{size:16,icon:'ico_build',floatName:'Build'}); this.buildBtn.setDepth(31);
-    this.buildBtnRect={x:1178,y:568,w:196,h:56};
-    this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:196,h:56}; });
+    // Upgrade 17: BUILD is a 64 circle at the row's right end — its old
+    // seat under the stack belongs to the grown power circles now. In
+    // the Simple face it is the fan's last member; buildBtnRect always
+    // names its ACTIVE circle (fan position while the fan stands).
+    this.buildBtn=button(this,1130,HUD_Y+55,64,64,'',()=>this.fanPress(()=>this.toggleBuildMode()),{size:16,icon:'ico_build',floatName:'Build',circle:64}); this.buildBtn.setDepth(31);
+    this.buildBtnRect={x:1130,y:HUD_Y+55,w:64,h:64};
+    this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:64,h:64}; });
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
     this.refreshHUD(); this.fixUI(); }
   phaseName(){ return this.wave>0&&this.isNightWave(this.wave)?'Night':'Day'; }
@@ -842,18 +923,29 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 9: while the camp panel is open, field taps belong to the
     // panel's own buttons — never to the marching hand behind it.
     if(this.campPanelOpen) return;
+    // Upgrade 17: while the ORDERS fan stands open, taps belong to it:
+    // a tap on one of its circles is that button's press (the wall
+    // lets the button's own handler do the work), and a tap anywhere
+    // else closes the fan — consumed, so a closing tap never becomes
+    // a march order by accident. ORDERS itself closes it via its own
+    // toggle. The walls are circles now, like the buttons.
+    if(this.fanIsOpen()){ const onFan=FAN_MEMBERS.some(id=>{ const b=this.fanBtn(id); return b&&Math.hypot(p.x-b.x,p.y-b.y)<=(b.circleR||28); });
+      const onOrders=this.ordersBtn&&Math.hypot(p.x-this.ordersBtn.x,p.y-this.ordersBtn.y)<=(this.ordersBtn.circleR||32);
+      if(onFan||onOrders) return;
+      this.closeFan(); return; }
     // Upgrade 8: a tap on the fight cluster is a fight input, never a
     // march order — the two hands stay separate.
     if(this.overFight(p)) return;
     // Upgrade 9: the same wall for the CAMP button — its tap is a button
     // press, not a march order at whatever world point lies beneath it.
-    if(this.campBtnRect&&Math.abs(p.x-this.campBtnRect.x)<=this.campBtnRect.w/2+4&&Math.abs(p.y-this.campBtnRect.y)<=this.campBtnRect.h/2+4) return;
+    // (Upgrade 17: the wall is the button's circle, plus a breath.)
+    if(this.campBtnRect&&Math.hypot(p.x-this.campBtnRect.x,p.y-this.campBtnRect.y)<=this.campBtnRect.w/2+4) return;
     // Upgrade 12: the same wall for the ⚙ pause button.
-    if(this.pauseBtnRect&&Math.abs(p.x-this.pauseBtnRect.x)<=this.pauseBtnRect.w/2+4&&Math.abs(p.y-this.pauseBtnRect.y)<=this.pauseBtnRect.h/2+4) return;
+    if(this.pauseBtnRect&&Math.hypot(p.x-this.pauseBtnRect.x,p.y-this.pauseBtnRect.y)<=this.pauseBtnRect.w/2+4) return;
     // Upgrade 15: the same wall for the BUILD button — and while build
     // mode stands open, the build bar's own ground belongs to its tools;
     // while the intermission field bar stands, its buttons own their taps.
-    if(this.buildBtnRect&&Math.abs(p.x-this.buildBtnRect.x)<=this.buildBtnRect.w/2+4&&Math.abs(p.y-this.buildBtnRect.y)<=this.buildBtnRect.h/2+4) return;
+    if(this.buildBtnRect&&Math.hypot(p.x-this.buildBtnRect.x,p.y-this.buildBtnRect.y)<=this.buildBtnRect.w/2+4) return;
     if(this.buildMode&&this.buildBarRect&&Math.abs(p.x-this.buildBarRect.x)<=this.buildBarRect.w/2&&Math.abs(p.y-this.buildBarRect.y)<=this.buildBarRect.h/2) return;
     if(this.interField&&(this.interBtnRects||[]).some(r=>Math.abs(p.x-r.x)<=r.w/2+4&&Math.abs(p.y-r.y)<=r.h/2+4)) return;
     // Upgrade 12: under STICK or FOLLOW, a field press is not yet a tap —
@@ -1059,7 +1151,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       { id:'kit', line:'Three buttons guard you: DODGE slips a blow, BLOCK softens one, SPRINT runs. Press each of them once.' },
       { id:'power', line:'His power moves have their own buttons — Psalm and Five Stones. A stronger dummy is coming: cast one at it. When a power is ready again, its button glows and whispers.' },
       { id:'army', line:'This squad is yours — a gift for the lesson. Tap the squad to choose it, then tap the ground to post it there.',
-        line2:'Now tap RALLY, then tap the ground. Your squad goes to the banner and holds it.' },
+        line2:'Your orders live behind one button now. Tap ORDERS — the banner at the row\'s left end — and the command rank opens.',
+        line3:'Now tap RALLY in the open rank, then tap the ground. Your squad goes to the banner and holds it.' },
       { id:'camp', line:'The camp is cared for while the fight goes on. Tap CAMP — or the camp itself — and look inside: Fortify makes it stronger, Repair mends it.' },
       { id:'orbs', line:'The glowing orbs sell powers for Grokonians. Walk David to the shining orb and tap it — this first buy is on the house, this once.' },
     ];
@@ -1091,7 +1184,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(name) this.tutCred[name]=true;
     if(this.tutFinished) return;
     const st=this.tutDefs&&this.tutDefs[this.tutStep]; if(!st) return;
-    if(st.id==='army'&&this.tutPhase===0&&name==='posted'){ this.tutPhase=1; this.tutRender(); return; } // the post turns the army step to its rally half
+    if(st.id==='army'&&this.tutPhase===0&&name==='posted'){ this.tutPhase=1; this.tutRender(); return; } // the post turns the army step to its orders half
+    // Upgrade 17: opening the fan turns the army step to its rally
+    // half (an opening credited earlier is honored the same way).
+    if(st.id==='army'&&this.tutPhase===1&&(name==='fanopen'||this.tutCred.fanopen)){ this.tutPhase=2; this.tutRender(); return; }
     if(this.tutStepDone(st)) this.tutAdvance(); else this.tutRender(); }
   tutStepDone(st){ const c=this.tutCred||{};
     switch(st.id){
@@ -1099,7 +1195,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       case 'autofire': return !!(c.autofired&&c.autotoggled); // both halves, in either order
       case 'kit': return !!(c.dodge&&c.block&&c.sprint);
       case 'power': return !!c.power;
-      case 'army': return this.tutPhase===1&&!!c.rallied;
+      case 'army': return this.tutPhase===2&&!!c.rallied;
       case 'camp': return !!c.camp;
       case 'orbs': return !!c.orb;
     } return false; }
@@ -1120,7 +1216,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const items=[];
     const g=this.add.graphics().setDepth(52); g.fillStyle(0x140c07,0.96); g.fillRoundedRect(W/2-420,236,840,232,12); g.lineStyle(3,0xd9a441,1); g.strokeRoundedRect(W/2-420,236,840,232,12); items.push(g);
     items.push(txt(this,W/2,262,'The lesson is complete',26,GOLD).setOrigin(0.5).setDepth(53));
-    items.push(txt(this,W/2,296,'You march where you tap. David fires on his own — auto-fire, your choice.\nDodge, block and sprint guard you. Psalm and Five Stones answer your tap,\nand whisper when they are ready. Your squads post and rally where you put\nthem. The camp is cared for from CAMP. The orbs sell their powers.\nThe wall is yours.',16,PARCH,{align:'center'}).setOrigin(0.5,0).setDepth(53));
+    items.push(txt(this,W/2,296,'You march where you tap. David fires on his own — auto-fire, your choice.\nDodge, block and sprint guard you. Psalm and Five Stones answer your tap,\nand whisper when they are ready. Your squads post where you put them, and\nyour orders wait behind ORDERS. The camp is cared for from CAMP.\nThe orbs sell their powers. The wall is yours.',16,PARCH,{align:'center'}).setOrigin(0.5,0).setDepth(53));
     const fb=button(this,W/2,428,200,46,'Finish',()=>this.exitTutorial(),{size:18}); fb.setDepth(53); items.push(fb);
     items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); });
     this.tutRender(); }
@@ -1131,6 +1227,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     let line=st.line;
     if(st.id==='autofire') line=this.tutCred.autofired?st.line2:(this.autoFire?st.line:st.lineOff);
     if(st.id==='army'&&this.tutPhase===1) line=st.line2;
+    if(st.id==='army'&&this.tutPhase===2) line=st.line3;
     this.tutLine.setText(line);
     let sub='Step '+(this.tutStep+1)+' of '+this.tutDefs.length;
     if(st.id==='kit'){ const left=[['dodge','Dodge'],['block','Block'],['sprint','Sprint']].filter(p=>!this.tutCred[p[0]]).map(p=>p[1]);
@@ -1145,7 +1242,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         return this.autoBtn?{hl:'screen',x:this.autoBtn.sx,y:this.autoBtn.sy}:null;
       case 'kit': { const left=['dodge','block','sprint'].find(k=>!this.tutCred[k]); const b=left&&this.fightBtns&&this.fightBtns[left]; return b?{hl:'screen',x:b.sx,y:b.sy}:null; }
       case 'power': { const b=this.skillBtns&&this.skillBtns[1]; return b?{hl:'screen',x:b.sx,y:b.sy}:null; }
-      case 'army': if(this.tutPhase===1) return this.rallyBtnRect?{hl:'screen',x:this.rallyBtnRect.x,y:this.rallyBtnRect.y}:null;
+      case 'army': if(this.tutPhase===2) return this.rallyBtnRect?{hl:'screen',x:this.rallyBtnRect.x,y:this.rallyBtnRect.y}:null;
+        if(this.tutPhase===1) return this.ordersBtn?{hl:'screen',x:this.ordersBtn.x,y:this.ordersBtn.y}:null;
         if(!this.selSquad&&this.squads&&this.squads[0]) return {hl:'world',x:this.squads[0].x,y:this.squads[0].y};
         return {hl:'world',x:this.campPos.x+430,y:this.campPos.y-140};
       case 'camp': return this.campBtnRect?{hl:'screen',x:this.campBtnRect.x,y:this.campBtnRect.y}:null;
@@ -1172,45 +1270,62 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // that fills toward the next Held tier — gold at Tempered, bright and
   // pulsing at Perfect. Drawn from live button state every frame.
   drawSkillSweep(b){ const g=b.sweep; if(!g) return; g.clear();
-    const x=b.sx-b.sw/2, y=b.sy-b.sh/2;
-    if(b.cd>0){ const f=Math.min(1,b.cd/(b.cdMax||b.def.cd||1)); g.fillStyle(0x000000,0.55); g.fillRect(x,y,b.sw,b.sh*f); return; }
+    // Upgrade 17: the sweep speaks in rings now. On cooldown a dark disc
+    // veils the glyph while a gold arc sweeps clockwise from the top,
+    // growing back as the power returns (the arc's length IS the time
+    // left, read at a glance). Smooth Stone's held charge — always
+    // ring-shaped in spirit — draws as a rim arc climbing to the
+    // Tempered rim and the pulsing Perfect rim; the power-ready
+    // whisper is a ring pulse that swells once and fades.
+    const cx=b.sx, cy=b.sy, r=(b.sw||56)/2;
+    if(b.cd>0){ const f=Math.min(1,b.cd/(b.cdMax||b.def.cd||1));
+      g.fillStyle(0x000000,0.45); g.fillCircle(cx,cy,r-2);
+      arcSegs(g,cx,cy,r-4,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-f),4,0xf2c14e,0.9); return; }
     const t=this.heldTierOf(b);
     const f=t===2?1:(t===1?(b.held-HELD.temperAt)/(HELD.perfectAt-HELD.temperAt):(b.held||0)/HELD.temperAt);
-    g.fillStyle(t===2?0xffe98a:(t===1?0xf2c14e:0x8a7a4a),t===2?0.95:0.8); g.fillRect(x,y+b.sh-5,b.sw*Math.max(0,Math.min(1,f)),5);
-    if(t===2){ g.lineStyle(3,0xffe98a,0.6+0.4*Math.sin((this._pulse||0)*6)); g.strokeRect(x,y,b.sw,b.sh); }
-    else if(t===1){ g.lineStyle(2,0xf2c14e,0.8); g.strokeRect(x,y,b.sw,b.sh); }
+    if(f>0) arcSegs(g,cx,cy,r-3,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,Math.min(1,f)),3,t===2?0xffe98a:(t===1?0xf2c14e:0x8a7a4a),t===2?0.95:0.8);
+    if(t===2){ g.lineStyle(3,0xffe98a,0.6+0.4*Math.sin((this._pulse||0)*6)); g.strokeCircle(cx,cy,r+1); }
+    else if(t===1){ g.lineStyle(2,0xf2c14e,0.8); g.strokeCircle(cx,cy,r+1); }
     // Upgrade 10: the whisper's glow — a soft halo that swells once when
     // a great power comes ready, then fades (b.readyPulse decays in update()).
-    if(b.readyPulse>0){ g.lineStyle(3,0xffe98a,0.15+0.5*b.readyPulse); g.strokeRect(x-2,y-2,b.sw+4,b.sh+4); } }
+    if(b.readyPulse>0){ g.lineStyle(3,0xffe98a,0.15+0.5*b.readyPulse); g.strokeCircle(cx,cy,r+3+(1-b.readyPulse)*5); } }
   // --- Upgrade 10: the right-thumb stack — kennin's approved button UI ---
-  // One wide column on the right of the screen (196px wide, every button
-  // 56px tall, stone-and-gold — Upgrade 16: SYMBOLS on the faces, names
-  // only in the press float and the Controls list): the AUTO-FIRE
-  // toggle at the top, the stamina readout under it, then DODGE, BLOCK
-  // (a hold) and SPRINT, then the hero's power moves as their OWN named
-  // buttons, driven from the hero data — for David: SMOOTH STONE, PSALM,
-  // FIVE STONES. Each power button keeps Upgrade 8's Held Power state and
-  // cooldown sweep. They are screen furniture (depth 31/32, pinned by
-  // fixUI), clear of the command row below (the stack ends at y=524, the
-  // bar starts at HUD_Y=610), and onTap refuses taps that land on them —
-  // a press here is never also a march order.
+  // One column on the right of the screen (stone-and-gold — Upgrade 16:
+  // SYMBOLS on the faces, names only in the press float and the Controls
+  // list — Upgrade 17: CIRCLES, the thumb cluster 64 across, the powers
+  // 76): the AUTO-FIRE toggle at the top, the stamina readout under it,
+  // then DODGE, BLOCK (a hold) and SPRINT, then the hero's power moves
+  // as their OWN buttons, driven from the hero data — for David: SMOOTH
+  // STONE, PSALM, FIVE STONES. Each power button keeps Upgrade 8's Held
+  // Power state and its cooldown — a ring sweep now. They are screen
+  // furniture (depth 31/32, pinned by fixUI), clear of the command row
+  // below (the stack's last rim ends at y=594, the bar starts at
+  // HUD_Y=610), and onTap refuses taps that land on them — a press here
+  // is never also a march order.
   buildFightControls(){ this.fightBtns={}; this.fightRects=[];
     if(this.autoFire===undefined) this.autoFire=loadAutoFire();
-    const mk=(id,x,y,w,h,label,cb,size,icon,floatName)=>{ const b=button(this,x,y,w,h,label,cb,{size:size||15,icon:icon,floatName:floatName}); b.setDepth(31);
-      b.sx=x; b.sy=y; b.sw=w; b.sh=h; b.sweep=this.add.graphics().setDepth(32);
-      this.fightBtns[id]=b; this.fightRects.push({x,y,w,h}); this.regLayout(id,b,(nx,ny)=>{ b.sx=nx; b.sy=ny; }); return b; };
-    const SX=1178, SW=196;
+    // Upgrade 17: the stack is built of CIRCLES — mk takes a diameter.
+    // sx/sy keep naming each circle's centre; the sweep rings draw
+    // around it; the fight rects carry the radius for circular walls.
+    const mk=(id,x,y,d,label,cb,size,icon,floatName)=>{ const b=button(this,x,y,d,d,label,cb,{size:size||15,icon:icon,floatName:floatName,circle:d}); b.setDepth(31);
+      b.sx=x; b.sy=y; b.sw=d; b.sh=d; b.sweep=this.add.graphics().setDepth(32);
+      this.fightBtns[id]=b; this.fightRects.push({x,y,w:d,h:d,r:d/2}); this.regLayout(id,b,(nx,ny)=>{ b.sx=nx; b.sy=ny; }); return b; };
+    const SX=1178;
     // Upgrade 16: the stack wears symbols now. AUTO-FIRE's state is the
     // face itself — the bow-and-arrow lit gold and the button lit when
     // ON, dimmed and unlit when OFF (applyAutoFace) — never the word.
-    this.autoBtn=mk('autofire',SX,70,SW,56,'',()=>this.toggleAutoFire(),17,'ico_auto','Auto-fire');
+    // Upgrade 17 diameters: the thumb cluster (auto-fire, dodge, block,
+    // sprint) at 64; the powers at 76, the biggest circles on the field.
+    this.autoBtn=mk('autofire',SX,76,64,'',()=>this.toggleAutoFire(),17,'ico_auto','Auto-fire');
     this.applyAutoFace();
-    mk('dodge',SX,176,SW,56,'',()=>this.pressDodge(),16,'ico_dodge','Dodge');
-    const bb=mk('block',SX,240,SW,56,'',()=>{},16,'ico_block','Block');
-    mk('sprint',SX,304,SW,56,'',()=>this.toggleSprint(),16,'ico_sprint','Sprint');
+    mk('dodge',SX,166,64,'',()=>this.pressDodge(),16,'ico_dodge','Dodge');
+    const bb=mk('block',SX,234,64,'',()=>{},16,'ico_block','Block');
+    mk('sprint',SX,302,64,'',()=>this.toggleSprint(),16,'ico_sprint','Sprint');
     // BLOCK is a HOLD, not a press: down raises the guard, up or out drops
     // it. (These ride beside the shared helper's own press handlers.)
-    bb.on('pointerdown',()=>this.setBlock(true));
+    // Upgrade 17: the hold obeys the circle too — a corner press outside
+    // the radius raises nothing (its coordinates are container-local).
+    bb.on('pointerdown',(p,lx,ly)=>{ if(Math.hypot(lx||0,ly||0)<=(bb.circleR||32)) this.setBlock(true); });
     bb.on('pointerup',()=>this.setBlock(false));
     bb.on('pointerout',()=>this.setBlock(false));
     this.input.on('pointerup',()=>this.setBlock(false)); // a release anywhere ends a hold
@@ -1219,11 +1334,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // cdMax drive the cooldown sweep, held accrues charge while the move
     // sits ready, buffered remembers a press that landed a breath early.
     const h=this.heroDef; this.skillBtns=[];
-    [...h.skills,h.ult].forEach((k,i)=>{ const b=mk('skill'+i,SX,368+i*64,SW,56,'',()=>this.pressSkill(i),15,skillIconKey(k),k.name);
+    [...h.skills,h.ult].forEach((k,i)=>{ const b=mk('skill'+i,SX,[384,470,556][i],76,'',()=>this.pressSkill(i),15,skillIconKey(k),k.name);
       b.cd=0; b.cdMax=k.cd; b.def=k; b.held=0; b.buffered=false; b._tierShown=0;
       this.skillBtns.push(b); });
     this.fightBar=this.add.graphics().setDepth(32);
-    this.fightStat=txt(this,SX,112,'',13,'#f2c14e').setOrigin(0.5).setDepth(31);
+    this.fightStat=txt(this,SX,116,'',13,'#f2c14e').setOrigin(0.5).setDepth(31);
     // Upgrade 12: every battle control now exists at its default — a
     // saved layout, if the player has one, is applied over the top.
     this.applyLayout(); }
@@ -1238,26 +1353,76 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.toast(this.autoFire?'Auto-fire ON — '+this.heroDef.name+' strikes on his own':'Auto-fire OFF — power moves only, by button');
     if(this.tutorial) this.tutEvent('autotoggled'); } // Upgrade 11: the auto-fire step listens for this flip, either way
   overFight(p){ if(!this.fightRects) return false;
-    return this.fightRects.some(r=>Math.abs(p.x-r.x)<=r.w/2+6&&Math.abs(p.y-r.y)<=r.h/2+6); }
+    // Upgrade 17: the wall is the circle itself — a corner tap outside
+    // the radius is NOT over the button, so it falls through to the
+    // field (a march, a post) instead of dying in a dead corner.
+    return this.fightRects.some(r=>Math.hypot(p.x-r.x,p.y-r.y)<=(r.r!==undefined?r.r:r.w/2)); }
   // --- Upgrade 12: layout — the registry, applying, the editor ---
   // Every movable battle control registers itself as it is built (the
   // command row in buildHUD, the stack in buildFightControls). A saved
   // layout moves the container AND syncs every coordinate the game
   // keeps beside it (sweep origins, the onTap walls, the fight rects,
   // the tutorial's rings) — there is one position per button, never two.
-  regLayout(id,obj,sync){ if(!this.layoutReg) this.layoutReg=[]; const def=LAYOUT_DEFS.find(d=>d[0]===id); this.layoutReg.push({id,obj,w:def?def[2]:110,h:def?def[3]:56,sync}); }
+  regLayout(id,obj,sync){ if(!this.layoutReg) this.layoutReg=[]; const def=LAYOUT_DEFS.find(d=>d[0]===id);
+    // Upgrade 17: seatPos is the layout truth apart from wherever a
+    // control is standing right now — the fan moves its members for
+    // display, but their seats stay here, recorded through the sync.
+    const wrapped=(x,y)=>{ if(!this.seatPos) this.seatPos={}; this.seatPos[id]={x,y}; if(sync) sync(x,y); };
+    this.layoutReg.push({id,obj,w:def?def[2]:56,h:def?def[3]:56,sync:wrapped}); }
   applyLayout(){ const pos=(loadLayout()||{pos:{}}).pos||{};
     (this.layoutReg||[]).forEach(en=>{ const p=pos[en.id]; if(!p) return;
       const nx=Math.max(en.w/2,Math.min(W-en.w/2,+p.x||0)), ny=Math.max(en.h/2,Math.min(H-en.h/2,+p.y||0));
       if(!isFinite(nx)||!isFinite(ny)) return;
       en.obj.setPosition(nx,ny); if(en.sync) en.sync(nx,ny); });
-    this.syncLayoutMeta(); }
+    this.syncLayoutMeta(); this.applyFace(); }
+  // A control's layout seat: the saved position if the registry sync
+  // has recorded one, else the table default. (Upgrade 17: seats are
+  // never read back off a container — the table is the truth.)
+  seatOf(id){ const s=this.seatPos&&this.seatPos[id]; if(s) return s; return defaultLayoutPos()[id]||{x:0,y:0}; }
   syncLayoutMeta(){ const fb=this.fightBtns?Object.values(this.fightBtns):[];
-    if(fb.length) this.fightRects=fb.map(b=>({x:b.sx,y:b.sy,w:b.sw,h:b.sh}));
+    if(fb.length) this.fightRects=fb.map(b=>({x:b.sx,y:b.sy,w:b.sw,h:b.sh,r:b.sw/2}));
     // The CAMP / RALLY onTap walls follow their buttons through the
     // registry sync callbacks (applyLayout / the editor), not from here.
-    if(this.fightStat&&this.autoBtn) this.fightStat.setPosition(this.autoBtn.sx,this.autoBtn.sy+42); }
-  saveLayoutFromScene(){ const pos={}; (this.layoutReg||[]).forEach(en=>{ pos[en.id]={x:Math.round(en.obj.x),y:Math.round(en.obj.y)}; }); saveLayout(pos); }
+    if(this.fightStat&&this.autoBtn) this.fightStat.setPosition(this.autoBtn.sx,this.autoBtn.sy+40); }
+  saveLayoutFromScene(){ const pos={}; (this.layoutReg||[]).forEach(en=>{ const s=this.seatOf(en.id); pos[en.id]={x:Math.round(s.x),y:Math.round(s.y)}; }); saveLayout(pos); } // seats only — never a container's live position: in the Simple editor the fan members STAND at fan spots, and a fan spot saved as a seat would strand the button there in the Full face
+  // --- Upgrade 17: the two faces and the ORDERS fan ------------------
+  // One mover for every face change: applyFace reads this.face and
+  // this.fanOpen and puts every control where the face says it stands.
+  // Seats never change here — only display positions, visibility, and
+  // the active-position walls (volley sweep origin, rally/build rects).
+  fanBtn(id){ if(id==='build') return this.buildBtn||null; if(id==='cmd_rally') return this.rallyBtn||null;
+    if(id==='cmd_camp') return this.campBtn||null;
+    if(id&&id.indexOf('cmd_')===0&&this.cmdBtns) return this.cmdBtns[id.slice(4)]||null;
+    const en=(this.layoutReg||[]).find(e=>e.id===id); return en?en.obj:null; }
+  fanSpot(id){ const o=this.seatOf('orders');
+    const f=FAN_OFFSETS[id]||{dx:0,dy:0}; return {x:o.x+f.dx,y:o.y+f.dy}; }
+  btnShow(b,shown){ if(!b) return; if(b.setVisible) b.setVisible(shown);
+    if(shown){ if(b.setInteractive) b.setInteractive({useHandCursor:true}); }
+    else if(b.disableInteractive) b.disableInteractive(); }
+  applyFace(){ if(!this.cmdBtns||!this.ordersBtn) return;
+    const simple=this.face==='simple', showFan=simple&&(this.fanOpen||this._fanShown);
+    FAN_MEMBERS.forEach(id=>{ const b=this.fanBtn(id); if(!b) return;
+      if(!simple){ this.btnShow(b,true); const s=this.seatOf(id); b.setPosition(s.x,s.y); }
+      else if(showFan){ const s=this.fanSpot(id); b.setPosition(s.x,s.y); this.btnShow(b,true); }
+      else this.btnShow(b,false); });
+    this.btnShow(this.ordersBtn,simple);
+    // The active-position records follow the circles that are standing,
+    // computed from seats and fan geometry (never read off a container):
+    const act=id=>(simple&&showFan)?this.fanSpot(id):this.seatOf(id);
+    const vb=this.cmdBtns.volley; if(vb){ const a=act('cmd_volley'); vb.sx=a.x; vb.sy=a.y; }
+    if(this.rallyBtn){ const a=act('cmd_rally'); this.rallyBtnRect={x:a.x,y:a.y,w:56,h:56}; }
+    if(this.buildBtn){ if(simple&&!showFan) this.buildBtnRect={x:-9999,y:-9999,w:64,h:64};
+      else { const a=act('build'); this.buildBtnRect={x:a.x,y:a.y,w:64,h:64}; } } }
+  fanIsOpen(){ return this.face==='simple'&&!!this.fanOpen; }
+  toggleFan(){ if(this.face!=='simple') return;
+    this.fanOpen=!this.fanOpen; this.applyFace();
+    if(this.fanOpen){ SFX.tap&&SFX.tap(); if(this.tutorial) this.tutEvent('fanopen'); } }
+  closeFan(){ if(!this.fanOpen) return; this.fanOpen=false; this.applyFace(); }
+  // A fan member's press: issue the order, then close the fan behind it.
+  // In the Full face (or with the fan shut) the action simply runs.
+  fanPress(fn){ const was=this.fanIsOpen(); if(fn) fn(); if(was&&this.fanOpen) this.closeFan(); }
+  setFace(f){ if(f!=='simple'&&f!=='full') return; this.face=f; saveFace(f); this.fanOpen=false; this.applyFace();
+    this.toast(f==='simple'?'Buttons: Simple — orders live behind ORDERS':'Buttons: Full — every circle stands'); }
   // --- Upgrade 12: movement schemes ---
   // Switchable any time (pause overlay in battle, Controls at the menu);
   // the choice persists, and a switch clears any half-finished press.
@@ -1346,10 +1511,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const mv=(id,label,x)=>{ const b=button(this,x,228,150,44,label+(this.moveScheme===id?' ✓':''),()=>{ this.setMoveScheme(id); this.renderPause(); },{size:15}); b.setDepth(59); items.push(b); };
     mv('tap','Tap',W/2-170); mv('stick','Joystick',W/2); mv('follow','Follow',W/2+170);
     items.push(txt(this,W/2,272,'Tap: tap the ground to march. Joystick: drag on the field.\nFollow: hold on the field — he runs to your finger.',13,'#cdbd95',{align:'center'}).setOrigin(0.5).setDepth(59));
-    const eb=button(this,W/2,330,300,48,'Edit button layout',()=>this.enterLayoutEdit(),{size:17}); eb.setDepth(59); items.push(eb);
-    items.push(txt(this,W/2,376,'Keybinds live in Controls, on the main menu.',13,'#cdbd95').setOrigin(0.5).setDepth(59));
-    const rb=button(this,W/2,434,300,52,'Resume',()=>this.closePause(),{size:19}); rb.setDepth(59); items.push(rb);
-    const qb=button(this,W/2,508,300,48,'Quit run',()=>{ this.closePause(); this.end(false); },{size:16}); qb.setDepth(59); items.push(qb);
+    // Upgrade 17: the battle face, switchable right here mid-run.
+    items.push(txt(this,W/2,306,'Battle buttons',17,PARCH).setOrigin(0.5).setDepth(59));
+    const fb=(id,label,x)=>{ const b=button(this,x,340,160,40,label+(this.face===id?' ✓':''),()=>{ this.setFace(id); this.renderPause(); },{size:15}); b.setDepth(59); items.push(b); };
+    fb('simple','Simple',W/2-85); fb('full','Full',W/2+85);
+    const eb=button(this,W/2,392,300,48,'Edit button layout',()=>this.enterLayoutEdit(),{size:17}); eb.setDepth(59); items.push(eb);
+    items.push(txt(this,W/2,436,'Keybinds live in Controls, on the main menu.',13,'#cdbd95').setOrigin(0.5).setDepth(59));
+    const rb=button(this,W/2,478,300,52,'Resume',()=>this.closePause(),{size:19}); rb.setDepth(59); items.push(rb);
+    const qb=button(this,W/2,540,300,48,'Quit run',()=>{ this.closePause(); this.end(false); },{size:16}); qb.setDepth(59); items.push(qb);
     items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); }); }
   // Editing in battle: the pause holds the fight while the REAL buttons
   // are dragged. They are disabled for the duration (layoutEditor), so
@@ -1359,19 +1528,32 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // applies at once, because the buttons being dragged ARE the battle's.
   enterLayoutEdit(){ if(this.layoutEdit) return; this.clearPause(); this.layoutEdit=true;
     if(!this.layoutEd) this.layoutEd=layoutEditor(this,()=>this.saveLayoutFromScene());
-    this.layoutEd.setItems(this.layoutReg||[]); this.layoutEd.enter();
+    // Upgrade 17: the editor edits the face the player stands in. In
+    // the Simple face the fan's circles are positioned AS A GROUP
+    // relative to ORDERS (the editor shows the fan open) — only ORDERS
+    // is dragged; its members ride it and are not editor items. In the
+    // Full face every command stands at its own seat and ORDERS is not
+    // an item (it is the Simple face's anchor, not a Full control).
+    // Buttons that are not items are still disabled for the duration,
+    // so a displayed fan member can never fire mid-edit.
+    const simple=this.face==='simple';
+    if(simple){ this._fanShown=true; this.applyFace(); }
+    const edItems=(this.layoutReg||[]).filter(en=>simple?!FAN_MEMBERS.includes(en.id):en.id!=='orders');
+    this.layoutEd.setItems(edItems); this.layoutEd.enter();
+    (this.layoutReg||[]).forEach(en=>{ if(!edItems.includes(en)&&en.obj.disableInteractive) en.obj.disableInteractive(); });
     const items=[]; this.editItems=items;
     const g=this.add.graphics().setDepth(60); g.fillStyle(0x140c07,0.92); g.fillRoundedRect(W/2-330,10,660,44,10); g.lineStyle(2,0xf2c14e,1); g.strokeRoundedRect(W/2-330,10,660,44,10); items.push(g);
     items.push(txt(this,W/2,32,'EDITING LAYOUT — drag any button into place',17,'#f2c14e').setOrigin(0.5).setDepth(61));
     const dn=button(this,W/2-100,580,170,44,'Done',()=>this.exitLayoutEdit(),{size:16}); dn.setDepth(61); items.push(dn);
     const rs=button(this,W/2+100,580,190,44,'Reset layout',()=>{ resetLayout(); const dp=defaultLayoutPos();
       (this.layoutReg||[]).forEach(en=>{ const p=dp[en.id]; if(p){ en.obj.setPosition(p.x,p.y); if(en.sync) en.sync(p.x,p.y); } });
-      this.syncLayoutMeta(); this.toast('Layout reset to the standard'); },{size:15}); rs.setDepth(61); items.push(rs);
+      this.syncLayoutMeta(); this.applyFace(); this.toast('Layout reset to the standard'); },{size:15}); rs.setDepth(61); items.push(rs);
     items.forEach(o=>{ if(o.setScrollFactor) o.setScrollFactor(0); }); }
   exitLayoutEdit(){ if(!this.layoutEdit) return; this.layoutEdit=false;
     if(this.layoutEd) this.layoutEd.exit();
     (this.editItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.editItems=[];
     this.saveLayoutFromScene();
+    this._fanShown=false; this.applyFace(); // fan members return to their seats / hiding; every control's interactivity restored per the face
     if(this.paused) this.renderPause(); }
   // Upgrade 10: AUTO-FIRE — the hero's basic attack, restored. When the
   // toggle is ON the hero strikes the nearest enemy inside his range
@@ -1431,18 +1613,24 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // The stack's faces: the dodge recovery veil, the stamina pool as a
   // bar under the AUTO-FIRE toggle and as the BLOCK button's base strip.
   drawFightUI(){ const B=this.fightBtns; if(!B||!this.hero) return; const h=this.hero;
+    // Upgrade 17: the dodge veil is a dark disc with a recovery arc, and
+    // the block stamina strip is a ring around the Block circle — green
+    // while the guard holds, red through a guard break. The stamina BAR
+    // under the toggle stays a bar (it is a readout, not a button) but
+    // narrows to the toggle's own width.
     const veil=(b,frac)=>{ if(!b||!b.sweep) return; const g=b.sweep; g.clear();
-      if(frac>0){ g.fillStyle(0x000000,0.55); g.fillRect(b.sx-b.sw/2,b.sy-b.sh/2,b.sw,b.sh*Math.min(1,frac)); } };
+      if(frac>0){ const r=(b.sw||56)/2; g.fillStyle(0x000000,0.5); g.fillCircle(b.sx,b.sy,r-2);
+        arcSegs(g,b.sx,b.sy,r-4,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-Math.min(1,frac)),3,0xf2c14e,0.85); } };
     veil(B.dodge,h.dodgeCd>0?h.dodgeCd/FIGHT.dodgeCd:0);
     if(B.block&&B.block.sweep){ const g=B.block.sweep; g.clear();
-      g.fillStyle(h.guardBreakT>0?0xa33b20:0x5aa33b,0.9); g.fillRect(B.block.sx-B.block.sw/2,B.block.sy+B.block.sh/2-5,B.block.sw*Math.max(0,h.stamina)/FIGHT.stamMax,5); }
+      arcSegs(g,B.block.sx,B.block.sy,(B.block.sw||56)/2-3,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,h.stamina)/FIGHT.stamMax,3,h.guardBreakT>0?0xa33b20:0x5aa33b,0.9); }
     if(this.fightBar){ const g=this.fightBar; g.clear();
       // Upgrade 12: the bar rides under the AUTO-FIRE toggle wherever
-      // the player's layout puts it (at the default: 1080,122, as ever).
-      const bx=this.autoBtn?this.autoBtn.sx-98:1080, by=this.autoBtn?this.autoBtn.sy+52:122;
-      g.fillStyle(0x000000,0.7); g.fillRect(bx,by,196,10);
-      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(bx,by,196*Math.max(0,h.stamina)/FIGHT.stamMax,10);
-      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(bx,by,196,10); }
+      // the player's layout puts it (Upgrade 17: as wide as the toggle).
+      const bw=this.autoBtn?this.autoBtn.sw:64, bx=this.autoBtn?this.autoBtn.sx-bw/2:1146, by=this.autoBtn?this.autoBtn.sy+(this.autoBtn.sh/2)+16:124;
+      g.fillStyle(0x000000,0.7); g.fillRect(bx,by,bw,8);
+      g.fillStyle(h.stamina>30?0x5aa33b:0xa33b20,1); g.fillRect(bx,by,bw*Math.max(0,h.stamina)/FIGHT.stamMax,8);
+      g.lineStyle(1,0xd9a441,0.9); g.strokeRect(bx,by,bw,8); }
     const st=Math.ceil(h.stamina);
     if(this.fightStat&&this._stamShown!==st){ this._stamShown=st; this.fightStat.setText('STAMINA '+st); } }
   // Upgrade 3: the hero returns only while the camp stands. If the camp has
@@ -1570,6 +1758,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // the real wall, the same refusal the ⚙ gives there.
     if(this.tutorial){ this.toast('Building waits for the real wall — the lesson stays as it is.'); return; }
     if(this.buildMode){ this.exitBuildMode(); return; }
+    this.closeFan(); // Upgrade 17: build mode and the fan never stand together
     this.buildMode=true; this.volleyMode=false; this.rallyMode=false;
     if(this.campPanelOpen) this.closeCampPanel();
     this.renderBuildBar(); this.refreshHUD(); }
@@ -2076,7 +2265,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // re-armed: the minute belongs to the intermission, not to whichever
   // room the player is standing in, so stepping in and out of the shop
   // can never farm time. Every other caller arms the full minute, as ever.
-  openShop(first,keepT){ if(this.campPanelOpen) this.closeCampPanel(); this.exitBuildMode(); this.interField=false; this.clearInterBar(); this.shopOpen=true; this.shopFirst=!!first; this.shopPage=0;
+  openShop(first,keepT){ if(this.campPanelOpen) this.closeCampPanel(); this.closeFan(); this.exitBuildMode(); this.interField=false; this.clearInterBar(); this.shopOpen=true; this.shopFirst=!!first; this.shopPage=0;
     if(keepT&&this.shopEndsAt>Date.now()) this.shopT=Math.max(0,(this.shopEndsAt-Date.now())/1000);
     else { this.shopT=SHOP_COUNTDOWN; this.shopEndsAt=Date.now()+SHOP_COUNTDOWN*1000; }
     // squads and hero mend between waves
@@ -2212,7 +2401,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
         // Upgrade 8: a Volley press buffered in its last breath fires now.
         if(this._volleyBuf){ this._volleyBuf=false; this.volleyMode=true; this.toast('Volley: tap a target spot'); } } }
     { const vb=this.cmdBtns&&this.cmdBtns.volley; // Volley's cooldown sweep
-      if(vb&&vb.sweep){ vb.sweep.clear(); if(this.volleyCd>0){ const f=Math.min(1,this.volleyCd/12); vb.sweep.fillStyle(0x000000,0.55); vb.sweep.fillRect(vb.sx-vb.sw/2,vb.sy-vb.sh/2,vb.sw,vb.sh*f); } } }
+      if(vb&&vb.sweep){ vb.sweep.clear(); if(this.volleyCd>0){ const f=Math.min(1,this.volleyCd/12), r=(vb.sw||56)/2; vb.sweep.fillStyle(0x000000,0.45); vb.sweep.fillCircle(vb.sx,vb.sy,r-2); arcSegs(vb.sweep,vb.sx,vb.sy,r-4,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-f),4,0xf2c14e,0.9); } } }
     this.orbTick(dt);
     this.fightTick(dt); // Upgrade 8: recovery, buffers, wind-ups, stamina
     // spawns
@@ -2396,7 +2585,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(this.waveActive&&!this.spawnQ.length&&!this.enemies.length) this.waveClear();
     this.refreshHUD();
   }
-  end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.closeCampPanel();
+  end(win){ if(this.over) return; this.over=true; this.clearShop(); this.shopOpen=false; this.closeCampPanel(); this.closeFan();
     this.interField=false; this.clearInterBar(); this.exitBuildMode(); // Upgrade 15: the field furniture leaves with the run
     const XP=DATA_P().xp;
     if(win){ this.tr('clears'); this.gx(XP.clear); this.earn('clear',DATA.grokonians.clear);
@@ -2502,6 +2691,14 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
     this.muteBtn=keep(button(this,1080,512,170,36,'Mute',()=>{ SFX.toggle(); this.refreshSnd(); },{size:15}));
     this.sndTxt=keep(txt(this,595,512,'',16,'#f2c14e').setOrigin(0.5));
     this.refreshSnd();
+    // Upgrade 17: the Battle buttons face. SIMPLE stands the core
+    // circles and keeps the command rank behind ORDERS; FULL stands
+    // every circle always. The choice persists; it applies to the next
+    // battle, and at once from the ⚙ pause in battle.
+    keep(txt(this,90,434,'Battle buttons',20,GOLD));
+    this.face=loadFace(); this.faceBtns={};
+    [['simple','Simple',300],['full','Full',560]].forEach(([id,label,x])=>{ const b=button(this,x,456,200,34,label,()=>{ this.face=id; saveFace(id); this.markFace(); this.bindStatus.setText(id==='simple'?'Buttons: Simple — the core circles stand; orders live behind ORDERS.':'Buttons: Full — every circle stands, always.'); },{size:15}); keep(b); this.faceBtns[id]=b; });
+    this.markFace();
     this.bindStatus=keep(txt(this,W/2,540,'',16,'#f2c14e').setOrigin(0.5));
     keep(button(this,300,592,260,46,'Reset keybinds',()=>{ this.binds=Object.assign({},DEFAULT_BINDS); saveBinds(this.binds); this._cap=null; this.renderBinds(); this.bindStatus.setText('Keybinds reset to the standard set.'); },{size:16}));
     keep(button(this,640,592,260,46,'Reset button layout',()=>{ resetLayout(); this.bindStatus.setText('Button layout reset to the standard.'); },{size:16}));
@@ -2517,6 +2714,8 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
     if(this.muteBtn) this.muteBtn.label.setText(v>0?'Mute':'Unmute'); }
   markMove(){ if(!this.moveBtns) return;
     Object.entries(this.moveBtns).forEach(([id,b])=>{ b.label.setText((id==='tap'?'Tap to move':id==='stick'?'Joystick':'Follow (hold)')+(this.moveScheme===id?' ✓':'')); }); }
+  markFace(){ if(!this.faceBtns) return; const f=this.face||loadFace();
+    Object.entries(this.faceBtns).forEach(([id,b])=>{ b.label.setText((id==='simple'?'Simple':'Full')+(f===id?' ✓':'')); }); }
   renderBinds(){ (this.bindItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.bindItems=[];
     // Upgrade 15: seventeen actions no longer fit two columns of eight —
     // the list now runs three columns of six, same rows, same capture.
@@ -2542,17 +2741,32 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
   // where these ghosts are left.
   enterGhostEdit(){ if(this._ghostEd) return; this._cap=null; this.setSectionVisible(false);
     const pos=layoutPositions(), items=[];
+    // Upgrade 17: the ghosts are the CIRCLES now, and the editor edits
+    // the player's own face. In SIMPLE the fan's members stand OPEN at
+    // their group positions above the bar — dimmed and not draggable:
+    // the group is positioned by dragging ORDERS, its one anchor; the
+    // members' own seats belong to the Full face and are untouched
+    // here. In FULL every command ghost stands at its own seat, and
+    // there is no ORDERS ghost (it is not a Full control). A save
+    // writes every seat it was not asked to move, unchanged.
+    const face=loadFace(), fanGhosts={};
+    const placeFan=()=>{ const og=items.find(it=>it.id==='orders'); if(!og) return;
+      Object.entries(fanGhosts).forEach(([id,b])=>{ const f=FAN_OFFSETS[id]; if(f) b.setPosition(og.obj.x+f.dx,og.obj.y+f.dy); }); };
     LAYOUT_DEFS.forEach(d=>{ const p=pos[d[0]];
+      if(face==='full'&&d[0]==='orders') return;
       // Upgrade 16: the ghosts wear the same symbols as the real buttons,
       // with the name kept as a caption beneath — the Controls screen is
       // where symbol and name are learned together.
-      const b=button(this,p.x,p.y,d[2],d[3],d[1],()=>{},{size:d[2]>150?15:13,icon:LAYOUT_ICONS[d[0]],caption:true}); b.setDepth(40);
-      this.ghostObjs.push(b); items.push({id:d[0],obj:b,w:d[2],h:d[3],sync:null}); });
+      const b=button(this,p.x,p.y,d[2],d[3],d[1],()=>{},{size:13,icon:LAYOUT_ICONS[d[0]],caption:true,circle:d[3]}); b.setDepth(40);
+      this.ghostObjs.push(b);
+      if(face==='simple'&&FAN_MEMBERS.includes(d[0])){ fanGhosts[d[0]]=b; b.setAlpha(0.55); if(b.disableInteractive) b.disableInteractive(); }
+      else items.push({id:d[0],obj:b,w:d[2],h:d[3],sync:d[0]==='orders'?()=>placeFan():null}); }); // dragging ORDERS carries the open fan with it, live
+    placeFan();
     const g=this.add.graphics().setDepth(41); g.fillStyle(0x140c07,0.92); g.fillRoundedRect(W/2-330,10,660,44,10); g.lineStyle(2,0xf2c14e,1); g.strokeRoundedRect(W/2-330,10,660,44,10); this.ghostItems.push(g);
-    this.ghostItems.push(txt(this,W/2,32,'EDITING LAYOUT — drag any button into place',17,'#f2c14e').setOrigin(0.5).setDepth(42));
+    this.ghostItems.push(txt(this,W/2,32,face==='simple'?'EDITING LAYOUT — drag any button; the open rank follows ORDERS':'EDITING LAYOUT — drag any button into place',17,'#f2c14e').setOrigin(0.5).setDepth(42));
     const dn=button(this,W/2-100,580,170,44,'Done',()=>this.exitGhostEdit(),{size:16}); dn.setDepth(42); this.ghostItems.push(dn);
-    const rs=button(this,W/2+100,580,190,44,'Reset layout',()=>{ resetLayout(); const dp=defaultLayoutPos(); items.forEach(it=>{ it.obj.setPosition(dp[it.id].x,dp[it.id].y); }); },{size:15}); rs.setDepth(42); this.ghostItems.push(rs);
-    this._ghostEd=layoutEditor(this,()=>{ const out={}; items.forEach(it=>{ out[it.id]={x:Math.round(it.obj.x),y:Math.round(it.obj.y)}; }); saveLayout(out); });
+    const rs=button(this,W/2+100,580,190,44,'Reset layout',()=>{ resetLayout(); const dp=defaultLayoutPos(); items.forEach(it=>{ it.obj.setPosition(dp[it.id].x,dp[it.id].y); }); placeFan(); },{size:15}); rs.setDepth(42); this.ghostItems.push(rs);
+    this._ghostEd=layoutEditor(this,()=>{ const out=layoutPositions(); items.forEach(it=>{ out[it.id]={x:Math.round(it.obj.x),y:Math.round(it.obj.y)}; }); saveLayout(out); });
     this._ghostEd.setItems(items); this._ghostEd.enter(); }
   exitGhostEdit(){ if(!this._ghostEd) return; this._ghostEd.exit(); this._ghostEd=null;
     (this.ghostObjs||[]).concat(this.ghostItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} });

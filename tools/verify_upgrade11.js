@@ -186,9 +186,14 @@ function freshFlags() { delete store.gxhub_wotw_tutorial_done; delete store.gxhu
   ok(g.selSquad === sq, 'tap the squad: selected');
   g.onTap({ x: 560, y: 460, worldX: 560, worldY: 460 });
   ok(sq.ord === 'post' && sq.post.x === 560 && sq.post.y === 460 && g.tutPhase === 1, 'tap the ground: posted — and the step turns to its rally half');
+  // Upgrade 17 re-point: the rally half is now two halves — the lesson
+  // teaches the Simple face's fan first (open ORDERS), then RALLY.
+  ok(/ORDERS/.test(g.tutLine._t), 'the orders line shows: "' + g.tutLine._t.slice(0, 60) + '..."');
+  fireUp(g.ordersBtn);
+  ok(g.fanOpen === true && g.tutPhase === 2, 'tap ORDERS: the fan opens — and the step turns to its rally half');
   ok(/RALLY/.test(g.tutLine._t), 'the rally line shows');
   fireUp(g.rallyBtn);
-  ok(g.rallyMode === true, 'tap RALLY: planting arms');
+  ok(g.rallyMode === true && g.fanOpen === false, 'tap RALLY: planting arms — and the fan closes behind the order');
   g.onTap({ x: 640, y: 420, worldX: 640, worldY: 420 });
   ok(sq.ord === 'rally' && sq.rally.x === 640 && sq.rally.y === 420 && g.tutStep === 5, 'tap the ground: the banner plants, the squad holds it — army step complete');
   // (f) THE CAMP — the real panel, mid-fight

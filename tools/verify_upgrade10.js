@@ -46,21 +46,21 @@ ok(main.includes('heroAutoFire(){') && main.includes('if(!this.autoFire||!h||h.d
 ok(main.includes('if(h.cd>0) h.cd-=dt;') && main.includes('this.heroAutoFire();'), 'auto-fire: the hero clock runs in update() and strikes through heroAutoFire()');
 ok(!main.includes('pressAttack') && !main.includes('lightStrike') && !main.includes('heavyStrike') && !main.includes('attackTarget'), 'the manual basic-attack path is REMOVED (pressAttack / lightStrike / heavyStrike / attackTarget)');
 ok(!main.includes("mk('light'") && !main.includes("mk('heavy'") && !/lightDmg|heavyDmg|openerMul/.test(main), 'no LIGHT or HEAVY button, and their numbers (incl. the sprint opener) are gone from the FIGHT table');
-ok(main.includes("mk('autofire',SX,70,SW,56") && main.includes("'ico_auto'") && main.includes('applyAutoFace(){'), 'the AUTO-FIRE toggle: top of the right stack, 56px tall — Upgrade 16 re-point: its state rides the symbol face (gold/lit vs dim), never words');
-ok(main.includes("mk('dodge',SX,176,SW,56") && main.includes("'ico_dodge'") && main.includes("'ico_block'") && main.includes("'ico_sprint'"), 'DODGE / BLOCK / SPRINT ride the stack at 56px — Upgrade 16 re-point: symbols (swoosh, shield, boot), not word labels');
+ok(main.includes("mk('autofire',SX,76,64") && main.includes("'ico_auto'") && main.includes('applyAutoFace(){'), 'the AUTO-FIRE toggle: top of the right stack, 56px tall — Upgrade 16 re-point: its state rides the symbol face (gold/lit vs dim), never words'); // Upgrade 17 re-point: a 64 circle at the stack's head
+ok(main.includes("mk('dodge',SX,166,64") && main.includes("'ico_dodge'") && main.includes("'ico_block'") && main.includes("'ico_sprint'"), 'DODGE / BLOCK / SPRINT ride the stack at 56px — Upgrade 16 re-point: symbols (swoosh, shield, boot), not word labels'); // Upgrade 17 re-point: 64 circles, wider pitch
 ok(main.includes('skillIconKey(k),k.name') && main.includes('[...h.skills,h.ult].forEach'), 'power buttons are driven from the hero data — Upgrade 16 re-point: each wears the symbol its own name resolves to, never hardcoded');
 ok(main.includes('dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6') && main.includes('blockDrain:12') && main.includes('sprintDrain:8'), 'the surviving stamina kit keeps its numbers (dodge dash/i-frames/cooldown, block and sprint drains)');
 { const row = main.slice(main.indexOf('buildHUD(){'), main.indexOf('phaseName(){'));
   ok(row.includes('icon:CMD_ICONS.camp') && row.includes("'Charge'") && row.includes("'Hold'") && row.includes("'Follow Me'") && row.includes("'Flank'") && row.includes("'Fall Back'") && row.includes("'Shield Wall'") && row.includes("'Volley'") && row.includes("'Rally'"), 'the command row carries all nine large buttons: Charge, Hold, Follow Me, Flank, Fall Back, Shield Wall, Volley, CAMP, Rally — Upgrade 16 re-point: symbols on the faces, names in the press float');
-  ok((row.match(/,110,56,/g) || []).length === 4 && (row.match(/\['[a-z]+','/g) || []).length === 6, 'every command-row button is 110x56 (one loop over the six orders, plus Volley, CAMP and Rally call sites)'); }
+  ok((row.match(/,56,56,/g) || []).length === 4 && (row.match(/\['[a-z]+','/g) || []).length === 6, 'every command-row button is 110x56 (one loop over the six orders, plus Volley, CAMP and Rally call sites)'); } // Upgrade 17 re-point: the row is 56 circles now — same four call sites, same six-order loop
 { const sfx = read('js/sfx.js');
   ok(/ready\(k\)\{/.test(sfx) && main.includes('SFX.ready(b.def.id)'), 'the whisper has its own quiet SFX cue (throttled per power) and the game calls it by power id');
   ok(main.includes('powerReady(b){ b.readyPulse=1; SFX.ready(b.def.id); }') && main.includes('if(wasCd&&b.cd<=0&&bi>=1) this.powerReady(b);'), 'the whisper fires on the cooldown-crossing tick only, and only for the second skill and the ult (bi>=1)');
-  ok(main.includes("button(this,130+8*117,HUD_Y+55,110,56,''") && main.includes("floatName:'Rally'") && main.includes('pressRally(){') && main.includes('plantRally(x,y){'), 'RALLY: a ninth seat on the command row at the full 110x56, with press/plant behind it (Upgrade 16: flag-and-ring symbol)');
+  ok(main.includes("button(this,130+8*117,HUD_Y+55,56,56,''") && main.includes("floatName:'Rally'") && main.includes('pressRally(){') && main.includes('plantRally(x,y){'), 'RALLY: a ninth seat on the command row at the full 110x56, with press/plant behind it (Upgrade 16: flag-and-ring symbol)'); // Upgrade 17 re-point: a 56 circle at the same ninth seat
   ok(main.includes("if(eo==='rally'){ const rp=(s.ord==='rally'&&s.rally)?s.rally:this.rallyPoint;"), 'rally composes with the ord model: an effective rally resolves the squad\'s own point, else the army\'s');
   ok(main.includes('rallyPoints(){') && main.includes('drawRallyBanners(){'), 'the banner flies only while someone holds it (rallyPoints / drawRallyBanners)'); }
 { const stack = main.slice(main.indexOf('buildFightControls(){'), main.indexOf('toggleAutoFire(){'));
-  ok((stack.match(/,SW,56,/g) || []).length === 5, 'the right stack: every button call site builds at SW x 56 (toggle, dodge, block, sprint, and the power-move loop that builds three)'); }
+  ok((stack.match(/,64,'',/g) || []).length === 4 && (stack.match(/\[384,470,556\]\[i\],76/g) || []).length === 1, 'the right stack: every button call site builds at SW x 56 (toggle, dodge, block, sprint, and the power-move loop that builds three)'); } // Upgrade 17 re-point: circles — the thumb cluster builds at 64, the power loop at 76
 { const game = JSON.parse(read('data/game.json')); const david = game.heroes.find(h => h.id === 'david');
   ok(david.skills.some(s => s.name === 'Psalm') && david.ult.name === 'Five Stones', 'the DATA names David\'s skill Psalm and his ult Five Stones — the buttons read PSALM and FIVE STONES from the data'); }
 
@@ -164,7 +164,7 @@ function countCalls(g, name) { const orig = GameProto[name]; let n = 0; g[name] 
   ok(g.overFight({ x: 1178, y: 176 }) === true && g.overFight({ x: 1178, y: 70 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight walls the whole stack (toggle included) off from march orders');
   const tx0 = g.hero.tx; g.onTap({ x: 1178, y: 432, worldX: 1178, worldY: 432 });
   ok(g.hero.tx === tx0, 'a tap ON a power button does not move the hero');
-  ok(g.campBtnRect.w === 110 && g.campBtnRect.h === 56 && g.campBtnRect.y === 610 + 55, 'CAMP rides the command row at 110x56 (rect ' + g.campBtnRect.x + ',' + g.campBtnRect.y + ')');
+  ok(g.campBtnRect.w === 56 && g.campBtnRect.h === 56 && g.campBtnRect.y === 610 + 55, 'CAMP rides the command row at 110x56 (rect ' + g.campBtnRect.x + ',' + g.campBtnRect.y + ')'); // Upgrade 17 re-point: a 56 circle, same seat
   fireUp(g.campBtn);
   ok(g.campPanelOpen === true, 'the row CAMP button opens the camp panel');
   fireUp(g.campBtn);

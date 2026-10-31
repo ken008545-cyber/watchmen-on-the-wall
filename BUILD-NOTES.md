@@ -1965,3 +1965,165 @@ already exists is never regenerated. The faces:
   blur at 110px wide) and **ico_volley** (the arrow fan's heads are
   small; the marked ring carries it). ico_flank's hooks read as
   brackets at small size — acceptable, but it is the third to watch.
+
+## Upgrade 17 — CIRCULAR battle UI + the SIMPLE battle face (built 2026-10-31)
+Kennin's rulings (2026-10-31 ~00:09–00:10 CDT): "I want the ui buttons
+and the attacks to be circles not squares and rectangles." — and a
+minute later: "And i want you to simplify the buttons. I want the game
+to be easy to play." Every battle-phase button is a circle now, and the
+battle view has two faces: SIMPLE (the core circles plus one ORDERS
+circle that fans the command rank open) and FULL (every circle always
+visible — the previously approved layout, preserved). Simplification is
+by presentation only: no function was removed; every command is at most
+two taps away in Simple. js/gxhub.js, js/tokens.js, js/net.js and the
+music are untouched; no balance numbers moved; the scaling law, the
+camp rules, and personal wallets / own-army orders stand as they were.
+
+### The circles (js/main.js)
+- The shared `button()` helper takes `opt.circle` (a diameter): the
+  face is drawn with fillCircle/strokeCircle, the U16 glyph is centered
+  at 64% of the diameter, and every control records `circleR`.
+- **Hit-testing is truly circular, enforced in the press handlers from
+  the pointer's own local coordinates** (`Math.hypot(lx,ly) <= circR`,
+  in the same centered frame the face is drawn in): a tap in the
+  bounding square's corner never dips, floats a name, or fires; center
+  taps always fire. The container's Phaser hit area stays the default
+  rectangle — a harmless superset. Why not a `Geom.Circle` hitArea:
+  Phaser's container hitArea offset conventions could not be verified
+  without a live browser, and a displaced hit area would silently
+  break every button in the real game while the stub suites could not
+  catch it; the layout editor also resets `setInteractive` on exit,
+  which would have wiped a custom hitArea. The radius gate is exact
+  under any Phaser version and survives the editor. BLOCK's hold
+  handler carries the same gate, and `overFight` (the onTap wall for
+  the stack) is a circle test with no padding — a corner tap now falls
+  through to the field instead of dying in a dead corner. The CAMP /
+  pause / BUILD onTap walls are circles too.
+- **Geometry** (LAYOUT_DEFS; w==h==diameter for all 18 controls):
+  powers **76** (the biggest circles), the thumb cluster (auto-fire,
+  dodge, block, sprint) **64**, the command rank **56** — every current
+  button was 56 tall, so no target shrank; the hierarchy kennin
+  approved stands. The stack keeps x 1178 with wider pitch (auto 76,
+  dodge 166, block 234, sprint 302, powers 384/470/556; the last rim
+  lands at 594, clear of the bar at 610). The command row keeps its
+  seats. **One default seat moved:** BUILD's old seat under the stack
+  (1178,568) is physically occupied by the grown power circles, so
+  BUILD is a 64 circle at the row's right end (1130,665) — and is the
+  fan's last member in Simple. Saved layouts are untouched by this:
+  positions are centers, were always stored as centers, and land
+  identically (proven against a pre-U17 save in the suite).
+- The ⚙ pause button is a 40 circle; the speed toggle is a 44 circle.
+  **One documented exception:** the Fullscreen button stays a rectangle
+  — it is a display utility whose whole word is its meaning, and no
+  circle that fits its corner could carry it. Menus, the shop, panels,
+  cards, and the build bar's tool buttons are panels, not battle
+  buttons, and stay as they were (per the brief). The stamina bar under
+  the auto-fire toggle stays a bar — it is a readout, not a button —
+  narrowed to the toggle's own width. NetGame's room controls in
+  js/net.js still wear the word-faced row from U16's deferral: the
+  circle support lives in the shared `button()` helper, so the room
+  work can adopt it without a fork; mirroring the faces into rooms is
+  room work, named here rather than smuggled in.
+
+### Round feedback
+Cooldowns are rings now. A skill on cooldown wears a dark disc over
+the glyph and a gold arc that sweeps clockwise from the top, growing
+back as the power returns — the arc's length is the time left. Smooth
+Stone's held charge, always ring-shaped in spirit, is a rim arc
+climbing to the gold Tempered rim and the pulsing Perfect rim. The
+power-ready whisper is a ring pulse that swells once and fades. The
+dodge veil is a disc with a recovery arc; the block stamina strip is a
+ring around the Block circle (green while the guard holds, red through
+a guard break); the volley sweep matches the skill language. Arcs are
+drawn from line segments (arcSegs) — the one graphics verb every
+surface already trusts. Buff chips and press name-floats are unchanged.
+
+### The two faces and the fan
+- SIMPLE stands: the three powers, Dodge, Block, Sprint, the auto-fire
+  toggle, CAMP, and **ORDERS** (a new circle wearing the existing
+  banner glyph, ico_banner — no new texture; the family stays 27).
+  The command rank (Charge, Hold, Follow Me, Flank, Fall Back, Shield
+  Wall, Volley, RALLY, BUILD) is hidden — disabled, not removed.
+  Tapping ORDERS fans the nine circles open in a row above the bar
+  (y = anchor − 113, pitch 84, the members at their full 56/64 size —
+  never shrunk to fit). Tapping a member issues it and closes the fan;
+  tapping ORDERS again, tapping anywhere else (consumed — never a
+  march order), opening the shop, or the run ending closes it without
+  issuing. CAMP is never behind the fan. Keyboard players keep their
+  one-press binds for everything, as before.
+- **The setting:** "Buttons: Simple / Full" in Controls AND in the ⚙
+  pause mid-battle (`gxhub_wotw_face`). **Derivation:** a stored choice
+  always wins; otherwise a player who already customized anything
+  under Upgrade 12 (layout, binds, or movement keys present) defaults
+  to **Full** — nobody's learned layout is taken away — and a new
+  player defaults to **Simple**. The tutorial always teaches Simple.
+- **Seats vs standings:** every control's layout seat is kept in
+  `seatPos` (recorded through the registry sync; `seatOf()` falls back
+  to the table default) — never read back off a container. The fan
+  moves members for display; their seats do not move. applyFace() is
+  the single mover for face changes, and the active-position records
+  (volley sweep origin, rally/build tap walls) are computed from seats
+  and fan geometry. One bug this design caught in its own first draft:
+  a save path that fell back to a container's live position would have
+  saved a fan spot as a seat — the save now reads seats only.
+
+### The editors, and what Reset does in each face
+- In-battle editor: in Simple, the fan's members are shown OPEN but are
+  not editor items — ORDERS is the one draggable anchor and the group
+  follows it live; every non-item button is still disabled for the
+  duration. In Full, every command is an item at its own seat and
+  ORDERS is not an item. The Controls ghost editor mirrors this (fan
+  ghosts dimmed and undraggable in Simple; no ORDERS ghost in Full).
+  Ghost saves and battle saves alike write every unmoved seat
+  unchanged.
+- **Reset, precisely:** Reset clears the saved layout (defaults return)
+  in either face — in Simple the defaults are the circular Simple
+  defaults with ORDERS at (130,665) and the fan's offsets as tabled; in
+  Full the defaults are the same table's seats, every circle standing.
+  Reset never changes the face itself; the face is its own setting.
+
+### The tutorial
+The army step is now three phases: post the squad (unchanged), then
+"Your orders live behind one button now. Tap ORDERS…" (the ring
+circles ORDERS), then RALLY in the open fan (the ring circles RALLY at
+its fan place) and plant as before. Earlier steps are unchanged; the
+finish summary names ORDERS. A fan opened early still earns its credit
+when the step arrives.
+
+### Verification (2026-10-31, this machine)
+- node --check passes on all JS files.
+- tools/verify_upgrade17.js (stubbed Phaser, REAL main.js): **79/79** —
+  the table's circle geometry and hierarchy; centre-press fires and
+  corner-press dead (no dip, no float) for every standing battle
+  button; Block's hold gated by the circle; overFight's circular wall
+  (corner falls through, rim inclusive); radii and glyph presence
+  (ORDERS = ico_banner); the cooldown ring's arc growing as the
+  cooldown drains (segment counts compared at full/half/near), the
+  ready ring pulse, the Perfect rim, the dodge disc + arc, the block
+  stamina ring; the fan's open/issue/close semantics, stray-tap
+  consumption, two-tap reachability of all nine members, CAMP in one
+  tap, mid-battle face switching + persistence; face derivation (new
+  player Simple; layout/binds/move customization each imply Full; an
+  explicit choice wins); a pre-U17 save landing on identical centres;
+  the layout round-trip exact under circles (including ORDERS' seat
+  saved while hidden in Full); both editors' fan-group handling
+  (members not items, anchor drag carries the group live, seats
+  preserved, fan spots never saved as seats); the tutorial's fan
+  phases end-to-end.
+- Superseded checks re-pointed, not deleted: verify_upgrade8.js and
+  verify_upgrade9.js (stack/CAMP call sites), verify_upgrade10.js (six
+  geometry assertions), verify_upgrade11.js (the army walk gains the
+  fan phase), verify_upgrade12.js (defaults/count/walls/drag-press
+  point), verify_upgrade15.js (BUILD's def + the count),
+  verify_upgrade16.js (the counts 17 -> 18). All fifteen suites green:
+  **908 checks** (827 prior + 79 new + 2 net re-point deltas). Standing
+  benchmarks unchanged: the champion sim still clears in 32.8s with the
+  camp at 500/500 across U8–U14; U7/U9/U11 proofs untouched.
+- NOT verified (no live browser here): whether the circles READ at
+  phone size in a live fight. Honest flags for kennin's eyes, carrying
+  the U16 doubts into smaller faces: the command circles are 56 across
+  — the same height the buttons always were, but the glyph now sits in
+  a circle's inscribed area, so **ico_follow** (the busiest face) and
+  **ico_volley** (small arrowheads) are the two most likely to blur;
+  **ico_flank** is third. If any face reads worse round, the fix is a
+  glyph redraw, not a return to squares — his eyes rule next.
