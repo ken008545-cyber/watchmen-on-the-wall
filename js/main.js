@@ -347,7 +347,10 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     // Upgrade 11: the tutorial's front door — always here, never locked,
     // replayable any time. It runs the Bible era with David, the hero the
     // lesson is written for (its power step names Psalm and Five Stones).
-    button(this,W/2,566,280,38,'Tutorial',()=>this.scene.start('Game',{hero:'david',level:{era:'bible'},tutorial:true}),{size:18});
+    button(this,W/2-160,566,280,38,'Tutorial',()=>this.scene.start('Game',{hero:'david',level:{era:'bible'},tutorial:true}),{size:18});
+    // Multiplayer (Slice 1): the Play Together door — NetLobby lives in
+    // js/net.js and registers itself with the running game from there.
+    button(this,W/2+160,566,280,38,'Play Together',()=>this.scene.start('NetLobby'),{size:18});
     const L=Progress.level(), T=Progress.state.title;
     txt(this,W/2,612,'Level '+L.lv+'  •  Account '+Progress.accountLevel()+'  •  Battle Pass tier '+Progress.bpTier()+'/30'+(T?'  •  "'+Progress.titleName(T)+'"':''),20).setOrigin(0.5);
     txt(this,W/2,652,'Grokonians: '+Tokens.balance(),24,GOLD).setOrigin(0.5); txt(this,W/2,694,'A GX Hub game'+(Tokens.mode==='hub'?'  (connected to GX Hub)':''),18).setOrigin(0.5);
