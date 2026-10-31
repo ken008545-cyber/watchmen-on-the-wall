@@ -1879,3 +1879,89 @@ Kennin's design, in his words across the call: gather resources by mining — wo
 - **Multiplayer port:** rooms need the sim to own nodes, the purse, pieces and placement (server-authoritative, per the Slice 1 pattern), with G4's command scoping deciding whose taps build and whose purse pays — a design question for kennin before it is a code question (shared camp, personal wallets: whose wood fences the shared camp?). Not attempted here, per the brief.
 - 3D/first-person build framing remains a later possibility only, as kennin left it.
 
+
+## Upgrade 16 — battle buttons become SYMBOLS, not words (2026-10-30)
+Kennin's ruling (voice, 2026-10-30 ~23:39 CDT): "I want you to upgrade
+the buttons, like the attack buttons — I don't want them to be words, I
+want them to be symbols." Every in-battle HUD face in the Upgrade
+8/9/12/15 control set now wears a symbol; menus keep their words.
+js/gxhub.js, js/tokens.js, js/net.js and the music are untouched; no
+balance numbers moved; button sizes, positions, drag layout, saved
+layouts and keybinds are byte-for-byte the systems they were.
+
+### The family (makeIcons() in js/main.js, called at Boot)
+27 textures drawn in code — Phaser Graphics vector shapes generated at
+boot on one 120px canvas (ICON_SIZE), gold-on-dark in the game's own
+palette; no emoji, no icon files, no text glyphs. A texture that
+already exists is never regenerated. The faces:
+- Powers (resolved per hero by skillIconKey, from the move's own name):
+  Psalm / any Song -> lyre (ico_psalm); Five Stones -> five stones in
+  an arc (ico_stones5); Smooth Stone / any Stone -> one ringed stone
+  (ico_stone1); flame/fire/altar/chariot -> flame; sea/geyser/wave ->
+  wave; palm/judgment -> palm; sword/cleave/jawbone -> sword; roar ->
+  sound arcs; rally -> banner; pitcher -> jar; manna/meal/raven ->
+  bowl; pillar -> pillars; anything else -> the eight-point burst
+  (ico_burst), the family's generic power mark.
+- Dodge -> curved swoosh arrow; Block -> shield with cross; Sprint ->
+  boot with speed lines.
+- Charge -> crossed swords; Hold -> planted flag over a ground line;
+  Follow Me -> footsteps toward a star; Flank -> two hooked arrows
+  around a center block; Fall Back -> an arrow returning to a shield;
+  Shield Wall -> three shields in a row; Volley -> a fan of arrows
+  arcing onto a marked ring.
+- CAMP -> a tent; RALLY -> a planted flag with a ring at its foot;
+  BUILD -> a hammer over a fence board; AUTO-FIRE -> a bow inside a
+  circular arrow.
+
+### How the faces are built (the button() helper grew three options)
+- opt.icon: the button carries the symbol image centered on its face;
+  its label text is created EMPTY and hidden — no word stands on any
+  battle button. Cooldowns ride the existing sweeps plus a dimmed icon;
+  Held Power tiers ride the sweep's bar/rim, and a Perfect power tints
+  its symbol gold (the update loop no longer writes names/countdowns
+  onto skill faces — the tier float above the hero still speaks them).
+- opt.floatName: a press (pointerdown) floats the action's name above
+  the button for ~1s (Game.floatBtnName, one float at a time) — the
+  Upgrade 9 skill-name float, generalized, so a symbol teaches its
+  meaning in the moment.
+- AUTO-FIRE's state is its face: ON = symbol untinted + the button lit
+  (applyAutoFace drives redraw(true)); OFF = symbol dimmed to grey +
+  unlit. The toast still speaks the state in words; the button doesn't.
+- opt.caption (Controls ghosts only): the layout editor's ghost buttons
+  wear the same symbols WITH the name as a small caption beneath, and
+  the Controls keybind list still names all 17 actions in words — the
+  Controls screen is where symbol and name are learned together.
+- Out of scope, deliberately: shop/intermission/menu/camp-panel/build-
+  bar buttons keep text (they are menus, with prices to read); the
+  speed (x1) and ⚙ buttons are untouched; NetGame's mirrored room
+  controls in js/net.js still carry their word faces — porting the
+  family there is a slice of the room work, not smuggled into this one.
+
+### Verification (2026-10-30, this machine)
+- node --check passes on all JS files.
+- tools/verify_upgrade16.js (stubbed Phaser, REAL main.js): **35/35** —
+  makeIcons generates exactly 27 textures at 120x120 and is Boot-safe
+  on a second call; CMD_ICONS complete (9 distinct) and LAYOUT_ICONS
+  covering all 17 controls; the resolver's mappings incl. fallback;
+  the built HUD: all 17 battle controls carry symbol images with EMPTY
+  hidden labels and 17 DISTINCT icon keys; simulated presses fire the
+  right actions (lyre -> pressSkill(1), crossed swords -> Charge,
+  swoosh -> dodge); presses float the right names ("Hold", "Five
+  Stones", "Build"); the AUTO-FIRE face flips gold<->dim with state
+  and never shows a word; a saved custom layout loads onto the symbol
+  faces (DODGE and CAMP land at saved seats with their sync state);
+  the Controls scene's bind list names every action and its ghosts
+  wear symbols + name captions.
+- Superseded checks re-pointed, not deleted: verify_upgrade10.js (the
+  U10 word-face assertions — "AUTO-FIRE: ON" label, "real text labels",
+  skill label==name — now assert the symbol faces and the same
+  behaviors: toggle persistence, per-hero resolution) and
+  verify_upgrade9.js (the CAMP button call site). All fourteen suites
+  green: **827/827 checks** (792 prior + 35 new). Prior benchmarks
+  unchanged (U7 champion sim, U9 posted-play, U11 tutorial 81/81).
+- NOT verified (no live browser here): whether each glyph READS at
+  phone size in a live fight — my honest doubts, named for kennin's
+  eyes: **ico_follow** (footsteps + star is the busiest face and may
+  blur at 110px wide) and **ico_volley** (the arrow fan's heads are
+  small; the marked ring carries it). ico_flank's hooks read as
+  brackets at small size — acceptable, but it is the third to watch.

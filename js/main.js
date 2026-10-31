@@ -331,15 +331,151 @@ const txt=(s,x,y,str,size,col,o)=>s.add.text(x,y,str,Object.assign({},FONT,{font
 function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
   const c=s.add.container(x,y); const g=s.add.graphics();
   const draw=(hl)=>{g.clear();g.fillStyle(opt.disabled?0x2a2018:(hl?0x5a3a1e:0x3a2412),0.95);g.fillRoundedRect(-w/2,-h/2,w,h,8);g.lineStyle(3,opt.disabled?0x5a4a3a:0xd9a441,1);g.strokeRoundedRect(-w/2,-h/2,w,h,8);};
-  draw(false); const t=txt(s,0,0,label,opt.size||20,opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
-  c.add([g,t]); c.setSize(w,h).setInteractive({useHandCursor:true});
+  draw(false);
+  // Upgrade 16: a button may wear a SYMBOL instead of its name — opt.icon
+  // names a texture drawn by makeIcons(). The word survives only where it
+  // belongs: as a small caption when opt.caption asks (the Controls
+  // screen's ghost buttons, so the name sits beside the symbol while
+  // learning the layout), and as the press float (opt.floatName) — a
+  // press on a battle button briefly floats its name above it, the way
+  // Upgrade 9 floats skill names, so the symbol teaches its meaning in
+  // the moment. With an icon and no caption the label text is EMPTY and
+  // hidden: no word stands on the button's face.
+  let t;
+  if(opt.icon){ const im=s.add.image(0,opt.caption?-8:0,opt.icon); const disp=Math.min(h*0.64,w*0.42); im.setScale(disp/ICON_SIZE); c.icon=im; c.iconKey=opt.icon;
+    t=txt(s,0,opt.caption?h/2-12:0,opt.caption?label:'',opt.caption?11:(opt.size||20),opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
+    if(!opt.caption) t.setVisible(false); }
+  else t=txt(s,0,0,label,opt.size||20,opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
+  c.add(c.icon?[g,c.icon,t]:[g,t]); c.setSize(w,h).setInteractive({useHandCursor:true});
   c.on('pointerover',()=>draw(true)); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
   // Upgrade 8: button weight — every button in the game presses like it has
   // mass: it dips and lights the instant a finger lands, and springs back on
   // release, so a press is felt before the action lands.
-  c.on('pointerdown',()=>{ if(opt.disabled) return; c.setScale(0.93); draw(true); });
+  c.on('pointerdown',()=>{ if(opt.disabled) return; c.setScale(0.93); draw(true);
+    if(opt.floatName&&s.floatBtnName) s.floatBtnName(c,opt.floatName); });
   c.on('pointerup',(p,lx,ly,e)=>{ if(e) e.stopPropagation(); c.setScale(1); draw(false); SFX.unlock(); if(!opt.disabled) cb(); });
   c.label=t; c.redraw=draw; return c; }
+
+// ---------- Upgrade 16: the symbol family ----------
+// Kennin's ruling (voice, 2026-10-30): the battle buttons stop carrying
+// WORDS and carry SYMBOLS. One coherent family, drawn in code at boot
+// (Phaser Graphics -> generated textures; no emoji, no icon files, no
+// text glyphs), in the game's gold-on-dark language, sized for the
+// existing 110x56 / 196x56 faces. Names are not lost — they live in the
+// Controls list, on the Controls ghosts as captions, and in the press
+// float (Game.floatBtnName). Menus keep their words; only the battle
+// faces change.
+const ICON_SIZE=120;
+const CMD_ICONS={charge:'ico_charge',hold:'ico_hold',follow:'ico_follow',flank:'ico_flank',fallback:'ico_fallback',shieldwall:'ico_shieldwall',volley:'ico_volley',camp:'ico_camp',rally:'ico_rally'};
+const LAYOUT_ICONS={autofire:'ico_auto',dodge:'ico_dodge',block:'ico_block',sprint:'ico_sprint',skill0:'ico_burst',skill1:'ico_burst',skill2:'ico_burst',cmd_charge:'ico_charge',cmd_hold:'ico_hold',cmd_follow:'ico_follow',cmd_flank:'ico_flank',cmd_fallback:'ico_fallback',cmd_shieldwall:'ico_shieldwall',cmd_volley:'ico_volley',cmd_camp:'ico_camp',cmd_rally:'ico_rally',build:'ico_build'};
+// A hero's power wears the symbol of what it IS: David's Psalm is a lyre,
+// Five Stones is five stones in an arc, Smooth Stone one stone ringed.
+// Other heroes resolve by their own names' plain meanings, with the
+// eight-point burst as the family's generic power mark.
+function skillIconKey(def){ const n=((def&&def.name)||'').toLowerCase();
+  if(n.includes('five stones')) return 'ico_stones5';
+  if(n.includes('psalm')||n.includes('song')) return 'ico_psalm';
+  if(n.includes('stone')) return 'ico_stone1';
+  if(n.includes('flame')||n.includes('fire')||n.includes('altar')||n.includes('chariot')) return 'ico_flame';
+  if(n.includes('sea')||n.includes('geyser')||n.includes('wave')) return 'ico_wave';
+  if(n.includes('palm')||n.includes('judgment')) return 'ico_palm';
+  if(n.includes('sword')||n.includes('cleave')||n.includes('jawbone')) return 'ico_sword';
+  if(n.includes('roar')) return 'ico_roar';
+  if(n.includes('rally')) return 'ico_banner';
+  if(n.includes('pitcher')) return 'ico_jar';
+  if(n.includes('manna')||n.includes('meal')||n.includes('raven')) return 'ico_bowl';
+  if(n.includes('pillar')) return 'ico_pillar';
+  return 'ico_burst'; }
+function makeIcons(scene){ if(!scene||!scene.make||!scene.make.graphics) return;
+  const GOLD=0xd9a441, BRIGHT=0xf2c14e, PARCH=0xe8d9b0, INK=0x140c07, STONE=0x9a8a76;
+  function tex(key,fn){ if(scene.textures&&scene.textures.exists&&scene.textures.exists(key)) return;
+    const g=scene.make.graphics({x:0,y:0,add:false}); fn(g); g.generateTexture(key,ICON_SIZE,ICON_SIZE); g.destroy(); }
+  function arc(g,cx,cy,r,a0,a1,w,col){ g.lineStyle(w,col,1); const N=16;
+    for(let i=0;i<N;i++){ const t0=a0+(a1-a0)*i/N, t1=a0+(a1-a0)*(i+1)/N;
+      g.lineBetween(cx+Math.cos(t0)*r,cy+Math.sin(t0)*r,cx+Math.cos(t1)*r,cy+Math.sin(t1)*r); } }
+  function spark(g,cx,cy,r,col){ g.fillStyle(col,1);
+    g.fillPoints([{x:cx,y:cy-r},{x:cx+r*0.26,y:cy-r*0.26},{x:cx+r,y:cy},{x:cx+r*0.26,y:cy+r*0.26},{x:cx,y:cy+r},{x:cx-r*0.26,y:cy+r*0.26},{x:cx-r,y:cy},{x:cx-r*0.26,y:cy-r*0.26}],true); }
+  function shieldAt(g,cx,cy,s,col){ g.fillStyle(col,1);
+    g.fillPoints([{x:cx,y:cy-30*s},{x:cx+22*s,y:cy-20*s},{x:cx+22*s,y:cy+6*s},{x:cx,y:cy+34*s},{x:cx-22*s,y:cy+6*s},{x:cx-22*s,y:cy-20*s}],true); }
+  function head(g,x,y,ang,col){ const s=11; g.fillStyle(col,1);
+    g.fillPoints([{x:x+Math.cos(ang)*s,y:y+Math.sin(ang)*s},{x:x+Math.cos(ang+2.5)*s*0.8,y:y+Math.sin(ang+2.5)*s*0.8},{x:x+Math.cos(ang-2.5)*s*0.8,y:y+Math.sin(ang-2.5)*s*0.8}],true); }
+  tex('ico_psalm',g=>{ arc(g,60,50,25,Math.PI*0.12,Math.PI*0.88,7,GOLD); // the lyre's U
+    g.lineStyle(6,GOLD,1); g.lineBetween(35,50,32,26); g.lineBetween(85,50,88,26);
+    g.lineStyle(5,BRIGHT,1); g.lineBetween(30,27,90,27); // crossbar
+    g.lineStyle(2,PARCH,1); [46,60,74].forEach(x=>g.lineBetween(x,31,x,58)); // strings
+    g.lineStyle(6,GOLD,1); g.lineBetween(42,84,78,84); }); // base
+  tex('ico_stones5',g=>{ for(let i=0;i<5;i++){ const a=Math.PI*(1.12+0.19*i), x=60+Math.cos(a)*27, y=64+Math.sin(a)*21;
+      g.fillStyle(i%2?PARCH:GOLD,1); g.fillEllipse(x,y,19,14); } });
+  tex('ico_stone1',g=>{ g.lineStyle(4,BRIGHT,1); g.strokeCircle(60,60,43);
+    g.fillStyle(GOLD,1); g.fillEllipse(60,62,36,25); g.fillStyle(PARCH,1); g.fillEllipse(53,56,13,8); });
+  tex('ico_flame',g=>{ g.fillStyle(GOLD,1);
+    g.fillPoints([{x:60,y:18},{x:76,y:52},{x:84,y:66},{x:78,y:88},{x:66,y:98},{x:52,y:98},{x:40,y:86},{x:38,y:64},{x:48,y:46}],true);
+    g.fillStyle(PARCH,1); g.fillEllipse(60,80,17,24); });
+  tex('ico_wave',g=>{ arc(g,44,52,20,Math.PI*1.05,Math.PI*2.15,6,GOLD); arc(g,76,70,20,Math.PI*1.05,Math.PI*2.15,6,BRIGHT);
+    arc(g,44,86,20,Math.PI*1.05,Math.PI*2.0,6,STONE); });
+  tex('ico_palm',g=>{ g.lineStyle(5,GOLD,1); g.lineBetween(60,98,60,44);
+    [[-38,-6],[-26,-22],[0,-30],[26,-22],[38,-6]].forEach(([dx,dy])=>{ g.lineStyle(4,BRIGHT,1); g.lineBetween(60,48,60+dx,48+dy); }); });
+  tex('ico_sword',g=>{ g.lineStyle(9,GOLD,1); g.lineBetween(38,82,76,44); // blade
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:82,y:26},{x:86,y:40},{x:72,y:46}],true); // tip
+    g.lineStyle(6,PARCH,1); g.lineBetween(30,66,48,84); // guard
+    g.lineStyle(6,STONE,1); g.lineBetween(34,80,26,88); g.fillStyle(BRIGHT,1); g.fillCircle(24,90,5); }); // grip + pommel
+  tex('ico_roar',g=>{ g.fillStyle(BRIGHT,1); g.fillCircle(44,60,7);
+    arc(g,44,60,17,-0.9,0.9,5,GOLD); arc(g,44,60,29,-0.9,0.9,5,GOLD); arc(g,44,60,41,-0.9,0.9,5,STONE); });
+  tex('ico_banner',g=>{ g.lineStyle(5,GOLD,1); g.lineBetween(42,20,42,98);
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:42,y:24},{x:86,y:32},{x:74,y:44},{x:86,y:54},{x:42,y:52}],true);
+    g.fillStyle(GOLD,1); g.fillCircle(42,18,5); });
+  tex('ico_jar',g=>{ g.fillStyle(GOLD,1); g.fillEllipse(60,68,44,52);
+    g.fillRect(50,26,20,14); g.fillStyle(BRIGHT,1); g.fillPoints([{x:66,y:28},{x:88,y:40},{x:64,y:44}],true);
+    g.fillStyle(INK,1); g.fillEllipse(60,30,16,7); });
+  tex('ico_bowl',g=>{ g.fillStyle(GOLD,1); const pts=[]; for(let i=0;i<=12;i++){ const a=Math.PI*i/12; pts.push({x:60+Math.cos(a)*36,y:62+Math.sin(a)*22}); }
+    g.fillPoints(pts,true); g.lineStyle(4,BRIGHT,1); g.lineBetween(24,62,96,62);
+    g.fillStyle(PARCH,1); [44,60,76].forEach((x,i)=>g.fillCircle(x,40-(i===1?8:0),5)); });
+  tex('ico_pillar',g=>{ g.fillStyle(GOLD,1); g.fillRect(28,26,64,9); g.fillRect(28,86,64,9);
+    g.fillRect(36,38,13,45); g.fillRect(71,38,13,45); g.fillStyle(BRIGHT,1); g.fillRect(28,26,64,4); });
+  tex('ico_burst',g=>{ for(let i=0;i<8;i++){ const a=Math.PI*i/4; g.lineStyle(i%2?4:6,i%2?STONE:GOLD,1);
+      g.lineBetween(60+Math.cos(a)*10,60+Math.sin(a)*10,60+Math.cos(a)*32,60+Math.sin(a)*32); }
+    g.fillStyle(BRIGHT,1); g.fillCircle(60,60,8); });
+  tex('ico_dodge',g=>{ arc(g,62,66,27,Math.PI*1.02,Math.PI*1.98,8,BRIGHT); // the swoosh
+    head(g,90,62,-0.5,GOLD); arc(g,58,84,20,Math.PI*1.1,Math.PI*1.8,5,GOLD); });
+  tex('ico_block',g=>{ shieldAt(g,60,58,1.05,GOLD); shieldAt(g,60,58,0.78,INK);
+    g.lineStyle(4,PARCH,1); g.lineBetween(60,36,60,82); g.lineBetween(43,52,77,52); });
+  tex('ico_sprint',g=>{ g.fillStyle(GOLD,1); // the boot: leg, then foot
+    g.fillPoints([{x:42,y:22},{x:62,y:22},{x:62,y:56},{x:88,y:70},{x:88,y:84},{x:42,y:84}],true);
+    g.lineStyle(5,BRIGHT,1); g.lineBetween(38,86,90,86); // sole
+    g.lineStyle(5,BRIGHT,1); g.lineBetween(12,40,30,40); g.lineBetween(8,56,30,56); g.lineBetween(12,72,30,72); }); // speed lines
+  tex('ico_charge',g=>{ g.lineStyle(8,GOLD,1); g.lineBetween(34,86,80,40); g.lineStyle(8,STONE,1); g.lineBetween(86,86,40,40);
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:88,y:24},{x:90,y:40},{x:76,y:44}],true); g.fillPoints([{x:32,y:24},{x:44,y:44},{x:30,y:40}],true);
+    g.lineStyle(5,PARCH,1); g.lineBetween(28,68,44,84); g.lineBetween(92,68,76,84); });
+  tex('ico_hold',g=>{ g.lineStyle(5,GOLD,1); g.lineBetween(52,22,52,86); // planted pole
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:52,y:26},{x:88,y:34},{x:52,y:46}],true); // grounded flag
+    g.lineStyle(6,STONE,1); g.lineBetween(28,90,92,90); // the ground it holds
+    g.fillStyle(GOLD,1); g.fillPoints([{x:44,y:90},{x:60,y:78},{x:76,y:90}],true); }); // mound
+  tex('ico_follow',g=>{ spark(g,84,32,13,BRIGHT); // the star to move toward
+    g.fillStyle(GOLD,1); g.fillEllipse(36,76,15,21); g.fillStyle(PARCH,1); g.fillEllipse(54,56,15,21); // footsteps
+    arc(g,52,84,30,Math.PI*1.25,Math.PI*1.85,4,STONE); });
+  tex('ico_flank',g=>{ g.fillStyle(STONE,1); g.fillRect(52,42,16,36); // the center block
+    arc(g,60,60,33,Math.PI*0.72,Math.PI*1.28,6,GOLD); head(g,38,80,2.2,GOLD); // left hook
+    arc(g,60,60,33,-Math.PI*0.28,Math.PI*0.28,6,BRIGHT); head(g,82,80,0.94,BRIGHT); }); // right hook
+  tex('ico_fallback',g=>{ shieldAt(g,36,60,0.8,GOLD); // the shield behind
+    g.lineStyle(7,BRIGHT,1); g.lineBetween(92,60,54,60); head(g,50,60,Math.PI,BRIGHT); }); // the arrow back to it
+  tex('ico_shieldwall',g=>{ shieldAt(g,33,60,0.66,GOLD); shieldAt(g,60,60,0.66,BRIGHT); shieldAt(g,87,60,0.66,GOLD); });
+  tex('ico_volley',g=>{ [[30,26],[48,20],[66,20],[84,26]].forEach(([x,y],i)=>{ g.lineStyle(5,i%2?GOLD:BRIGHT,1);
+      g.lineBetween(x+16,y+34,x,y); head(g,x-2,y-4,Math.PI*1.25,i%2?GOLD:BRIGHT); }); // the fan, arcing down
+    g.lineStyle(3,PARCH,1); g.strokeCircle(74,92,9); }); // the marked spot
+  tex('ico_camp',g=>{ g.fillStyle(GOLD,1); g.fillPoints([{x:60,y:24},{x:94,y:88},{x:26,y:88}],true); // the tent
+    g.fillStyle(INK,1); g.fillPoints([{x:60,y:54},{x:74,y:88},{x:46,y:88}],true); // its door
+    g.lineStyle(4,BRIGHT,1); g.lineBetween(60,24,60,12); g.fillStyle(BRIGHT,1); g.fillPoints([{x:60,y:6},{x:76,y:10},{x:60,y:15}],true); });
+  tex('ico_rally',g=>{ g.lineStyle(5,GOLD,1); g.lineBetween(56,16,56,84); // the planted banner
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:56,y:20},{x:92,y:28},{x:80,y:38},{x:92,y:48},{x:56,y:46}],true);
+    g.lineStyle(4,GOLD,1); g.strokeCircle(56,88,17); }); // the ring it holds
+  tex('ico_build',g=>{ g.fillStyle(STONE,1); g.fillRect(38,52,9,40); g.fillRect(74,52,9,40); // fence posts
+    g.fillStyle(GOLD,1); g.fillRect(28,60,64,11); g.fillRect(28,76,64,11); // its boards
+    g.lineStyle(7,PARCH,1); g.lineBetween(40,50,66,26); // hammer handle
+    g.fillStyle(BRIGHT,1); g.fillPoints([{x:58,y:14},{x:84,y:22},{x:78,y:36},{x:54,y:28}],true); }); // hammer head
+  tex('ico_auto',g=>{ arc(g,60,60,42,-Math.PI*0.35,Math.PI*0.95,6,STONE); head(g,100,44,-0.6,BRIGHT); // the circular arrow
+    arc(g,54,60,21,-Math.PI*0.42,Math.PI*0.42,6,GOLD); // the bow
+    g.lineStyle(3,PARCH,1); const a=Math.PI*0.42; g.lineBetween(54+Math.cos(-a)*21,60+Math.sin(-a)*21,54+Math.cos(a)*21,60+Math.sin(a)*21); }); // its string
+}
 
 // ---------- Boot: a real loading screen (Upgrade 3) ----------
 // Only the logo is preloaded the classic way; everything else is queued from
@@ -386,7 +522,7 @@ class Boot extends Phaser.Scene{ constructor(){super('Boot');}
     // pad he heard on the loading screen is the music he wants — his own
     // battle track was removed at his word. Music.play() falls back to the
     // pad whenever no track is cached, which is now always.
-    this.load.once('complete',()=>{ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); ERAS=this.cache.json.get('eras'); UNITS=this.cache.json.get('units'); makeArt(this); makeArt2(this);
+    this.load.once('complete',()=>{ DATA=this.cache.json.get('data'); Progress.init(this.cache.json.get('prog'),DATA); Levels.init(this.cache.json.get('worlds'),DATA.enemies); ERAS=this.cache.json.get('eras'); UNITS=this.cache.json.get('units'); makeArt(this); makeArt2(this); makeIcons(this);
       const wait=Math.max(0,900-(performance.now()-t0));
       this.time.delayedCall(wait,()=>this.scene.start('Menu')); });
     this.load.start(); } }
@@ -623,8 +759,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Fullscreen keep the far right.
     const cmds=[['charge','Charge'],['hold','Hold'],['follow','Follow Me'],['flank','Flank'],['fallback','Fall Back'],['shieldwall','Shield Wall']];
     this.cmdBtns={};
-    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,label,()=>this.giveOrder(id),{size:16}); b.setDepth(31); this.cmdBtns[id]=b; this.regLayout('cmd_'+id,b,null); });
-    const vb=button(this,130+6*117,HUD_Y+55,110,56,'Volley',()=>this.pressVolley(),{size:16}); vb.setDepth(31); this.cmdBtns.volley=vb; this.regLayout('cmd_volley',vb,(x,y)=>{ vb.sx=x; vb.sy=y; });
+    cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,'',()=>this.giveOrder(id),{size:16,icon:CMD_ICONS[id],floatName:label}); b.setDepth(31); this.cmdBtns[id]=b; this.regLayout('cmd_'+id,b,null); });
+    const vb=button(this,130+6*117,HUD_Y+55,110,56,'',()=>this.pressVolley(),{size:16,icon:CMD_ICONS.volley,floatName:'Volley'}); vb.setDepth(31); this.cmdBtns.volley=vb; this.regLayout('cmd_volley',vb,(x,y)=>{ vb.sx=x; vb.sy=y; });
     // Upgrade 8: Volley carries a cooldown sweep like the skill buttons.
     vb.sx=130+6*117; vb.sy=HUD_Y+55; vb.sw=110; vb.sh=56; vb.sweep=this.add.graphics().setDepth(32);
     // Upgrade 9: the active-buff chips — each live orb power wears a labeled
@@ -636,7 +772,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 10: it rides the command row now, as the approved sketch
     // draws it — camp care sits with the army's orders. Same panel, same
     // CAMP_UPGRADES / CAMP_REPAIR state and prices behind it.
-    this.campBtn=button(this,130+7*117,HUD_Y+55,110,56,'CAMP',()=>this.toggleCampPanel(),{size:16}); this.campBtn.setDepth(31);
+    this.campBtn=button(this,130+7*117,HUD_Y+55,110,56,'',()=>this.toggleCampPanel(),{size:16,icon:CMD_ICONS.camp,floatName:'Camp'}); this.campBtn.setDepth(31);
     this.campBtnRect={x:130+7*117,y:HUD_Y+55,w:110,h:56};
     this.regLayout('cmd_camp',this.campBtn,(x,y)=>{ this.campBtnRect={x,y,w:110,h:56}; });
     // Upgrade 10 (approved addition): RALLY — the ninth seat on the row.
@@ -645,7 +781,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Rally, then tap the ground: the banner is planted there and the
     // selected squad — or the whole army, hero selected — moves to it
     // and holds (plantRally).
-    this.rallyBtn=button(this,130+8*117,HUD_Y+55,110,56,'Rally',()=>this.pressRally(),{size:16}); this.rallyBtn.setDepth(31);
+    this.rallyBtn=button(this,130+8*117,HUD_Y+55,110,56,'',()=>this.pressRally(),{size:16,icon:CMD_ICONS.rally,floatName:'Rally'}); this.rallyBtn.setDepth(31);
     this.rallyBtnRect={x:130+8*117,y:HUD_Y+55,w:110,h:56}; // Upgrade 11: where the tutorial's ring finds Rally
     this.regLayout('cmd_rally',this.rallyBtn,(x,y)=>{ this.rallyBtnRect={x,y,w:110,h:56}; });
     // Upgrade 10: the hero's power buttons are built in
@@ -666,7 +802,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade-10 stack wall stays exactly seven), it keeps its own
     // onTap wall like CAMP and ⚙, and it registers in the layout
     // system like every other battle control.
-    this.buildBtn=button(this,1178,568,196,56,'BUILD',()=>this.toggleBuildMode(),{size:16}); this.buildBtn.setDepth(31);
+    this.buildBtn=button(this,1178,568,196,56,'',()=>this.toggleBuildMode(),{size:16,icon:'ico_build',floatName:'Build'}); this.buildBtn.setDepth(31);
     this.buildBtnRect={x:1178,y:568,w:196,h:56};
     this.regLayout('build',this.buildBtn,(x,y)=>{ this.buildBtnRect={x,y,w:196,h:56}; });
     this.buildFightControls(); // Upgrade 8: the right-hand fight cluster
@@ -1048,7 +1184,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     if(b.readyPulse>0){ g.lineStyle(3,0xffe98a,0.15+0.5*b.readyPulse); g.strokeRect(x-2,y-2,b.sw+4,b.sh+4); } }
   // --- Upgrade 10: the right-thumb stack — kennin's approved button UI ---
   // One wide column on the right of the screen (196px wide, every button
-  // 56px tall, real text labels, the game's stone-and-gold): the AUTO-FIRE
+  // 56px tall, stone-and-gold — Upgrade 16: SYMBOLS on the faces, names
+  // only in the press float and the Controls list): the AUTO-FIRE
   // toggle at the top, the stamina readout under it, then DODGE, BLOCK
   // (a hold) and SPRINT, then the hero's power moves as their OWN named
   // buttons, driven from the hero data — for David: SMOOTH STONE, PSALM,
@@ -1059,14 +1196,18 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // a press here is never also a march order.
   buildFightControls(){ this.fightBtns={}; this.fightRects=[];
     if(this.autoFire===undefined) this.autoFire=loadAutoFire();
-    const mk=(id,x,y,w,h,label,cb,size)=>{ const b=button(this,x,y,w,h,label,cb,{size:size||15}); b.setDepth(31);
+    const mk=(id,x,y,w,h,label,cb,size,icon,floatName)=>{ const b=button(this,x,y,w,h,label,cb,{size:size||15,icon:icon,floatName:floatName}); b.setDepth(31);
       b.sx=x; b.sy=y; b.sw=w; b.sh=h; b.sweep=this.add.graphics().setDepth(32);
       this.fightBtns[id]=b; this.fightRects.push({x,y,w,h}); this.regLayout(id,b,(nx,ny)=>{ b.sx=nx; b.sy=ny; }); return b; };
     const SX=1178, SW=196;
-    this.autoBtn=mk('autofire',SX,70,SW,56,this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF',()=>this.toggleAutoFire(),17);
-    mk('dodge',SX,176,SW,56,'DODGE',()=>this.pressDodge(),16);
-    const bb=mk('block',SX,240,SW,56,'BLOCK',()=>{},16);
-    mk('sprint',SX,304,SW,56,'SPRINT',()=>this.toggleSprint(),16);
+    // Upgrade 16: the stack wears symbols now. AUTO-FIRE's state is the
+    // face itself — the bow-and-arrow lit gold and the button lit when
+    // ON, dimmed and unlit when OFF (applyAutoFace) — never the word.
+    this.autoBtn=mk('autofire',SX,70,SW,56,'',()=>this.toggleAutoFire(),17,'ico_auto','Auto-fire');
+    this.applyAutoFace();
+    mk('dodge',SX,176,SW,56,'',()=>this.pressDodge(),16,'ico_dodge','Dodge');
+    const bb=mk('block',SX,240,SW,56,'',()=>{},16,'ico_block','Block');
+    mk('sprint',SX,304,SW,56,'',()=>this.toggleSprint(),16,'ico_sprint','Sprint');
     // BLOCK is a HOLD, not a press: down raises the guard, up or out drops
     // it. (These ride beside the shared helper's own press handlers.)
     bb.on('pointerdown',()=>this.setBlock(true));
@@ -1078,7 +1219,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // cdMax drive the cooldown sweep, held accrues charge while the move
     // sits ready, buffered remembers a press that landed a breath early.
     const h=this.heroDef; this.skillBtns=[];
-    [...h.skills,h.ult].forEach((k,i)=>{ const b=mk('skill'+i,SX,368+i*64,SW,56,k.name,()=>this.pressSkill(i),15);
+    [...h.skills,h.ult].forEach((k,i)=>{ const b=mk('skill'+i,SX,368+i*64,SW,56,'',()=>this.pressSkill(i),15,skillIconKey(k),k.name);
       b.cd=0; b.cdMax=k.cd; b.def=k; b.held=0; b.buffered=false; b._tierShown=0;
       this.skillBtns.push(b); });
     this.fightBar=this.add.graphics().setDepth(32);
@@ -1086,9 +1227,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 12: every battle control now exists at its default — a
     // saved layout, if the player has one, is applied over the top.
     this.applyLayout(); }
+  // Upgrade 16: the AUTO-FIRE face — ON is gold and lit, OFF is dim and
+  // unlit. The toast still speaks the state in words; the button does not.
+  applyAutoFace(){ if(!this.autoBtn) return;
+    if(this.autoBtn.icon) this.autoBtn.icon.setTint(this.autoFire?0xffffff:0x6a5a4a);
+    if(this.autoBtn.redraw) this.autoBtn.redraw(!!this.autoFire); }
   // The AUTO-FIRE toggle: the choice is the player's and it persists.
   toggleAutoFire(){ this.autoFire=!this.autoFire; saveAutoFire(this.autoFire);
-    if(this.autoBtn) this.autoBtn.label.setText(this.autoFire?'AUTO-FIRE: ON':'AUTO-FIRE: OFF');
+    this.applyAutoFace();
     this.toast(this.autoFire?'Auto-fire ON — '+this.heroDef.name+' strikes on his own':'Auto-fire OFF — power moves only, by button');
     if(this.tutorial) this.tutEvent('autotoggled'); } // Upgrade 11: the auto-fire step listens for this flip, either way
   overFight(p){ if(!this.fightRects) return false;
@@ -1846,6 +1992,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   shoot(x,y,target,key,opt,speed){ const s=this.add.image(x,y,key).setDepth(13); this.shots.push({s,target,opt,speed:speed||560,lx:target.x,ly:target.y}); }
   spark(x,y,col,n){ for(let i=0;i<(n||4);i++){ const p=this.add.image(x,y,'spark').setTint(col).setDepth(16).setScale(0.8); this.tweens.add({targets:p,x:x+Phaser.Math.Between(-24,24),y:y+Phaser.Math.Between(-24,24),alpha:0,scale:0.2,duration:350,onComplete:()=>p.destroy()}); } }
   floatText(x,y,s,c){ const t=txt(this,x,y,s,14,c).setOrigin(0.5).setDepth(25); this.tweens.add({targets:t,y:y-26,alpha:0,duration:700,onComplete:()=>t.destroy()}); }
+  // Upgrade 16: the press float — a battle button's press floats its NAME
+  // above the button for a breath, so the symbol on its face teaches its
+  // meaning in the moment. One float at a time; a new press replaces it.
+  floatBtnName(c,name){ if(!c||!name) return;
+    if(this._nf){ try{ this._nf.destroy(); }catch(e){} this._nf=null; }
+    const t=txt(this,c.x,c.y-46,name,15,'#f2c14e').setOrigin(0.5).setDepth(45); if(t.setScrollFactor) t.setScrollFactor(0); this._nf=t;
+    if(this.tweens&&this.tweens.add) this.tweens.add({targets:t,y:c.y-64,alpha:0,duration:950,onComplete:()=>{ try{ t.destroy(); }catch(e){} if(this._nf===t) this._nf=null; }}); }
   nearestEnemy(x,y,r){ let best=null,bd=r; for(const e of this.enemies){ if(e.dead) continue; const d=Phaser.Math.Distance.Between(x,y,e.x,e.y); if(d<bd){ bd=d; best=e; } } return best; }
   useSkill(i){ const b=this.skillBtns[i]; if(this.over||b.cd>0||this.shopOpen) return; const k=b.def, h=this.hero, E=this.enemies.filter(e=>!e.dead);
     // Upgrade 8: the Held tier is read at the moment of the cast. Every
@@ -2223,13 +2376,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // colour and sweep — is redrawn from the same state.
     this.skillBtns.forEach((b,bi)=>{ const wasCd=b.cd>0; if(b.cd>0){ b.cd-=dt;
         if(b.cd<=0){ b.cd=0; if(b.buffered){ b.buffered=false; this.useSkill(bi); } } }
-      if(b.cd>0){ b.label.setText(b.def.name+'\n'+Math.ceil(b.cd)+'s'); b.alpha=0.5; }
+      if(b.cd>0){ if(b.label&&b.label._t) b.label.setText(''); if(b.icon) b.icon.setTint(0x777777); b.alpha=0.5; }
       else { // Upgrade 15: patience is earned in the fight — the field
         // intermission is the shop's time wherever the player stands, so
         // Held charge does not accrue while it runs.
         if(!this.interField) b.held=(b.held||0)+dt; const t=this.heldTierOf(b);
         if(t>(b._tierShown||0)){ b._tierShown=t; this.floatText(h.x,h.y-72,b.def.name+' — '+HELD.names[t]+'!','#ffe98a'); }
-        b.label.setText(b.def.name+(t>0?'\n'+HELD.names[t]:'')); if(b.label.setColor) b.label.setColor(t===2?'#ffe98a':(t===1?'#f2c14e':'#e8d9b0')); b.alpha=1; }
+        // Upgrade 16: the face stays a symbol — cooldown rides the sweep
+        // and the dimmed icon, Held tiers ride the sweep's bar and rim,
+        // and a Perfect power tints its symbol gold. The NAME appears
+        // only in the tier float above the hero and in the press float.
+        if(b.label&&b.label._t) b.label.setText(''); if(b.icon) b.icon.setTint(t===2?0xffe98a:0xffffff); b.alpha=1; }
       // Upgrade 10: the power-ready whisper — the crossing tick only,
       // and only for the two great powers (second skill and ult).
       if(wasCd&&b.cd<=0&&bi>=1) this.powerReady(b);
@@ -2386,7 +2543,10 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
   enterGhostEdit(){ if(this._ghostEd) return; this._cap=null; this.setSectionVisible(false);
     const pos=layoutPositions(), items=[];
     LAYOUT_DEFS.forEach(d=>{ const p=pos[d[0]];
-      const b=button(this,p.x,p.y,d[2],d[3],d[1],()=>{},{size:d[2]>150?15:13}); b.setDepth(40);
+      // Upgrade 16: the ghosts wear the same symbols as the real buttons,
+      // with the name kept as a caption beneath — the Controls screen is
+      // where symbol and name are learned together.
+      const b=button(this,p.x,p.y,d[2],d[3],d[1],()=>{},{size:d[2]>150?15:13,icon:LAYOUT_ICONS[d[0]],caption:true}); b.setDepth(40);
       this.ghostObjs.push(b); items.push({id:d[0],obj:b,w:d[2],h:d[3],sync:null}); });
     const g=this.add.graphics().setDepth(41); g.fillStyle(0x140c07,0.92); g.fillRoundedRect(W/2-330,10,660,44,10); g.lineStyle(2,0xf2c14e,1); g.strokeRoundedRect(W/2-330,10,660,44,10); this.ghostItems.push(g);
     this.ghostItems.push(txt(this,W/2,32,'EDITING LAYOUT — drag any button into place',17,'#f2c14e').setOrigin(0.5).setDepth(42));

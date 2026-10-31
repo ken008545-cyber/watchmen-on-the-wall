@@ -46,17 +46,17 @@ ok(main.includes('heroAutoFire(){') && main.includes('if(!this.autoFire||!h||h.d
 ok(main.includes('if(h.cd>0) h.cd-=dt;') && main.includes('this.heroAutoFire();'), 'auto-fire: the hero clock runs in update() and strikes through heroAutoFire()');
 ok(!main.includes('pressAttack') && !main.includes('lightStrike') && !main.includes('heavyStrike') && !main.includes('attackTarget'), 'the manual basic-attack path is REMOVED (pressAttack / lightStrike / heavyStrike / attackTarget)');
 ok(!main.includes("mk('light'") && !main.includes("mk('heavy'") && !/lightDmg|heavyDmg|openerMul/.test(main), 'no LIGHT or HEAVY button, and their numbers (incl. the sprint opener) are gone from the FIGHT table');
-ok(main.includes("mk('autofire',SX,70,SW,56") && main.includes("'AUTO-FIRE: ON'") && main.includes("'AUTO-FIRE: OFF'"), 'the AUTO-FIRE toggle: top of the right stack, 56px tall, labeled with its state');
-ok(main.includes("mk('dodge',SX,176,SW,56,'DODGE'") && main.includes("mk('block',SX,240,SW,56,'BLOCK'") && main.includes("mk('sprint',SX,304,SW,56,'SPRINT'"), 'DODGE / BLOCK / SPRINT ride the stack at 56px with real text labels');
-ok(main.includes('SW,56,k.name,()=>this.pressSkill(i)') && main.includes('[...h.skills,h.ult].forEach'), 'power buttons are driven from the hero data (skill/ult names), never hardcoded');
+ok(main.includes("mk('autofire',SX,70,SW,56") && main.includes("'ico_auto'") && main.includes('applyAutoFace(){'), 'the AUTO-FIRE toggle: top of the right stack, 56px tall — Upgrade 16 re-point: its state rides the symbol face (gold/lit vs dim), never words');
+ok(main.includes("mk('dodge',SX,176,SW,56") && main.includes("'ico_dodge'") && main.includes("'ico_block'") && main.includes("'ico_sprint'"), 'DODGE / BLOCK / SPRINT ride the stack at 56px — Upgrade 16 re-point: symbols (swoosh, shield, boot), not word labels');
+ok(main.includes('skillIconKey(k),k.name') && main.includes('[...h.skills,h.ult].forEach'), 'power buttons are driven from the hero data — Upgrade 16 re-point: each wears the symbol its own name resolves to, never hardcoded');
 ok(main.includes('dodgeDist:150, dodgeTime:0.22, dodgeIframes:0.30, dodgeCd:1.6') && main.includes('blockDrain:12') && main.includes('sprintDrain:8'), 'the surviving stamina kit keeps its numbers (dodge dash/i-frames/cooldown, block and sprint drains)');
 { const row = main.slice(main.indexOf('buildHUD(){'), main.indexOf('phaseName(){'));
-  ok(/110,56,'CAMP'/.test(row) && row.includes("'Charge'") && row.includes("'Hold'") && row.includes("'Follow Me'") && row.includes("'Flank'") && row.includes("'Fall Back'") && row.includes("'Shield Wall'") && row.includes("'Volley'") && row.includes("'Rally'"), 'the command row carries all nine large labeled buttons: Charge, Hold, Follow Me, Flank, Fall Back, Shield Wall, Volley, CAMP, Rally');
+  ok(row.includes('icon:CMD_ICONS.camp') && row.includes("'Charge'") && row.includes("'Hold'") && row.includes("'Follow Me'") && row.includes("'Flank'") && row.includes("'Fall Back'") && row.includes("'Shield Wall'") && row.includes("'Volley'") && row.includes("'Rally'"), 'the command row carries all nine large buttons: Charge, Hold, Follow Me, Flank, Fall Back, Shield Wall, Volley, CAMP, Rally — Upgrade 16 re-point: symbols on the faces, names in the press float');
   ok((row.match(/,110,56,/g) || []).length === 4 && (row.match(/\['[a-z]+','/g) || []).length === 6, 'every command-row button is 110x56 (one loop over the six orders, plus Volley, CAMP and Rally call sites)'); }
 { const sfx = read('js/sfx.js');
   ok(/ready\(k\)\{/.test(sfx) && main.includes('SFX.ready(b.def.id)'), 'the whisper has its own quiet SFX cue (throttled per power) and the game calls it by power id');
   ok(main.includes('powerReady(b){ b.readyPulse=1; SFX.ready(b.def.id); }') && main.includes('if(wasCd&&b.cd<=0&&bi>=1) this.powerReady(b);'), 'the whisper fires on the cooldown-crossing tick only, and only for the second skill and the ult (bi>=1)');
-  ok(main.includes("button(this,130+8*117,HUD_Y+55,110,56,'Rally'") && main.includes('pressRally(){') && main.includes('plantRally(x,y){'), 'RALLY: a ninth seat on the command row at the full 110x56, with press/plant behind it');
+  ok(main.includes("button(this,130+8*117,HUD_Y+55,110,56,''") && main.includes("floatName:'Rally'") && main.includes('pressRally(){') && main.includes('plantRally(x,y){'), 'RALLY: a ninth seat on the command row at the full 110x56, with press/plant behind it (Upgrade 16: flag-and-ring symbol)');
   ok(main.includes("if(eo==='rally'){ const rp=(s.ord==='rally'&&s.rally)?s.rally:this.rallyPoint;"), 'rally composes with the ord model: an effective rally resolves the squad\'s own point, else the army\'s');
   ok(main.includes('rallyPoints(){') && main.includes('drawRallyBanners(){'), 'the banner flies only while someone holds it (rallyPoints / drawRallyBanners)'); }
 { const stack = main.slice(main.indexOf('buildFightControls(){'), main.indexOf('toggleAutoFire(){'));
@@ -142,11 +142,11 @@ function countCalls(g, name) { const orig = GameProto[name]; let n = 0; g[name] 
 { delete store.gxhub_wotw_autofire;
   const g = bareBattle(); g.buildHUD();
   ok(g.autoFire === true, 'default: auto-fire is ON when no choice has ever been saved');
-  ok(g.autoBtn && g.autoBtn.label._t === 'AUTO-FIRE: ON', 'the toggle reads AUTO-FIRE: ON');
+  ok(g.autoBtn && g.autoBtn.iconKey === 'ico_auto' && g.autoBtn.label._t === '', 'the toggle wears the bow-and-arrow symbol and NO word (Upgrade 16)');
   fireUp(g.autoBtn);
-  ok(g.autoFire === false && store.gxhub_wotw_autofire === '0' && g.autoBtn.label._t === 'AUTO-FIRE: OFF', 'one press: OFF, saved as 0, label follows');
+  ok(g.autoFire === false && store.gxhub_wotw_autofire === '0' && g.autoBtn.label._t === '', 'one press: OFF, saved as 0, the face follows (dimmed symbol, still no word)');
   const g2 = bareBattle(); g2.buildHUD();
-  ok(g2.autoFire === false && g2.autoBtn.label._t === 'AUTO-FIRE: OFF', 'a fresh scene opens with the SAVED choice — OFF persists across runs');
+  ok(g2.autoFire === false && g2.autoBtn.iconKey === 'ico_auto', 'a fresh scene opens with the SAVED choice — OFF persists across runs');
   fireUp(g2.autoBtn);
   ok(g2.autoFire === true && store.gxhub_wotw_autofire === '1', 'pressing again: ON, saved as 1');
   delete store.gxhub_wotw_autofire; }
@@ -158,9 +158,9 @@ function countCalls(g, name) { const orig = GameProto[name]; let n = 0; g[name] 
   ok(g.fightRects.every(r => r.x - r.w / 2 >= 1000), 'the whole stack lives on the right side of the screen');
   ok(Math.max(...g.fightRects.map(r => r.y + r.h / 2)) < 610, 'the stack clears the command bar (bottom edge ' + Math.max(...g.fightRects.map(r => r.y + r.h / 2)) + ' < 610)');
   ok(g.skillBtns.length === 3 && g.skillBtns[0].def.name === 'Smooth Stone' && g.skillBtns[1].def.name === 'Psalm' && g.skillBtns[2].def.name === 'Five Stones', 'David\'s power buttons come from his data: SMOOTH STONE, PSALM, FIVE STONES');
-  ok(g.skillBtns.every(b => b.label._t === b.def.name), 'each power button is labeled with its move\'s own name');
+  ok(g.skillBtns.map(b => b.iconKey).join(',') === 'ico_stone1,ico_psalm,ico_stones5' && g.skillBtns.every(b => b.label._t === ''), 'each power button wears the symbol of its move (stone, lyre, five stones) and no word (Upgrade 16)');
   const gS = bareBattle('samson'); gS.buildHUD();
-  ok(gS.skillBtns[2].def.name !== 'Five Stones' && gS.skillBtns.every(b => b.label._t === b.def.name), 'another hero shows HIS OWN names (' + gS.skillBtns.map(b => b.def.name).join(', ') + ') — nothing is hardcoded to David');
+  ok(gS.skillBtns[2].def.name !== 'Five Stones' && gS.skillBtns.every(b => b.iconKey === vm.runInContext('skillIconKey', ctx)(b.def) && b.label._t === ''), 'another hero wears HIS OWN symbols (' + gS.skillBtns.map(b => b.iconKey).join(', ') + ' from ' + gS.skillBtns.map(b => b.def.name).join(', ') + ') — nothing is hardcoded to David');
   ok(g.overFight({ x: 1178, y: 176 }) === true && g.overFight({ x: 1178, y: 70 }) === true && g.overFight({ x: 400, y: 300 }) === false, 'overFight walls the whole stack (toggle included) off from march orders');
   const tx0 = g.hero.tx; g.onTap({ x: 1178, y: 432, worldX: 1178, worldY: 432 });
   ok(g.hero.tx === tx0, 'a tap ON a power button does not move the hero');
