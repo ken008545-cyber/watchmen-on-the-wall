@@ -3000,3 +3000,107 @@ no hub balance, no account-gated multiplayer (G12), no score identity.
   panel visit settles it, and the panel's balance always reads the hub.
 - Game tokens are bound to the game that asked (Watchmen). A second
   GX game signing in later mints its own; the table already carries it.
+
+## Upgrade 22 — Fullscreen, restored (built 2026-10-31)
+
+Kennin's word, on a live call (2026-10-31 ~11:41 CDT): *"You need to
+put full screen back on the game."* He experienced fullscreen as GONE
+on his Samsung. Diagnosis before any change, against the live build
+(both proxies and the local tree byte-identical, md5-verified):
+
+### What was actually wrong (three causes, all evidenced)
+
+1. **Every press failed in silence.** Both buttons (Menu at 1150,42;
+   battle bar at 1221,HUD_Y+26 — in their seats since Upgrade 3,
+   untouched by every face) called Phaser's `scale.startFullscreen()`
+   inside `try{ }catch(e){ }`. Phaser 3.90's implementation discards
+   the request's promise: when the browser refuses (the textbook case
+   is a frame that does not delegate fullscreen), the rejection is
+   unhandled and invisible; when Phaser finds no API it only emits
+   FULLSCREEN_UNSUPPORTED, which nothing in the game listens to.
+   Either way the button looks dead. The hub embed made refusal a
+   live possibility: the game iframe carried `allow="fullscreen"`
+   but NOT the `allowfullscreen` attribute.
+2. **No exit, no state.** The button only ever asked to ENTER;
+   already fullscreen, a press did literally nothing, and no label
+   ever reflected the state.
+3. **The hotfix's standalone hide read the HOST's display mode.**
+   `matchMedia('(display-mode: standalone)')` describes the top-level
+   application context; a game framed inside a standalone host (the
+   GX Hub opened as an installed app) inherits that flag while
+   standing in a 70vh frame. displayMode called that "standalone"
+   and BOTH buttons hid — fullscreen gone in exactly the place a
+   player would look for it. (Pause and Controls were also checked:
+   neither has ever carried a fullscreen button — U3 put it on the
+   menu and the battle bar, and nowhere else.)
+
+### The fix — fullscreen is the game's own work now (js/main.js)
+
+- **fsPress/fsToggle/fsRequest/fsExit** beside the hotfix helpers.
+  One press enters, the next leaves. The request goes to the game
+  container (`#game`, falling back to the scale parent, then the
+  document root) as `requestFullscreen({navigationUI:'hide'})`,
+  with a bare-call retry on a synchronous refusal and the prefixed
+  names (webkit/moz/ms) behind it. Every returned promise is settled
+  into a boolean — no rejection escapes unhandled. A refusal is
+  answered by **fsFloat**, a visible banner: *"Fullscreen is blocked
+  in this window — open the game in its own tab for true full
+  screen."* Success is silent.
+- **Labels tell the truth.** Buttons are born with the live label
+  (Fullscreen / Exit full), and `fsSyncLabels` re-reads the real
+  state on every `fullscreenchange` (plus vendor spellings) for
+  every scene carrying the button.
+- **Nothing hides anymore.** Both `setVisible(false)` calls are
+  deleted. Top-level standalone keeps its meaning — the installed
+  game already fills the screen — and a press there answers with
+  the float *"You are already full screen — the installed game
+  fills your screen."* The iPhone truth is untouched: no-API iOS
+  still routes to the install panel (same sentence, same panel).
+- **displayMode learned the difference between a host and a frame.**
+  It now derives `embedded` (window.self !== window.top, injectable
+  in tests) and only a NON-embedded standalone signal earns the
+  standalone mode; framed under a standalone host, the game answers
+  browser (or ios-install on iPhone) and the button stands.
+- **Rooms got their button** (js/net.js): NetGame's bar, the solo
+  seat (1221,HUD_Y+26), same fsPress — rooms are played framed in
+  the hub more than anywhere, and they had no fullscreen at all.
+
+### The hub side (tree ~/workspace/gxhub/src-fs/, from live src-pieces)
+
+Both game iframes (the link branch Watchmen actually serves from,
+and the hosted branch) gain the **`allowfullscreen`** attribute
+beside the standing `allow="fullscreen; gamepad"` — the delegation
+now speaks both spellings. Nothing else in the frame tag moved:
+sandbox tokens, referrer policy and CSP are byte-identical, and no
+Permissions-Policy header caps fullscreen on the hub (verified
+against the live response headers before touching anything).
+
+### Verification
+
+- New `tools/verify_upgrade22.js`, **22 checks**: the three buttons
+  at their seats routing through fsPress and never hidden; the
+  standalone law kept at top level and bounded when embedded
+  (injected AND derived); the request landing on #game with the
+  options form, the bare retry, the webkit fallback; a rejected
+  request answered by the blocked float; no-API answered the same;
+  the second press exiting; labels syncing both ways; a standalone
+  press speaking the already-fullscreen float.
+- Two standing statics re-pointed with their reasons recorded in
+  place: U3's "buttons call startFullscreen" and the iOS hotfix's
+  "hide in standalone" — both described the mechanism kennin's word
+  superseded. The hotfix's UA matrix and panel batteries pass
+  UNCHANGED: the iOS truth did not move.
+- **Full battery: 1,229 PASS lines, 0 failures** (1,207 standing +
+  22 new). The starter Common-sling champion benchmark (~32.8s,
+  camp 500/500) stands reproduced by the suites that carry it;
+  no gameplay or balance code was touched.
+- Hub: settings snapshotted before deploy; bindings identical
+  after (hub 12/12, play 9/9); AUTH_GATE untouched; live source
+  re-downloaded and diffed against the tree.
+- NOT verified from this desk (no live browser here): the press
+  itself under a real thumb. On kennin's Samsung, in an ordinary
+  browser tab — direct game address, playtest address, or the hub
+  frame — the button now stands on the menu and in battle, one tap
+  fills the screen, the label turns to "Exit full", and a second
+  tap comes back. If any surface still refuses, the float will say
+  so in words instead of failing in silence.

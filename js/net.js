@@ -288,6 +288,9 @@ class NetGame extends Phaser.Scene{ constructor(){ super('NetGame'); }
     cmds.forEach(([id,label],i)=>{ const b=button(this,130+i*117,HUD_Y+55,110,56,label,()=>this.sendOrder(id),{size:15}); b.setDepth(31); });
     const vb=button(this,130+6*117,HUD_Y+55,110,56,'Volley',()=>{ if(this.runEnded||this.shopOpen||this.goalOpen) return; this.volleyMode=true; this.postMode=false; this.toast('Volley: tap a target spot'); },{size:15}); vb.setDepth(31);
     const pb=button(this,130+7*117,HUD_Y+55,110,56,'Post',()=>{ if(this.runEnded||this.shopOpen||this.goalOpen) return; this.postMode=true; this.volleyMode=false; this.toast('Post: tap where your squads hold'); },{size:15}); pb.setDepth(31);
+    // Upgrade 22: rooms get the fullscreen button too — the solo bar's
+    // own seat (far right of the command bar), same fsPress truth.
+    const nfsb=button(this,1221,HUD_Y+26,110,36,fsActive()?'Exit full':'Fullscreen',()=>fsPress(this),{size:13}); nfsb.setDepth(31); this.fsb=nfsb;
     // Quick signals (protocol ids thumbs|attack|defend|wait).
     [['thumbs','👍'],['attack','⚔'],['defend','🛡'],['wait','⏳']].forEach(([id,glyph],i)=>{
       const b=button(this,972+i*64,30,56,44,glyph,()=>{ if(NETS) NETS.link.send({t:'signal',id}); },{size:19}); b.setDepth(31); });

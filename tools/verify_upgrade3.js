@@ -16,7 +16,11 @@ function read(p) { return fs.readFileSync(path.join(ROOT, p), 'utf8'); }
 const main = read('js/main.js'), index = read('index.html'), music = read('js/music.js'),
       art = read('js/art.js'), sfx = read('js/sfx.js');
 ok(/Phaser\.Scale\.FIT/.test(main) && /CENTER_BOTH/.test(main), 'scale config: FIT + CENTER_BOTH present');
-ok((main.match(/startFullscreen/g) || []).length >= 2, 'fullscreen buttons (Menu + battle HUD) call startFullscreen');
+// Re-pointed at Upgrade 22 (2026-10-31, kennin's word: "put full screen
+// back on the game"): the buttons no longer call Phaser's startFullscreen
+// — that call swallowed every refusal in silence. They route through
+// fsPress/fsToggle now, which the game owns end to end.
+ok((main.match(/fsPress\(this\)/g) || []).length >= 2 && main.includes('function fsToggle'), 'fullscreen buttons (Menu + battle HUD) route through fsPress/fsToggle');
 ok(index.includes('js/music.js'), 'index.html loads js/music.js');
 ok(/canvas\{[^}]*max-width:100vw/.test(index) && /max-height:100vh/.test(index), 'index.html CSS caps canvas at the viewport');
 ok(!main.includes("load.audio('mus_menu'") && !main.includes("load.audio('mus_battle'"), "Boot loads no music files — the pad is the music (kennin's ruling, 2026-10-30)");

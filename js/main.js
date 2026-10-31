@@ -113,14 +113,23 @@ function displayMode(env){ env=env||{};
   let standalone=false;
   try{ standalone=!!(win&&win.matchMedia&&win.matchMedia('(display-mode: standalone)').matches); }catch(e){}
   if(nav&&nav.standalone===true) standalone=true;
+  // Upgrade 22: the display-mode signal describes the HOST window, not
+  // this document. Framed inside a standalone host (the GX Hub opened
+  // as an installed app, say), the game inherits the host's standalone
+  // flag while standing in a frame that plainly is not full screen —
+  // the hotfix read that flag and hid the button, so fullscreen was
+  // simply GONE there. Embedded is its own fact: a framed game is
+  // never "already fullscreen" on the host's say-so.
+  let embedded=!!env.embedded;
+  if(!embedded&&win){ try{ embedded=!!(win.self&&win.top&&win.self!==win.top); }catch(e){ embedded=true; } }
   const ua=(nav&&nav.userAgent)||'';
   const platform=(nav&&nav.platform)||'';
   const ios=/iPhone|iPad|iPod/.test(ua)||(platform==='MacIntel'&&(nav&&nav.maxTouchPoints||0)>1);
   const root=doc&&doc.documentElement;
   const canFullscreen=!!(root&&(root.requestFullscreen||root.webkitRequestFullscreen));
-  if(standalone) return {mode:'standalone',standalone:true,ios:ios,canFullscreen:canFullscreen,showButton:false,installHelp:false};
-  if(ios&&!canFullscreen) return {mode:'ios-install',standalone:false,ios:true,canFullscreen:false,showButton:true,installHelp:true};
-  return {mode:'browser',standalone:false,ios:ios,canFullscreen:canFullscreen,showButton:true,installHelp:false};
+  if(standalone&&!embedded) return {mode:'standalone',standalone:true,embedded:false,ios:ios,canFullscreen:canFullscreen,showButton:false,installHelp:false};
+  if(ios&&!canFullscreen) return {mode:'ios-install',standalone:false,embedded:embedded,ios:true,canFullscreen:false,showButton:true,installHelp:true};
+  return {mode:'browser',standalone:false,embedded:embedded,ios:ios,canFullscreen:canFullscreen,showButton:true,installHelp:false};
 }
 function showIOSFullscreenHelp(s){ if(!s||s._iosFsPanel) return false;
   const items=[]; s._iosFsPanel=items;
@@ -139,6 +148,80 @@ function fullscreenRoute(s){ const st=displayMode();
   if(st.installHelp){ showIOSFullscreenHelp(s); return 'install'; }
   return 'native';
 }
+// ---------- Upgrade 22: fullscreen, restored (kennin, 2026-10-31) ----
+// "You need to put full screen back on the game." The buttons never
+// left their seats (Menu top-right, battle bar far right, since
+// Upgrade 3) — what failed was everything around the press:
+//   1. Every press disappeared into Phaser's scale.startFullscreen()
+//      inside a bare try/catch. When the browser refused — the
+//      textbook case is a frame that does not delegate fullscreen —
+//      the request's promise rejected unhandled, and when Phaser
+//      found no Fullscreen API it only emitted an event nothing
+//      listens to. Either way: a silent, dead-feeling button.
+//   2. The button had no second act: it could only ever ask to
+//      ENTER; already fullscreen, a press did nothing at all, and
+//      no label ever said which state the game was in.
+//   3. The hotfix's standalone hide read the host window's display
+//      mode (see displayMode above): embedded in a standalone host,
+//      the button hid while the game stood in a part-page frame.
+// So fullscreen is the game's own work now. fsToggle enters on one
+// press and leaves on the next; the request goes to the game
+// container (#game) with the prefixed names as fallbacks, and every
+// returned promise is settled into a boolean — a refusal is answered
+// by a visible float naming the block, never by silence. The label
+// keeps the truth (Fullscreen / Exit full) off the real
+// fullscreenchange events. And nothing hides anymore: top-level
+// standalone means the installed game already fills the screen, and
+// the button SAYS so when pressed.
+const FS_BLOCKED_MSG='Fullscreen is blocked in this window — open the game in its own tab for true full screen.';
+const FS_ALREADY_MSG='You are already full screen — the installed game fills your screen.';
+function fsDoc(env){ if(env&&env.document) return env.document; return (typeof document!=='undefined')?document:null; }
+function fsWin(env){ if(env&&env.window) return env.window; return (typeof window!=='undefined')?window:null; }
+function fsActive(env){ const d=fsDoc(env); if(!d) return false;
+  return !!(d.fullscreenElement||d.webkitFullscreenElement||d.mozFullScreenElement||d.msFullscreenElement); }
+function fsTarget(env){ const d=fsDoc(env); if(!d) return null;
+  if(d.getElementById){ const el=d.getElementById('game'); if(el) return el; }
+  const w=fsWin(env), g=w&&w.__game;
+  if(g&&g.scale&&g.scale.parent) return g.scale.parent;
+  return d.documentElement||null; }
+function fsRequest(el){ if(!el) return Promise.resolve(false);
+  const attempt=(name,args)=>{ try{ const r=el[name].apply(el,args);
+    if(r&&typeof r.then==='function') return r.then(()=>true,()=>false);
+    return Promise.resolve(true); }catch(e){ return null; } };
+  if(typeof el.requestFullscreen==='function'){ const p=attempt('requestFullscreen',[{navigationUI:'hide'}])||attempt('requestFullscreen',[]); if(p) return p; }
+  const kb=(typeof Element!=='undefined'&&typeof Element.ALLOW_KEYBOARD_INPUT!=='undefined')?[Element.ALLOW_KEYBOARD_INPUT]:[];
+  const prefixed=['webkitRequestFullscreen','webkitRequestFullScreen','mozRequestFullScreen','msRequestFullscreen'];
+  for(let i=0;i<prefixed.length;i++){ const n=prefixed[i];
+    if(typeof el[n]==='function'){ const p=attempt(n,kb)||attempt(n,[]); if(p) return p; } }
+  return Promise.resolve(false); }
+function fsExit(env){ const d=fsDoc(env); if(!d) return Promise.resolve(false);
+  const names=['exitFullscreen','webkitExitFullscreen','mozCancelFullScreen','msExitFullscreen'];
+  for(let i=0;i<names.length;i++){ const n=names[i];
+    if(typeof d[n]==='function'){ try{ const r=d[n]();
+      if(r&&typeof r.then==='function') return r.then(()=>true,()=>false);
+      return Promise.resolve(true); }catch(e){ return Promise.resolve(false); } } }
+  return Promise.resolve(false); }
+function fsFloat(s,msg){ if(!s||!s.add||!s.add.graphics) return false;
+  if(s._fsFloat){ s._fsFloat.forEach(o=>{ try{ o.destroy(); }catch(e){} }); s._fsFloat=null; }
+  const items=[]; s._fsFloat=items;
+  const g=s.add.graphics(); if(g.setDepth) g.setDepth(94); items.push(g);
+  g.fillStyle(0x140c07,0.96); g.fillRoundedRect(W/2-440,314,880,88,12);
+  g.lineStyle(3,0xd9a441,1); g.strokeRoundedRect(W/2-440,314,880,88,12);
+  const t=txt(s,W/2,358,msg,19,GOLD,{align:'center',wordWrap:{width:820}}).setOrigin(0.5); if(t.setDepth) t.setDepth(95); items.push(t);
+  const kill=()=>{ items.forEach(o=>{ try{ o.destroy(); }catch(e){} }); if(s._fsFloat===items) s._fsFloat=null; };
+  if(s.time&&s.time.delayedCall) s.time.delayedCall(3600,kill); else setTimeout(kill,3600);
+  return true; }
+function fsSyncLabels(){ const label=fsActive()?'Exit full':'Fullscreen';
+  const w=(typeof window!=='undefined')?window:null, g=w&&w.__game;
+  if(!g||!g.scene) return;
+  const scenes=g.scene.getScenes?g.scene.getScenes(true):(g.scene.scenes||[]);
+  scenes.forEach(sc=>{ if(!sc) return; [sc.fsBtn,sc.fsb].forEach(b=>{ if(b&&b.label&&b.label.setText) b.label.setText(label); }); }); }
+function fsToggle(s,env){ if(fsActive(env)) return fsExit(env).then(()=>{ fsSyncLabels(); return 'exit'; });
+  return fsRequest(fsTarget(env)).then(ok=>{ fsSyncLabels(); if(!ok) fsFloat(s,FS_BLOCKED_MSG); return ok?'enter':'blocked'; }); }
+function fsPress(s){ const r=fullscreenRoute(s);
+  if(r==='native') return fsToggle(s);
+  if(r==='standalone'){ fsFloat(s,FS_ALREADY_MSG); return Promise.resolve('standalone'); }
+  return Promise.resolve(r); }
 // ---------- Upgrade 18: WEAPONS & LOOT (kennin, 2026-10-31) ----------
 // "I also want to add guns... I want there to be guns and different type
 // of weapons and powers. I also want the bible to be a weapon as well. I
@@ -1079,8 +1162,8 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     // Upgrade 12: the Controls door — movement scheme, keybinds and the
     // button-layout editor live in the Settings scene.
     button(this,1112,510,300,50,'Controls',()=>this.scene.start('Settings'),{size:20});
-    const fsMenuBtn=button(this,1150,42,220,46,'Fullscreen',()=>{ if(fullscreenRoute(this)==='native'){ try{ this.scale.startFullscreen(); }catch(e){} } },{size:17});
-    if(displayMode().mode==='standalone') fsMenuBtn.setVisible(false);
+    const fsMenuBtn=button(this,1150,42,220,46,fsActive()?'Exit full':'Fullscreen',()=>fsPress(this),{size:17});
+    this.fsBtn=fsMenuBtn; // Upgrade 22: never hidden again — fsPress speaks the truth on every platform
     // Upgrade 18: the Armory's front door — the Rack, where found
     // weapons are kept and the carried one is chosen.
     button(this,130,42,220,46,'Armory',()=>this.scene.start('Armory',{from:'Menu'}),{size:17});
@@ -1501,8 +1584,8 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // utility whose whole word is its meaning, and no circle that fits
     // the corner could carry it — noted in BUILD-NOTES, not hidden.
     this.spdBtn=button(this,1221,HUD_Y+80,44,44,'x1',()=>{ this.speed=this.speed===1?2:1; this.spdBtn.label.setText('x'+this.speed); },{size:15,circle:44}).setDepth(31);
-    const fsb=button(this,1221,HUD_Y+26,110,36,'Fullscreen',()=>{ if(fullscreenRoute(this)==='native'){ try{ this.scale.startFullscreen(); }catch(e){} } },{size:13}); fsb.setDepth(31); this.fsb=fsb;
-    if(displayMode().mode==='standalone') fsb.setVisible(false);
+    const fsb=button(this,1221,HUD_Y+26,110,36,fsActive()?'Exit full':'Fullscreen',()=>fsPress(this),{size:13}); fsb.setDepth(31); this.fsb=fsb;
+    // Upgrade 22: the standalone hide is gone — the button stands in every face and every mode; fsPress answers truthfully instead.
     // Upgrade 12: the pause/settings entry — a small ⚙ above the fight
     // stack. It opens the pause overlay (movement scheme, the layout
     // editor, resume, quit), and its rect is walled in onTap like the
@@ -3989,6 +4072,7 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
     (this.ghostObjs||[]).concat(this.ghostItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} });
     this.ghostObjs=[]; this.ghostItems=[]; this.setSectionVisible(true); } }
 
+if(typeof document!=='undefined'&&document.addEventListener){ ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(ev=>document.addEventListener(ev,()=>fsSyncLabels())); }
 window.__game=new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#0d0906',
   scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{activePointers:3},
   scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,Armory,GXAccount,BattlePass,Chests,CardAlbum,Profile,Game,End]});

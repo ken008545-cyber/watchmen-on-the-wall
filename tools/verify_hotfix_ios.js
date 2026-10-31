@@ -8,7 +8,8 @@
 //     three icon routes with their real PNG dimensions on disk;
 // (3) the pure displayMode function over a UA matrix: iPhone Safari
 //     (install help), iPhone standalone by either signal (already
-//     fullscreen — the button hides), iPadOS in its desktop disguise,
+//     fullscreen — displayMode says so; since Upgrade 22 the button
+//     stays standing and says it too), iPadOS in its desktop disguise,
 //     an iPhone that CAN fullscreen (the capability, not the badge,
 //     decides), Android Chrome and desktop (native fullscreen);
 // (4) the panel and the route, in a stubbed scene — the exact help
@@ -56,9 +57,13 @@ function pngSize(p) { const b = fs.readFileSync(path.join(ROOT, p));
 // ---------- main.js statics ----------
 ok(main.includes('function displayMode(env)') && main.includes("const IOS_FS_HELP='On iPhone, install the game for true fullscreen: tap Share, then Add to Home Screen — it opens like an app, full screen.'"),
   'main.js: the pure displayMode function and the exact install sentence the panel speaks');
+// Re-pointed at Upgrade 22 (2026-10-31): the standalone HIDE is retired —
+// framed inside a standalone host it hid the button while the game was
+// not fullscreen at all. The buttons now stand in every mode and route
+// through fsPress; standalone answers with the already-fullscreen float.
 ok(main.includes('function showIOSFullscreenHelp(s)') && main.includes('function fullscreenRoute(s)') &&
-   (main.match(/displayMode\(\)\.mode==='standalone'/g) || []).length >= 2 && (main.match(/startFullscreen/g) || []).length >= 2,
-  'both Fullscreen buttons route through the hotfix, hide in standalone, and still call startFullscreen on the native route');
+   (main.match(/fsPress\(this\)/g) || []).length >= 2 && !main.includes('fsMenuBtn.setVisible(false)') && !main.includes('fsb.setVisible(false)'),
+  'both Fullscreen buttons route through the hotfix route and fsPress — and neither is ever hidden again');
 ok(!/serviceWorker/.test(main), 'no service worker — deliberate: stale builds have bitten this project before, and iOS installability needs none');
 
 // ---------- runtime scaffolding (the U17/U18 pattern) ----------
@@ -168,7 +173,7 @@ function clearGlobals() { delete ctx.navigator; delete ctx.document; ctx.window 
 { const s = panelScene();
   ctx.window = { matchMedia: () => ({ matches: false }) };
   ctx.navigator = { userAgent: ANDROID, platform: 'Linux armv8l' }; ctx.document = NATIVE_FS;
-  ok(fullscreenRoute(s) === 'native' && s._iosFsPanel === null, 'the route: Android answers native — the button calls startFullscreen as it always did');
+  ok(fullscreenRoute(s) === 'native' && s._iosFsPanel === null, 'the route: Android answers native — the button goes to fsToggle for real fullscreen');
   clearGlobals(); }
 
 console.log(fails === 0 ? 'ALL PASS (' + total + ' checks)' : fails + ' FAILURES of ' + total);
