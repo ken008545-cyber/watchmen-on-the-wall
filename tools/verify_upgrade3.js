@@ -85,9 +85,13 @@ function bareGame() {
   g.end = function (w) { this.endCalls.push(w); this.over = true; };
   return g;
 }
-// camp defeat
+// camp defeat — RE-POINTED by the Camp-Falls fix (2026-10-31): kennin's
+// ruling ("the camp is only there so the player can respawn... the player
+// has to die to lose") retired the U3 defeat this block asserted. Camp HP
+// 0 is now the FALL (rubble, no respawns), not the end of the run; the
+// full fall semantics live in tools/verify_campfalls.js.
 { const g = bareGame(); g.hitCamp(120); ok(g.campHp === 380 && g.endCalls.length === 0 && g.campHurtTotal === true, 'hitCamp: 120 damage lands, run continues');
-  g.hitCamp(1000); ok(g.campHp === 0 && g.endCalls.length === 1 && g.endCalls[0] === false, 'camp HP 0 -> defeat (end(false))'); }
+  g.hitCamp(1000); ok(g.campHp === 0 && g.endCalls.length === 0 && g.over === false && g.campDown() === true, 'camp HP 0 -> the camp FALLS (rubble) and the run CONTINUES — no defeat while the hero stands (Camp-Falls re-point)'); }
 // union shield + boss multiplier
 { const g = bareGame(); g.shieldT = 5; g.hitCamp(100); ok(g.campHp === CAMP_MAX, 'Union Shield: camp takes no damage');
   const g2 = bareGame(); g2.hitCamp(50, { boss: true }); ok(g2.campHp === CAMP_MAX - 150, 'boss deals x3 camp damage'); }

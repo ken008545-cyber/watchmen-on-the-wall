@@ -1,6 +1,9 @@
 // Watchmen on the Wall — Conquest. Plain JS + Phaser 3. (Tower defense retired 2026-10-30; heroes/battle pass kept.)
 const W=1280,H=720,HUD_Y=610;
-// Upgrade 3: the camp's health is the run's life. CAMP_MAX hit points; if it falls, the run falls.
+// Upgrade 3: CAMP_MAX hit points. Camp-Falls (2026-10-31): the camp's
+// health is the hero's way back, not the run's life — if it falls, the
+// fight goes on and only the hero's own fall, with no camp standing,
+// ends the run.
 const CAMP_MAX=500;
 // Upgrade 4: the camp has its own upgrade track, bought per-run in the shop.
 // Fortify tiers raise (and heal by) hpAdd; "req" chains them like unit upgrades.
@@ -833,7 +836,11 @@ function button(s,x,y,w,h,label,cb,opt){ opt=opt||{};
     if(!opt.caption) t.setVisible(false); }
   else t=txt(s,0,0,label,opt.size||20,opt.disabled?'#7a6a5a':PARCH).setOrigin(0.5);
   c.add(c.icon?[g,c.icon,t]:[g,t]); c.setSize(w,h).setInteractive({useHandCursor:true});
-  c.on('pointerover',(p,lx,ly)=>{ if(inCirc(lx,ly)) draw(true); }); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
+  // Camp-Falls rider (2026-10-31): a HOVER speaks the name too — the
+  // same press float, so a mouse player can learn the symbol family
+  // by resting on a circle, not only by pressing it (floatBtnName
+  // keeps a single float alive, so a sweep across the row cannot stack).
+  c.on('pointerover',(p,lx,ly)=>{ if(inCirc(lx,ly)){ draw(true); if(opt.floatName&&s.floatBtnName) s.floatBtnName(c,opt.floatName); } }); c.on('pointerout',()=>{ c.setScale(1); draw(false); });
   // Upgrade 8: button weight — every button in the game presses like it has
   // mass: it dips and lights the instant a finger lands, and springs back on
   // release, so a press is felt before the action lands.
@@ -1190,7 +1197,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.goalWave=ERAS.goalWave; this.squadCap=ERAS.squadCap;
     this.worldW=this.era.worldW||1280; this.worldH=this.era.worldH||720;
     this.runXp=0; this.kills=0; this.pend={}; this.pendXp=0; this.shieldT=0; this.banquet=false; this.earned=0;
-    // Upgrade 3: the camp is the defeat meter now — camp HP replaces lives.
+    // Upgrade 3: camp HP replaces lives. Camp-Falls (kennin's ruling,
+    // restated 2026-10-31): the camp is the RESPAWN, not the defeat
+    // meter — the run ends only when the hero falls with no camp
+    // standing to bring him back (see campFall / hurtHero).
     this.campHp=CAMP_MAX; this.campHurtThisWave=false; this.campHurtTotal=false; this.campWarnedWave=0;
     this.campSndFirst=false; this.campSndHalf=false; this.campSndQuarter=false; // Upgrade 13: camp threshold drums, once per run each
     // Upgrade 4: campMax is the single source for the camp's current maximum
@@ -1608,7 +1618,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       // lesson goes on. (Nothing in the tutorial deals real damage anyway
       // — the dummies deal 0 — so this is a promise kept, not a path taken.)
       if(this.tutorial){ h.hp=1; this.floatText(h.x,h.y-84,'You cannot fall here','#8fd06a'); }
-      else { h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; SFX.heroDown(); this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000); } } }
+      else { h.down=this.respawnTime||8; h.hp=0; h.spr.setAlpha(0.35); h.blocking=false; h.sprint=false; SFX.heroDown(); this.toast(h.def.name+' is down! Returns in '+Math.round(this.respawnTime||8)+'s — while the camp stands',3000);
+        // Camp-Falls: he fell with no camp to bring him back. There is
+        // no respawn to wait for — this fall IS the defeat, spoken now.
+        if(this.campHp<=0){ this._heroFell=true; this.end(false); } } } }
   // --- Upgrade 8: Held Power + button weight ---
   heldTierOf(b){ const s=b.held||0; return s>=HELD.perfectAt?2:(s>=HELD.temperAt?1:0); }
   // A press on a skill button: fires at once when ready; a press inside the
@@ -1916,6 +1929,23 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // never double-fire a verb the grammar already spoke.
   pressGatesOpen(){ return !(this.over||this.shopOpen||this.victoryOpen||this.paused||this.layoutEdit); }
   wirePress(btn,kind,idx){ if(!btn||!btn.on) return;
+    // Camp-Falls rider (2026-10-31): the release OVER the button
+    // resolves HERE, on the button itself. The shared helper's own
+    // pointerup calls stopPropagation, and in the vendored Phaser
+    // that cancels the shared input event data — processUpEvents
+    // then never emits the scene-level 'pointerup' at all (proven in
+    // vendor/phaser.min.js: the scene POINTER_UP is emitted only
+    // when the event data was not cancelled). U20 wired every TAP
+    // verb to that scene release, so a press released over its own
+    // circle was never resolved: the record lingered and fired late,
+    // on some later field release. In the watched playtest that was
+    // the CAMP button: tapped, nothing opened — the panel answered
+    // only to the camp structure's own field tap, which never goes
+    // near the button's release path. The handler below runs in the
+    // object phase, before suppression can matter; endPresses is
+    // idempotent (it clears what it resolves), so the scene path
+    // still serving field releases costs nothing.
+    btn.on('pointerup',p=>this.endPresses(p));
     btn.on('pointerdown',(p,lx,ly)=>{ if(Math.hypot(lx||0,ly||0)>(btn.circleR||32)) return; // the circle is the law, as everywhere
       if(!this.pressGatesOpen()) return;
       const rec={t0:performance.now(),held:false,id:p&&p.id};
@@ -2338,14 +2368,17 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       g.lineStyle(1,0xd9a441,0.9); g.strokeRect(bx,by,bw,8); }
     const st=Math.ceil(h.stamina);
     if(this.fightStat&&this._stamShown!==st){ this._stamShown=st; this.fightStat.setText('STAMINA '+st); } }
-  // Upgrade 3: the hero returns only while the camp stands. If the camp has
-  // fallen the run is already over, so a downed hero simply stays down.
+  // Upgrade 3: the hero returns only while the camp stands. Camp-Falls:
+  // if the camp is rubble he simply stays down — the defeat itself is
+  // spoken by campFall (he was already down when it fell) or by hurtHero
+  // (he fell after it), never by this clock.
   tickHeroDown(dt){ const h=this.hero; if(h.down<=0) return; h.down-=dt;
     if(h.down<=0&&this.campHp>0){ h.hp=h.def.hp; h.down=0; h.spr.setAlpha(1); h.x=h.tx=this.campPos.x+60; h.y=h.ty=this.campPos.y; this.toast(h.def.name+' returns!'); } }
   // Upgrade 3: camp damage. Union Shield (shieldT) turns every blow aside.
   // The goal-wave champion hits the camp three times as hard.
   hitCamp(amt,e){ if(this.over) return;
     if(this.tutorial) return; // Upgrade 11: the tutorial's camp cannot fall — no blow lands on it at all
+    if(this.campHp<=0) return; // Camp-Falls: rubble takes no blows — nothing is left to hit, and the fall is spoken once
     if(this.shieldT>0) return;
     if(e&&e.boss) amt*=3;
     this.campHp-=amt; this.campHurtThisWave=true; this.campHurtTotal=true;
@@ -2358,9 +2391,34 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       if(f<=0.5&&!this.campSndHalf){ this.campSndHalf=true; SFX.campAlarm(2); }
       if(f<=0.25&&!this.campSndQuarter){ this.campSndQuarter=true; SFX.campAlarm(3); } }
     if(this.campWarnedWave!==this.wave){ this.campWarnedWave=this.wave; SFX.campWarning(); this.toast('The camp is under attack!',2600); }
-    if(this.campHp<=0){ this.campHp=0; this.refreshHUD(); this.end(false); return; }
+    if(this.campHp<=0){ this.campHp=0; this.refreshHUD(); this.campFall(); return; }
     this.refreshHUD(); }
-  drawCampBar(){ if(!this.campBar) return; const f=Math.max(0,this.campHp/this.campMax), x=this.campPos.x-46, y=this.campPos.y-58, b=this.campBar;
+  // --- Camp-Falls (kennin's ruling, given twice and restated while he
+  // watched the playtest, 2026-10-31 ~02:02 CDT): "The camp is only
+  // there so the player can respawn. When the camp is not there or if
+  // the camp gets destroyed while the player is still alive, the player
+  // has to die to lose." The camp is the respawn, not the run: its fall
+  // changes what a hero's death MEANS, and nothing else about the fight.
+  campDown(){ return this.campHp<=0; }
+  campFall(){ if(this.over) return;
+    this.syncCampRubble();
+    SFX.campAlarm(3);
+    this.toast('The camp has fallen — no more respawns. Stay alive.',4200);
+    this.floatText(this.campPos.x,this.campPos.y-84,'THE CAMP HAS FALLEN','#ff8a6a');
+    // A hero already down was waiting on the camp's promise; with the
+    // camp gone the wait has no end — the run ends here, at the fall.
+    if(this.hero&&this.hero.down>0){ this._heroFell=true; this.end(false); } }
+  // The rubble read: the camp sprite dims and greys where it stands.
+  // syncCampRubble follows campHp wherever it changed — a blow, a
+  // Repair, a Fortify tier, a mending orb — so the picture can never
+  // disagree with the number. campFall calls it the moment of the
+  // fall; update() calls it every frame for every quieter road back.
+  syncCampRubble(){ const down=this.campHp<=0;
+    if(down===!!this._campDown) return; this._campDown=down;
+    if(this.campSpr){ if(down){ if(this.campSpr.setTint) this.campSpr.setTint(0x6a5a4a); if(this.campSpr.setAlpha) this.campSpr.setAlpha(0.55); }
+      else { if(this.campSpr.clearTint) this.campSpr.clearTint(); if(this.campSpr.setAlpha) this.campSpr.setAlpha(1); } } }
+  drawCampBar(){ if(!this.campBar) return; if(this.campHp<=0){ this.campBar.clear(); return; } // Camp-Falls: the bar leaves the field with the camp
+    const f=Math.max(0,this.campHp/this.campMax), x=this.campPos.x-46, y=this.campPos.y-58, b=this.campBar;
     b.clear(); b.fillStyle(0x000000,0.7); b.fillRect(x,y,92,8); b.fillStyle(f>0.3?0x5aa33b:0xa33b20,1); b.fillRect(x,y,92*f,8); b.lineStyle(1,0xd9a441,0.9); b.strokeRect(x,y,92,8); }
   // --- camp upgrades (Upgrade 4): the camp grows with the run, bought in the shop ---
   campUpLocked(u){ return !!(u.req&&!this.campUp[u.req]); }
@@ -2407,7 +2465,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   // Watch Fire: a camp that has bought its fire fights back — an ember at the
   // nearest enemy in range every CAMP_FIRE.rate seconds, with a gold spark at
   // the camp so the shot has a visible source.
-  campFireTick(dt){ if(!this.campUp||!this.campUp.watchfire||!this.waveActive) return;
+  campFireTick(dt){ if(!this.campUp||!this.campUp.watchfire||!this.waveActive||this.campHp<=0) return; // Camp-Falls: the fire is the camp's — rubble has no fire; a rebuilt camp's fire returns with it
     this.campFireCd-=dt; if(this.campFireCd>0) return;
     const t=this.nearestEnemy(this.campPos.x,this.campPos.y,CAMP_FIRE.range);
     if(!t){ this.campFireCd=0.25; return; }
@@ -2857,14 +2915,14 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 15: a piece he is chewing also engages him — the wind-up
     // gathers while he is held at a fence, as it does at a defender.
     for(const pc of (this.builds||[])){ if(pc.hp>0&&Phaser.Math.Distance.Between(e.x,e.y,pc.x,pc.y)-BUILD.bodyR<=90) return true; }
-    return Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34; }
+    return this.campHp>0&&Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+34; } // Camp-Falls: rubble does not engage him — no wind-up is spent on a fallen camp
   // The slam falls where the prey stands when the champion commits: the
   // nearest defender within 150px, else the camp if the champion is on it.
   bossSlamTarget(e){ let best=null,bd=150; const h=this.hero;
     if(h&&h.down<=0){ const d=Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y); if(d<bd){ bd=d; best={x:h.x,y:h.y}; } }
     for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; best={x:s.x,y:s.y}; } }
     if(best) return best;
-    if(Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+74) return {x:this.campPos.x,y:this.campPos.y};
+    if(this.campHp>0&&Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y)<=e.range+74) return {x:this.campPos.x,y:this.campPos.y}; // Camp-Falls: the slam is never spent on rubble
     return null; }
   // Telegraphs, redrawn from live state every tick: the wind-up ring closes
   // around the champion as the blow gathers; the slam's circle fills toward
@@ -3064,7 +3122,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const units=this.roster.player, pages=Math.ceil(units.length/6), pageUnits=units.slice(this.shopPage*6,this.shopPage*6+6);
     // Panel starts at y=38, below the HUD stat line, so the header is never clipped behind the shop.
     const bg=this.add.graphics().setDepth(50); bg.fillStyle(0x140c07,0.92); bg.fillRect(24,38,W-48,H-62); bg.lineStyle(3,0xd9a441); bg.strokeRect(24,38,W-48,H-62); this.shopAdd(bg);
-    const head=first?'Prepare your squads':('Wave '+this.wavesCleared+' survived!  +'+(this.lastBonus||0)+' manna');
+    // Camp-Falls rider (2026-10-31): the head reads the RUN's own count,
+    // never the caller's flag — a re-render of the OPENING shop (a camp
+    // purchase, a page turn) used to announce "Wave 0 survived!".
+    const head=this.wavesCleared>0?('Wave '+this.wavesCleared+' survived!  +'+(this.lastBonus||0)+' manna'):'Prepare your squads';
     this.shopAdd(txt(this,W/2,50,head,26,GOLD).setOrigin(0.5).setDepth(51));
     // Upgrade 15: the field door — step out of the shop and spend the
     // rest of the intermission gathering and building. The deadline
@@ -3076,7 +3137,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // unit grid down by 24px; pages 2+ keep the original geometry untouched.
     const gridY=this.shopPage===0?136:112;
     if(this.shopPage===0) this.renderCampStrip();
-    if(this.shopFirst) this.shopAdd(txt(this,W/2,635,'If the camp falls, the run falls — and the fallen hero only returns while it stands.',13,'#cdbd95').setOrigin(0.5).setDepth(51));
+    if(this.shopFirst) this.shopAdd(txt(this,W/2,635,'While the camp stands, the fallen hero returns to it. If the camp falls, the fight goes on — but then the hero must not fall.',13,'#cdbd95').setOrigin(0.5).setDepth(51));
     pageUnits.forEach((def,i)=>{ const col=i%3,row=Math.floor(i/3),x=70+col*400,y=gridY+row*252,cx=x+190;
       const g=this.add.graphics().setDepth(51); g.fillStyle(0x2a1a10,0.97); g.fillRoundedRect(x,y,380,238,10); g.lineStyle(2,0xd9a441); g.strokeRoundedRect(x,y,380,238,10); this.shopAdd(g);
       const im=uspr(this,x+42,y+44,def,58).setDepth(52); applyTint(im,def); this.shopAdd(im);
@@ -3244,15 +3305,21 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     this.refreshHUD(); }
   showVictory(){ this.victoryOpen=true; const s=[];
     const campFrac=Math.max(0,this.campHp/this.campMax);
-    const stars=campFrac>=0.85?3:(campFrac>=0.45?2:1);
+    // Camp-Falls stars fork (first pass, kennin's to tune): a camp
+    // STANDING at victory earns stars exactly as it always has; a camp
+    // FALLEN at victory caps the run at one star, and the panel says
+    // why in plain words below.
+    const stars=this.campDown()?1:(campFrac>=0.85?3:(campFrac>=0.45?2:1));
     const bg=this.add.graphics().setDepth(55); bg.fillStyle(0x140c07,0.94); bg.fillRect(340,180,600,330); bg.lineStyle(3,0xd9a441); bg.strokeRect(340,180,600,330); s.push(bg);
     s.push(txt(this,W/2,225,this.era.name+': Held!',38,GOLD).setOrigin(0.5).setDepth(56));
     s.push(txt(this,W/2,275,'★'.repeat(stars)+'☆'.repeat(3-stars),36,GOLD).setOrigin(0.5).setDepth(56));
     s.push(txt(this,W/2,325,'Goal wave '+this.goalWave+' survived. Endless waves go on from here —\nhow deep can your squads march?',18,PARCH,{align:'center'}).setOrigin(0.5).setDepth(56));
+    if(this.campDown()) s.push(txt(this,W/2,378,'The field was held, but the camp was lost — one star.',15,'#cdbd95',{align:'center'}).setOrigin(0.5).setDepth(56));
     const c=button(this,W/2-160,440,290,56,'Continue Endless',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.endless=true; this.flush(); this.openShop(false); },{size:19}); c.setDepth(56); s.push(c);
     const f=button(this,W/2+160,440,290,56,'Finish run',()=>{ s.forEach(o=>{try{o.destroy();}catch(e){}}); this.victoryOpen=false; this.end(true); },{size:19}); f.setDepth(56); s.push(f); this.fixUI(); }
   // --- main loop ---
   update(time,delta){ if(this.over) return;
+    this.syncCampRubble(); // Camp-Falls: the rubble read follows campHp wherever it changed — including a Repair bought in the shop below
     if(this.shopOpen){ // Upgrade 6: every shop counts the same honest minute
       // down from the wall-clock deadline set in openShop. Phaser stops
       // calling update() while the tab is hidden, so a returning player
@@ -3415,9 +3482,12 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
           if(dl>TUT_DUMMY.stop){ e.x+=dx/dl*e.speed*dt; e.y+=dy/dl*e.speed*dt; e.spr.setFlipX(dx<0); } } }
       else { // Upgrade 3: the camp is the prize. A defender within 90px blocks
         // the road and the enemy stops to fight it; otherwise it marches on
-        // the camp and, on arrival, stays and attacks it. It never vanishes,
-        // and the run ends only when the camp itself falls.
-        let def=null,bd=90;
+        // the camp and, on arrival, stays and attacks it. It never vanishes.
+        // Camp-Falls: the prize was only ever the respawn. Once the camp is
+        // rubble the host stops marching on it — the defender scan widens
+        // to the whole field and the enemy hunts whoever still stands,
+        // because now the player has to die to lose.
+        let def=null,bd=this.campHp>0?90:Infinity;
         if(h.down<=0){ const d=Phaser.Math.Distance.Between(e.x,e.y,h.x,h.y); if(d<bd){ bd=d; def={x:h.x,y:h.y,kind:'hero'}; } }
         for(const s of this.squads){ if(s.dead) continue; const d=Phaser.Math.Distance.Between(e.x,e.y,s.x,s.y); if(d<bd){ bd=d; def={x:s.x,y:s.y,kind:'squad',s}; } }
         const dc=Phaser.Math.Distance.Between(e.x,e.y,this.campPos.x,this.campPos.y);
@@ -3436,9 +3506,13 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
           else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate;
             if(def.kind==='hero') this.hurtHero(e.dmg); else if(def.kind==='build') this.damageBuild(def.pc,e.dmg); else this.hurtSquad(def.s,e.dmg);
             SFX.enemyAttack(e); this.spark(def.x,def.y,0xc0392b,2); } }
-        } else if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
+        } else if(this.campHp>0){ if(dc>e.range+34){ const dx=this.campPos.x-e.x, dy=this.campPos.y-e.y, dl=Math.hypot(dx,dy)||1;
           const sp=e.speed*(1-(e.slow||0))*this.enemySpdMul()*(e.boss?this.bossMoveMul(e):1); e.x+=dx/dl*sp*dt; e.y+=dy/dl*sp*dt; e.spr.setFlipX(dx<0);
-        } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } }
+        } else { e.cd-=dt; if(e.cd<=0){ e.cd=e.boss?this.bossAtkRate(e):e.rate; this.hitCamp(e.dmg,e); this.spark(this.campPos.x+30,this.campPos.y-10,0xc0392b,2); } } }
+        // Camp-Falls: rubble, and no defender anywhere for the widened
+        // scan to find — the foe simply holds its ground. (With the hero
+        // alive the scan always finds him; this is only the held breath
+        // when he is already down and the run is ending.)
       }
       const p={x:e.x,y:e.y}; e.spr.setOrigin(0.5,0.9).setPosition(p.x,p.y+(e.def.size||18)).setDepth((e.boss?9:7)+p.y/1000);
       e.bar.clear(); if(e.hp<e.max){ e.bar.fillStyle(0x000000,0.7); e.bar.fillRect(e.x-16,e.y-36,32,4); e.bar.fillStyle(0xa33b20,1); e.bar.fillRect(e.x-16,e.y-36,32*Math.max(0,e.hp)/e.max,4); }
@@ -3513,18 +3587,24 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 3: stars and score now read from the camp the player kept standing.
     // Upgrade 4: the fraction divides by the CURRENT max, so Fortify tiers
     // neither gift nor steal stars — keeping 85% of a bigger camp is the same feat.
+    // Camp-Falls stars fork (first pass, kennin's to tune): camp standing
+    // at victory -> the fraction rules above, untouched; camp FALLEN at
+    // victory -> one star, and the end screen carries the reason
+    // (campLost). The score's camp term already reads the fraction, so
+    // a lost camp scores its honest zero there without new arithmetic.
     const campFrac=Math.max(0,this.campHp/this.campMax);
-    const stars=win?(campFrac>=0.85?3:(campFrac>=0.45?2:1)):0;
+    const stars=win?(this.campDown()?1:(campFrac>=0.85?3:(campFrac>=0.45?2:1))):0;
     if(win) cqRecordStars(this.eraId,stars);
     this.flush(); const ev=Progress.takeEvents();
     const rec={score:this.kills*10+Math.round(campFrac*20)*50+this.wavesCleared*100+stars*500};
     if(window.GXHub&&GXHub.submitScore) GXHub.submitScore(rec.score,this.wavesCleared); // GX Hub leaderboard (no-op standalone)
-    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless,held:this.heldSpent?this.heldSpent.slice():[0,0,0],loot:this.lootFound?this.lootFound.slice():[],chestsWaiting:Rack.pending().length})); } }
+    this.time.delayedCall(800,()=>this.scene.start('End',{win,earned:this.earned,newUnlock:this.newUnlock,perfect:!this.campHurtTotal,xp:this.runXp,hero:this.heroDef.id,ev,stars,rec,waves:this.wavesCleared,era:this.eraId,eraName:this.era.name,endless:this.endless,held:this.heldSpent?this.heldSpent.slice():[0,0,0],loot:this.lootFound?this.lootFound.slice():[],chestsWaiting:Rack.pending().length,campLost:win&&this.campDown(),heroFell:!win&&!!this._heroFell})); } }
 
 class End extends Phaser.Scene{ constructor(){super('End');}
   create(d){ backdrop(this,0.7);
-    txt(this,W/2,150,d.win?(d.eraName||'Era')+': Held':'The Camp has Fallen',52,d.win?GOLD:'#c0392b').setOrigin(0.5);
+    txt(this,W/2,150,d.win?(d.eraName||'Era')+': Held':(d.heroFell?'The Hero has Fallen':'The Camp has Fallen'),52,d.win?GOLD:'#c0392b').setOrigin(0.5);
     if(d.win) txt(this,W/2,212,'★'.repeat(d.stars)+'☆'.repeat(3-d.stars),40,GOLD).setOrigin(0.5);
+    if(d.win&&d.campLost) txt(this,W/2,240,'The field was held, but the camp was lost.',16,'#cdbd95').setOrigin(0.5); // Camp-Falls: the one star explains itself
     txt(this,W/2,262,d.win?'"The battle is the LORD\'s." 1 Samuel 17:47':'"Be strong and of a good courage." Joshua 1:9',22).setOrigin(0.5);
     txt(this,W/2,305,'Score '+(d.rec?d.rec.score:0)+(d.endless?'  •  Endless run — waves survived: '+d.waves:''),22,'#f2c14e').setOrigin(0.5);
     txt(this,W/2,340,'Grokonians earned this run: '+d.earned+(d.perfect&&d.win?'  (perfect clear!)':''),28,GOLD).setOrigin(0.5);

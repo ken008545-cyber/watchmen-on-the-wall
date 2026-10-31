@@ -2729,3 +2729,164 @@ Bible's only road.
 - Further holidays (Thanksgiving, New Year, Easter…) are future DATA
   rows with their own sets to design at kennin's word — the framework
   takes them without new code, but no pools were invented for them.
+
+## Camp-Falls — the camp is the respawn, not the run (built 2026-10-31)
+
+kennin's ruling, given before and restated while he watched the
+playtest (01:57–02:09 CDT), the second statement sharpening the
+first: "You still have to change it to where when the camp falls you
+still are able to be alive and the game continues." — "The camp is
+only there so the player can respawn. When the camp is not there and
+or if the camp gets destroyed while the player is still alive, the
+player has to die to lose." Solo only: the multiplayer rooms (js/net.js
+and the room sim) already lived by this law and are untouched.
+
+### The rule, as it now stands in js/main.js
+
+- **The camp falls; the run does not.** `hitCamp` no longer ends
+  anything. At campHp 0 the camp becomes rubble (`campFall`): the
+  sprite stands dimmed and greyed (tint 0x6a5a4a, alpha 0.55), a field
+  float and a long toast speak it — "The camp has fallen — no more
+  respawns. Stay alive." — its HP bar leaves the field, rubble takes
+  no further blows (so the fall is spoken once), and Watch Fire goes
+  quiet. Waves, squads, orbs, chests, gathering and the hero's fight
+  continue exactly as before — proven in the suite by clearing a wave,
+  starting the next, watching it spawn, and banking a chest, all on a
+  rubble field.
+- **Respawn is the camp's only job.** While it stands, hero death →
+  the standing respawn (8s / Swift Return 4s, at the camp), unchanged.
+  A hero who falls while the camp is rubble meets the game's only
+  defeat, at that moment (`hurtHero` ends the run). A hero already
+  down when the camp falls has his pending respawn cancelled by the
+  fall itself — he stays down and the run ends there (`campFall`
+  checks him). The end screen names this defeat for what it is:
+  "The Hero has Fallen" (a quit still reads as it always has).
+- **The host stops targeting rubble.** With no camp to win, enemies
+  no longer march on it: the defender scan that normally blocks the
+  road within 90px widens to the whole field and the host hunts
+  whoever still stands. The champion neither winds a heavy up on
+  rubble (`bossEngaged`) nor spends a slam on it (`bossSlamTarget`);
+  his heavy/slam camp blows already pass through `hitCamp`, which
+  now refuses them. No enemy numbers moved — while the camp stands,
+  every targeting rule is byte-for-byte the old behavior, which is
+  why the standing benchmarks (starter ~32.5s, camp 500/500, in
+  U18/U19's suites) reproduce exactly.
+- **Victory unchanged in shape.** Clearing the goal champion with
+  the hero alive wins, camp or no camp. Endless: banking continues
+  while the hero lives; his death on a rubble field ends the run
+  with the banked waves on the record (the end payload carries them;
+  the hub submission already rode wavesCleared).
+- **Tutorial** untouched: its camp still cannot fall (the U11 guard
+  line stands verbatim at the top of `hitCamp`).
+
+### FORK 1 — the rebuild (FIRST PASS, awaiting kennin's ruling)
+
+The existing **Repair** action works on a fallen camp: paying its
+standing cost (90 Manna) raises the camp from rubble at the repair
+amount (+100 HP), respawns and camp systems resume, and the rubble
+read clears. The camp panel and the shop strip stay reachable after
+the fall for exactly this purpose, and the CAMP-hold quick Repair
+works on rubble mid-wave too. The choice that makes this coherent is
+a single derived rule — *the camp stands iff campHp > 0* — so any
+road that lifts HP also raises the camp: Repair, a Fortify tier's
+heal (upgrades already bought stay bought across a rebuild; they are
+never reset), the Mending orb's +75, the Ark's mend. `syncCampRubble`
+follows campHp on every update tick so the picture can never disagree
+with the number. If kennin wants rubble to be permanent, or Repair
+priced differently at zero, or mends forbidden from raising it, each
+is a small, single-place change — but as built, the camp can always
+be raised again by care, which matches "the camp is there so the
+player can respawn" read as a standing invitation rather than a
+one-time gift.
+
+### FORK 2 — stars (FIRST PASS, awaiting kennin's ruling)
+
+Stars today ride on the camp fraction at victory. As built: a camp
+**standing** at victory earns stars exactly as it always has
+(≥85% → 3, ≥45% → 2, else 1 — the formula is untouched at both star
+desks, the victory panel and `end()`); a camp **fallen** at victory
+caps the run at **1 star**, and the reason is written on both
+surfaces in plain words — the victory panel: "The field was held,
+but the camp was lost — one star."; the end screen: "The field was
+held, but the camp was lost." The score's camp term already read the
+fraction, so a lost camp scores its honest zero there with no new
+arithmetic. The interesting bend for kennin: a camp that fell and was
+REBUILT to, say, 60% stands at victory and earns its two stars under
+this pass — history is forgiven, only the standing state is read.
+
+### Rider 1 — the CAMP button did not open the panel (REAL, root-caused, repaired)
+
+In the watched session the CAMP tent button never opened the camp
+panel; the panel answered only to tapping the camp structure. The
+trace, against the vendored engine (vendor/phaser.min.js): U20 wired
+every TAP verb to the **scene-level** 'pointerup' (`endPresses`). But
+Phaser's `processUpEvents` runs the game objects' own handlers first
+and emits the scene POINTER_UP **only if the shared input event data
+was not cancelled** — and the shared `button()` helper's own
+pointerup handler calls `stopPropagation()`, which sets exactly that
+cancelled flag (`_eventContainer.stopPropagation` writes
+`_eventData.cancelled`). So a press released over its own circle was
+never resolved: the record lingered and fired late, on some later
+field release. The structure tap worked because it never goes near a
+button's release. This cut EVERY grammar tap released over its own
+button (Guard, powers, ORDERS, auto-fire included); CAMP was simply
+the visible symptom, because it is the one verb with an unmistakable
+binary outcome and a working alternative path to compare against.
+The repair: `wirePress` now also resolves the press on the **button's
+own** pointerup, which runs in the object phase before suppression
+can matter. `endPresses` is idempotent, so the scene path still
+serving field releases costs nothing. The new suite proves it
+through a faithful model of the engine's flow: the helper's release
+demonstrably suppresses the scene event (cancelled === true) AND the
+panel still opens — in Few and in Full; the CAMP hold still
+quick-repairs and never opens the panel behind it; the structure tap
+still works; and a Guard tap over its circle dodges through the same
+repaired channel.
+
+### Rider 2 — "Wave 0 survived!" (fixed)
+
+The shop head chose its text from the `first` argument, so any
+re-render of the OPENING shop — a camp purchase, a page turn —
+announced "Wave 0 survived! +0 manna". The head now reads the run's
+own count: `wavesCleared > 0` earns the survived line; before wave 1
+it always says "Prepare your squads". The shop's first-visit footer
+also taught the old law ("If the camp falls, the run falls…") and
+now teaches the new one.
+
+### Rider 3 — hover labels (done — it fell out trivially)
+
+The name float (`floatBtnName`, single-float by construction) is now
+also called from the helper's pointerover, so a mouse player resting
+on a circle hears its name without pressing it. One guarded line,
+the same call the press already made.
+
+### What kennin's eyes must judge
+
+- **The rubble read** — tint + dim on the standing sprite was the
+  honest minimum; if it does not read as "destroyed" at a glance in
+  a real fight, the camp wants a broken-tent frame of its own.
+- **The fall banner** — a 4.2s toast plus a field float; if the
+  moment deserves more weight (a pause, a drum), say so.
+- **Forks 1 and 2 above** — the rebuild's generosity and the star
+  cap are first passes in his game's two most judgment-shaped
+  numbers; both are written to be bent by one-line edits.
+
+### Verification — tools/verify_campfalls.js (new suite, 53 checks)
+
+The fall and continuation, the respawn law in all three positions,
+victory after the fall with the star cap and its reasons, standing
+camps earning the old stars (3 at whole, 2 at 60%), the rebuild
+(repair at rubble, panel reachable, Watch Fire asleep then awake,
+upgrades kept, respawns restored), endless banking to the hero's
+death, the CAMP-button battery above through the faithful event
+flow, and the opening-shop head. One prior check re-pointed with its
+reason recorded in place: verify_upgrade3.js's "camp HP 0 -> defeat"
+— the exact assertion kennin's ruling retired. Full battery:
+**1,176 checks, 0 failures** (1,123 standing + 53 new), benchmarks
+reproduced. js/net.js, js/gxhub.js, js/tokens.js and every data file
+byte-untouched; the scaling law untouched — no enemy number moved.
+
+- NOT verified (no live browser here): the rubble read in a real
+  fight, the fall banner's weight on a phone, and the CAMP button
+  under a real thumb on iOS — the playtest that found the bug is
+  the test that closes it.
