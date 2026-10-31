@@ -218,7 +218,7 @@ const BIBLE_VERSES=['"Thy word is a lamp unto my feet." Ps 119:105','"The word o
 // family a higher tier is never weaker in damage, rate, range or crit,
 // and each trait number (arc / pierce / pellets / critMul) steps up at
 // its named tiers.
-function resolveWeapon(family,tier){ if(family==='bible') return Object.assign({tier:-1,tierName:'Unique',key:'bible',familyName:'The Bible'},BIBLE_WEAPON);
+function resolveWeapon(family,tier,variant){ if(family==='bible') return Object.assign({tier:-1,tierName:'Unique',key:'bible',familyName:'The Bible'},BIBLE_WEAPON);
   const F=WEAPON_FAMILIES[family]||WEAPON_FAMILIES.sling, T=WEAPON_TIERS[tier]||WEAPON_TIERS[0];
   const w={ family:family, tier:tier, tierName:T.name, key:family+':'+tier, name:F.names[tier]||F.name, familyName:F.name,
     type:F.type, proj:F.proj, traitName:F.traitName, trait:F.trait,
@@ -230,10 +230,17 @@ function resolveWeapon(family,tier){ if(family==='bible') return Object.assign({
   if(family==='scattergun') w.pellets=5+Math.floor(tier/2);    // 5,5,6,6,7,7
   if(family==='bow') w.critMul=1+0.12*tier;                    // crits land harder
   if(family==='rifle') w.pierce=99;                            // through the whole line
+  // Upgrade 19: a SEASONAL VARIANT (the Hallows torch-flame dressing)
+  // is the same weapon under U18's rules — same numbers, same trait —
+  // wearing the season: a new key ('family:tier@hallows'), a Torchlit
+  // name, the flame's palette, and blows that land as FIRE. It lives
+  // on the Rack beside its plain twin; neither replaces the other.
+  if(variant==='hallows'){ w.variant='hallows'; w.key=w.key+'@hallows'; w.name='Torchlit '+w.name; w.type='fire'; w.flame=true;
+    w.trait=w.trait+' Wreathed in torch-flame: every blow lands as fire.'; }
   return w; }
 function parseWeaponKey(key){ if(key==='bible') return {family:'bible',tier:-1};
-  const p=String(key||'').split(':'); const f=WEAPON_FAMILIES[p[0]]?p[0]:'sling';
-  return {family:f,tier:Math.max(0,Math.min(5,parseInt(p[1],10)||0))}; }
+  const parts=String(key||'').split('@'), p=parts[0].split(':'); const f=WEAPON_FAMILIES[p[0]]?p[0]:'sling';
+  return {family:f,tier:Math.max(0,Math.min(5,parseInt(p[1],10)||0)),variant:parts[1]||null}; }
 // --- chests: grades, drop chances, loot rolls ---
 // Grades weight the rarity odds; Gold alone can hold the Bible, at
 // BIBLE_ODDS, and only while the Rack lacks it (the Bible is unique —
@@ -279,15 +286,197 @@ const Rack={ _s:null,
   grant(key){ const s=this._load(); if(s.owned[key]) return 'dup'; s.owned[key]=true; this._save(); return 'new'; }, // 'new' | 'dup' — a duplicate converts to Manna at reveal
   equippedKey(){ return this._load().equipped; },
   equip(key){ const s=this._load(); if(!s.owned[key]) return false; s.equipped=key; this._save(); return true; },
-  equippedWeapon(){ const p=parseWeaponKey(this.equippedKey()); return resolveWeapon(p.family,p.tier); },
+  equippedWeapon(){ const p=parseWeaponKey(this.equippedKey()); return resolveWeapon(p.family,p.tier,p.variant); },
   pending(){ return this._load().pending.slice(); },
-  setPending(list){ const s=this._load(); s.pending=(list||[]).filter(g=>CHEST_GRADES[g]); this._save(); },
+  setPending(list){ const s=this._load(); s.pending=(list||[]).filter(g=>CHEST_GRADES[g]||SEASON_BY_ID[g]); this._save(); }, // Upgrade 19: seasonal chest ids wait in the same queue
   // The armory's list: the Bible first (it stands above the ladder),
   // then families in arsenal order, tiers ascending.
-  list(){ const s=this._load(), out=[];
-    if(s.owned['bible']) out.push(resolveWeapon('bible',-1));
-    WEAPON_FAMILY_ORDER.forEach(f=>{ for(let t=0;t<6;t++){ if(s.owned[f+':'+t]) out.push(resolveWeapon(f,t)); } });
-    return out; },
+  list(){ const s=this._load();
+    // Every owned key resolves — the Bible first (it stands above the
+    // ladder), then families in arsenal order, tiers ascending, and a
+    // seasonal variant (Upgrade 19) directly after its plain twin.
+    const all=Object.keys(s.owned).filter(k=>s.owned[k]).map(k=>{ const p=parseWeaponKey(k); return resolveWeapon(p.family,p.tier,p.variant); });
+    const rank=w=>w.family==='bible'?-1:WEAPON_FAMILY_ORDER.indexOf(w.family);
+    all.sort((a,b)=>rank(a)-rank(b)||(a.tier-b.tier)||((a.variant?1:0)-(b.variant?1:0)));
+    return all; },
+};
+// ---------- Upgrade 19: SEASONAL CHESTS & GIFT CARDS (kennin, 2026-10-31) ----------
+// "I want to make a chest system where you can get gifts in like the
+// madden player cards. I want to make Halloween themed chest and base
+// the chest system off of seasons and holidays." — and, minutes later:
+// "You gotta make it where you can buy them with the grokonians."
+//
+// SEASONS ARE DATA. A season is a row below: an id, a name, a YEARLY
+// window by month/day (it may wrap the year end), a visual identity, a
+// gift pool, a Grokonian price. A season is LIVE when the player's own
+// date falls inside its window; adding a future holiday is a new row,
+// never new code. The U18 Wood/Iron/Gold chests stand exactly as they
+// were — this system stands beside them, and a seasonal chest waits in
+// the Rack's one pending queue and opens in the same intermission
+// reveal, bought or found alike: battle is never interrupted by loot.
+//
+// GIFTS ARE CARDS, in the Madden sense: a seasonal chest can deal a
+// collectible CARD — a name, a tier on kennin's six-rung ladder, a set,
+// a face drawn from the game's own glyph family. Cards persist in the
+// ALBUM (guarded storage, the Rack's pattern). A duplicate card melts
+// into Manna at reveal, like a duplicate weapon; finishing a set pays
+// the set's gift ONCE — Manna to the run and Grokonians through the
+// Tokens earn path, so the hub's caps apply as they do to every earn.
+//
+// THE HALLOWS CHEST is first, and it wears kennin's own settled
+// meaning of the day: celebrating the living in Christ, and those who
+// died in Christ who live with Him now. A chest of REMEMBRANCE in
+// torch-flame gold — the Night of the Torches' own fire — with no
+// horror and no devil anywhere in it. Its card set honors WITNESSES;
+// each card carries a name, an epithet in plain words, and a Scripture
+// REFERENCE — no new verse text is quoted on a card (the only quoted
+// words in the game remain the verified U18 Word cycle).
+//
+// THE HARD LAW, unchanged and extended: the Bible enters NO seasonal
+// pool and NO purchasable chest, at any tier, ever. It is not in any
+// table below — the U19 suite proves its rate is exactly zero across
+// every seasonal pool and path, and U18's Gold reveal remains its only
+// road into a player's hands. Rooms keep their fixed loadout:
+// seasonal chests are solo-side this pass, like U18 (js/net.js clean).
+const CARD_DUP_MANNA=[25,40,70,120,200,325]; // a duplicate card melts like a duplicate weapon — the same ladder, tier for tier
+const CARD_TIER_WEIGHTS=[30,26,20,13,8,3];   // a set's cards are dealt weighted toward the low rungs — the Mythic is the chase
+// Card faces reuse the game's existing glyph textures (the U16/U17
+// hand): David's lyre, Deborah's palm, Gideon's torch-flame, Samson's
+// pillars, Peter's stone, Stephen's stones, Paul's sword, John's star.
+const CARD_SETS={
+  witnesses:{ id:'witnesses', name:'The Witnesses', giftManna:150, giftGrok:25,
+    blurb:'Those who stood in the faith — the living in Christ, and those who died in His name and live with Him now.',
+    cards:[
+      { id:'wit_gideon',  name:'Gideon',  epithet:'Torches in jars, carried into the night',        ref:'Judges 7',     tier:0, glyph:'ico_flame'  },
+      { id:'wit_samson',  name:'Samson',  epithet:'Strength given — and spent at the pillars',      ref:'Judges 16',    tier:1, glyph:'ico_pillar' },
+      { id:'wit_deborah', name:'Deborah', epithet:'Judge and prophetess, under the palm',           ref:'Judges 5',     tier:2, glyph:'ico_palm'   },
+      { id:'wit_peter',   name:'Peter',   epithet:'The rock who stood and spoke',                   ref:'Acts 2',       tier:2, glyph:'ico_stone1' },
+      { id:'wit_john',    name:'John',    epithet:'The disciple who remained — and saw the end',    ref:'Revelation 1', tier:3, glyph:'ico_burst'  },
+      { id:'wit_stephen', name:'Stephen', epithet:'The first martyr, his face like an angel\'s',    ref:'Acts 7',       tier:3, glyph:'ico_stones5'},
+      { id:'wit_paul',    name:'Paul',    epithet:'Apostle to the nations',                         ref:'Acts 9',       tier:4, glyph:'ico_sword'  },
+      { id:'wit_david',   name:'David',   epithet:'Shepherd, king, and psalmist',                   ref:'1 Samuel 17',  tier:5, glyph:'ico_psalm'  },
+    ] },
+  tidings:{ id:'tidings', name:'Tidings of Great Joy', giftManna:100, giftGrok:20,
+    blurb:'The first witnesses of the birth — those who heard, who saw, and who carried the news.',
+    cards:[
+      { id:'tid_shepherds', name:'The Shepherds', epithet:'The first to hear the tidings',        ref:'Luke 2',    tier:0, glyph:'wpn_sling' },
+      { id:'tid_joseph',    name:'Joseph',        epithet:'The guardian who obeyed in silence',   ref:'Matthew 1', tier:1, glyph:'ico_build' },
+      { id:'tid_anna',      name:'Anna',          epithet:'The prophetess who waited and watched', ref:'Luke 2',    tier:1, glyph:'ico_flame' },
+      { id:'tid_simeon',    name:'Simeon',        epithet:'The watcher who saw salvation',        ref:'Luke 2',    tier:2, glyph:'ico_pillar'},
+      { id:'tid_mary',      name:'Mary',          epithet:'The mother who believed',              ref:'Luke 1',    tier:3, glyph:'ico_burst' },
+      { id:'tid_magi',      name:'The Magi',      epithet:'Seekers who followed the star',        ref:'Matthew 2', tier:4, glyph:'ico_jar'   },
+    ] },
+};
+const CARD_SET_ORDER=['witnesses','tidings'];
+const CARD_BY_ID={};
+CARD_SET_ORDER.forEach(sid=>{ CARD_SETS[sid].cards.forEach(c=>{ c.set=sid; CARD_BY_ID[c.id]=c; }); });
+function cardDef(id){ return CARD_BY_ID[id]||null; }
+// The seasons themselves. weaponTiers is the rarity ladder a season's
+// weapon gifts are dealt on (Hallows deals on Iron's, Tidings on
+// Wood's); variant names the seasonal dressing on those weapons
+// (Hallows only — Tidings deals the framework's plain generic gifts).
+const SEASONS=[
+  { id:'hallows', name:'Hallows Chest', price:60,
+    window:{ sm:10, sd:25, em:11, ed:7 },
+    color:0xf28c3c, css:'#f28c3c',
+    tagline:'In remembrance — the living in Christ, and those who died in His name and live with Him now.',
+    set:'witnesses', variant:'hallows',
+    pool:{ card:0.45, weapon:0.30, bundle:0.25 },
+    weaponTiers:[0.38,0.30,0.20,0.09,0.025,0.005],
+    drop:{ elite:0.35 },
+    bundles:[ {kind:'manna',amount:120,w:4}, {kind:'grok',amount:10,w:3}, {kind:'orbs',amount:1,w:2}, {kind:'manna',amount:60,w:2}, {kind:'grok',amount:25,w:1} ] },
+  { id:'tidings', name:'Tidings Chest', price:60,
+    window:{ sm:12, sd:18, em:12, ed:27 },
+    color:0x7ab0e8, css:'#7ab0e8',
+    tagline:'Tidings of great joy — the season of the birth, and of those who first heard of it.',
+    set:'tidings', variant:null,
+    pool:{ card:0.45, weapon:0.30, bundle:0.25 },
+    weaponTiers:[0.62,0.25,0.10,0.025,0.005,0],
+    drop:{ elite:0.35 },
+    bundles:[ {kind:'manna',amount:100,w:4}, {kind:'grok',amount:10,w:3}, {kind:'orbs',amount:1,w:2}, {kind:'manna',amount:50,w:2}, {kind:'grok',amount:20,w:1} ] },
+];
+const SEASON_BY_ID={}; SEASONS.forEach(sv=>{ SEASON_BY_ID[sv.id]=sv; });
+// --- the calendar: one window math for the panel, the drops, the shop ---
+const SEASON_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function seasonWindowOf(sv,year){ const w=sv.window, wraps=(w.em<w.sm)||(w.em===w.sm&&w.ed<w.sd);
+  return { start:new Date(year,w.sm-1,w.sd,0,0,0,0), end:new Date(wraps?year+1:year,w.em-1,w.ed,23,59,59,999) }; }
+// Live means: the player's date stands inside the window, both named
+// days whole. daysLeft counts today. Out of season, nextStart is the
+// next opening — windows that wrap the year end resolve correctly
+// from either side of New Year.
+function seasonState(sv,date){ const d=date||new Date(), y=d.getFullYear();
+  for(const yy of [y-1,y,y+1]){ const iv=seasonWindowOf(sv,yy);
+    if(d>=iv.start&&d<=iv.end){ const a=new Date(d.getFullYear(),d.getMonth(),d.getDate()), b=new Date(iv.end.getFullYear(),iv.end.getMonth(),iv.end.getDate());
+      return { live:true, daysLeft:Math.round((b-a)/86400000)+1, start:iv.start, end:iv.end }; }
+    if(d<iv.start) return { live:false, nextStart:iv.start }; }
+  return { live:false, nextStart:seasonWindowOf(sv,y+1).start }; }
+function liveSeason(date){ for(const sv of SEASONS){ if(seasonState(sv,date).live) return sv; } return null; }
+function nextSeason(date){ let best=null;
+  for(const sv of SEASONS){ const st=seasonState(sv,date); if(st.live) continue;
+    if(!best||st.nextStart<best.state.nextStart) best={ season:sv, state:st }; }
+  return best; }
+function seasonWindowLabel(sv){ const w=sv.window; return SEASON_MONTHS[w.sm-1]+' '+w.sd+' – '+SEASON_MONTHS[w.em-1]+' '+w.ed; }
+function seasonDateLabel(dt){ return SEASON_MONTHS[dt.getMonth()]+' '+dt.getDate(); }
+// One display face for every chest the reveal can hold: a U18 grade or
+// a season's chest, behind one lookup (name / color / css).
+function chestDisplay(id){ if(CHEST_GRADES[id]) return CHEST_GRADES[id];
+  const sv=SEASON_BY_ID[id]; if(sv) return { name:sv.name, color:sv.color, css:sv.css, season:sv };
+  return CHEST_GRADES.wood; }
+// In play, in season: elites at the season's real chance, champions
+// ALWAYS — beside the U18 chests, never instead of them. Ordinary
+// enemies leave the standing chests to U18's own roll.
+function rollSeasonalDrop(sv,kind,rng){ if(!sv) return false;
+  if(kind==='champion') return true;
+  if(kind==='elite') return (rng||Math.random)()<((sv.drop&&sv.drop.elite)||0.35);
+  return false; }
+// The seasonal gift roll. Roll order is fixed — kind, then the gift —
+// so a seeded stream reads the same way every time. NO Bible branch
+// exists here, at any weight: that absence is the law, not an odds row.
+function rollSeasonalGift(sv,rng){ const R=rng||Math.random, P=sv.pool, set=CARD_SETS[sv.set];
+  const r=R();
+  if(r<P.card){ let tot=0; set.cards.forEach(c=>{ tot+=CARD_TIER_WEIGHTS[c.tier]; });
+    let x=R()*tot, card=set.cards[set.cards.length-1];
+    for(const c of set.cards){ x-=CARD_TIER_WEIGHTS[c.tier]; if(x<0){ card=c; break; } }
+    return { kind:'card', card:card }; }
+  if(r<P.card+P.weapon){ const family=WEAPON_FAMILY_ORDER[Math.min(WEAPON_FAMILY_ORDER.length-1,Math.floor(R()*WEAPON_FAMILY_ORDER.length))];
+    let x=R(), acc=0, tier=0; for(let i=0;i<sv.weaponTiers.length;i++){ acc+=sv.weaponTiers[i]; tier=i; if(x<acc) break; }
+    return { kind:'weapon', family:family, tier:tier, variant:sv.variant||null }; }
+  let tot=0; sv.bundles.forEach(b=>{ tot+=b.w; });
+  let x=R()*tot, bundle=sv.bundles[sv.bundles.length-1];
+  for(const b of sv.bundles){ x-=b.w; if(x<0){ bundle=b; break; } }
+  return { kind:'bundle', bundle:{ kind:bundle.kind, amount:bundle.amount } }; }
+// Buying with Grokonians (kennin: "You gotta make it where you can buy
+// them with the grokonians"): the spend rides the Tokens path — the
+// orb path — and a bought chest joins the Rack's pending queue,
+// opening in the same intermission reveal as a found one. Out of
+// season there is nothing to buy: the chest is not purchasable, and
+// (rollSeasonalDrop is only consulted under liveSeason) not droppable.
+function purchaseSeasonalChest(seasonId,date){ const sv=SEASON_BY_ID[seasonId]; if(!sv) return 'noseason';
+  if(!seasonState(sv,date).live) return 'season-over';
+  if(!Tokens.spend('chest:'+sv.id,sv.price)) return 'funds';
+  const p=Rack.pending(); p.push(sv.id); Rack.setPending(p); return 'ok'; }
+// --- THE ALBUM: the gift cards' keeping (the Rack's guarded pattern) ---
+const ALBUM_KEY='gxhub_wotw_album_v1';
+const Album={ _s:null,
+  _base(){ return { cards:{}, gifts:{} }; },
+  _load(){ if(this._s) return this._s;
+    try{ const s=Object.assign(this._base(),JSON.parse(localStorage.getItem(ALBUM_KEY)||'{}'));
+      if(!s.cards||typeof s.cards!=='object') s.cards={};
+      if(!s.gifts||typeof s.gifts!=='object') s.gifts={};
+      this._s=s; }catch(e){ this._s=this._base(); }
+    return this._s; },
+  _save(){ try{ localStorage.setItem(ALBUM_KEY,JSON.stringify(this._s)); }catch(e){} },
+  reset(){ this._s=null; try{ localStorage.removeItem(ALBUM_KEY); }catch(e){} this._load(); },
+  owns(id){ return (this._load().cards[id]||0)>0; },
+  count(id){ return this._load().cards[id]||0; },
+  // 'new' | 'dup' — a duplicate melts into Manna at reveal, and the
+  // count is kept so the Album can say how many times a card was found.
+  grantCard(id){ const s=this._load(), had=(s.cards[id]||0)>0; s.cards[id]=(s.cards[id]||0)+1; this._save(); return had?'dup':'new'; },
+  setProgress(setId){ const set=CARD_SETS[setId]; if(!set) return { owned:0, total:0 };
+    return { owned:set.cards.filter(c=>this.owns(c.id)).length, total:set.cards.length }; },
+  setComplete(setId){ const p=this.setProgress(setId); return p.total>0&&p.owned===p.total; },
+  giftClaimed(setId){ return !!this._load().gifts[setId]; },
+  claimSetGift(setId){ const s=this._load(); if(s.gifts[setId]) return false; s.gifts[setId]=Date.now(); this._save(); return true; },
 };
 // Upgrade 15 — GATHER & BUILD (kennin, voice 2026-10-30: gather by mining
 // — wood from trees, stone from rocks — then build defenses around the
@@ -837,6 +1026,7 @@ const LOAD_TIPS=[
   'Tip: GUARD does both: TAP it to dodge — untouchable for a blink — or HOLD it to block and soften a blow (a boss heavy still lands through it). Sprint in, strike the opener, get out.',
   'Tip: Your squads hold their ground until you direct them — tap a squad, then tap where it should post up. Orders from the command bar go to the selected squad, or to the whole army when your hero is selected.',
   'Tip: The camp can be cared for mid-wave — tap the camp or the CAMP button to Fortify, Repair, and light the Watch Fire without leaving the fight. HOLD CAMP and the Repair is bought at once.',
+  'Tip: Seasons bring their own chests — the Hallows Chest stands open Oct 25 – Nov 7. Elites and champions drop it in season, and the Chests panel sells it for Grokonians. Its gift cards fill the Album; finish a set and it pays.',
   'Tip: Tap an orb once and your hero will walk up and buy it — watch for the banner: it names the power and what it does.',
   'Tip: Between waves, step out of the shop: gather wood from trees and stone from rocks, and BUILD fences and walls around the camp. Worn pieces can be mended; the enemy road can be funneled, never sealed.'
 ];
@@ -887,6 +1077,9 @@ class Menu extends Phaser.Scene{ constructor(){super('Menu');}
     // Upgrade 18: the Armory's front door — the Rack, where found
     // weapons are kept and the carried one is chosen.
     button(this,130,42,220,46,'Armory',()=>this.scene.start('Armory',{from:'Menu'}),{size:17});
+    // Upgrade 19: the Chests door — the seasons' calendar, seasonal
+    // chests for sale in Grokonians, and the road to the card Album.
+    button(this,378,42,230,46,'Chests',()=>this.scene.start('Chests',{from:'Menu'}),{size:17});
     // Upgrade 11: the tutorial's front door — always here, never locked,
     // replayable any time. It runs the Bible era with David, the hero the
     // lesson is written for (its power step names Psalm and Five Stones).
@@ -1079,10 +1272,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       this.weapon={ family:'innate', key:'sling:0', tier:0, tierName:'Innate', name:hd0.name+'\'s own hand', familyName:'His own hand',
         type:hd0.dmgType, dmg:hd0.dmg, rate:hd0.rate, range:hd0.range, crit:0.10, proj:hd0.dmgType==='holy'?'ember':'stone',
         arc:0, pierce:0, pellets:0, critMul:1, traitName:'His Own Hand', trait:'' }; }
-    else { const wp=parseWeaponKey(this.weaponKey); this.weapon=resolveWeapon(wp.family,wp.tier); }
+    else { const wp=parseWeaponKey(this.weaponKey); this.weapon=resolveWeapon(wp.family,wp.tier,wp.variant); }
     this.bibleT=null; this._verseI=0;
     this.fieldChests=[]; this.pendingChests=this.tutorial?[]:Rack.pending();
-    this.revealQueue=[]; this.revealItems=[]; this.revealPanel=false; this.lootFound=[]; }
+    this.revealQueue=[]; this.revealItems=[]; this.revealPanel=false; this.lootFound=[];
+    this.freeOrbs=0; } // Upgrade 19: orb treats (seasonal bundle gifts) — free orb touches banked for THIS run
   gx(n){ this.runXp+=n; this.pendXp+=n; }
   tr(k,n){ this.pend[k]=(this.pend[k]||0)+(n||1); }
   flush(){ const id=this.heroDef.id; Object.entries(this.pend).forEach(([k,n])=>Progress.track(k,n)); this.pend={};
@@ -1387,6 +1581,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const w=this.weapon||resolveWeapon('sling',0), tierCol=w.family==='bible'?0xfff3c0:(WEAPON_TIERS[Math.max(0,w.tier)]||WEAPON_TIERS[0]).color;
     this.hero.ring=this.add.circle(hx,hy,w.range,0xffffff,0.04).setStrokeStyle(1,tierCol,0.45).setDepth(3);
     this.hero.wpn=this.add.image(hx+26,hy-44,'wpn_'+(w.family==='innate'?'sling':w.family)).setDepth(9).setScale(0.34);
+    if(w.flame&&this.hero.wpn.setTint) this.hero.wpn.setTint(0xf28c3c); // Upgrade 19: a Torchlit weapon's glyph burns orange at his shoulder
     this.hero.wpnShown=w.family!=='innate'; if(!this.hero.wpnShown&&this.hero.wpn.setVisible) this.hero.wpn.setVisible(false); }
   hurtHero(n,heavy){ const h=this.hero; if(h.down>0) return;
     // Upgrade 8: dodge i-frames are true invulnerability — a blow timed
@@ -2457,7 +2652,10 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Upgrade 11: in the tutorial a buy is a GRANT, never a purchase —
     // Tokens is not called at all, so no real Grokonian can move here
     // (the U11 harness proves the spend count stays zero through a buy).
-    if(!this.tutorial&&!Tokens.spend('orb:'+o.def.id,o.def.cost)){ this.toast('Not enough Grokonians (have '+Tokens.balance()+')'); return 'funds'; }
+    // Upgrade 19: an orb TREAT (a seasonal bundle gift) pays for the
+    // touch instead — one banked treat, one free orb, this run only.
+    if(!this.tutorial&&(this.freeOrbs||0)>0){ this.freeOrbs--; this.toast('A treat pays for this orb — '+this.freeOrbs+' free '+(this.freeOrbs===1?'orb':'orbs')+' left'); }
+    else if(!this.tutorial&&!Tokens.spend('orb:'+o.def.id,o.def.cost)){ this.toast('Not enough Grokonians (have '+Tokens.balance()+')'); return 'funds'; }
     o.cd=ORB_CD; o._cdShown=null; o.pending=0;
     this.applyOrb(o); if(this.tutorial) this.tutEvent('orb'); SFX.orbBuy(); if(SFX.orbDrink) SFX.orbDrink(); this.orbBanner(o); this.spark(o.x,o.y-8,o.def.color,10); this.refreshHUD();
     return 'bought'; }
@@ -2713,7 +2911,11 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     // Golem) at a real chance; an ordinary enemy rarely. The tutorial
     // drops none: its economy firewall stays sealed.
     if(!this.tutorial){ const kind=e.boss?'champion':(e.def.id==='idol_golem'?'elite':'normal');
-      const grade=rollChestDrop(kind); if(grade) this.dropChest(grade,e.x,e.y,kind!=='normal'); }
+      const grade=rollChestDrop(kind); if(grade) this.dropChest(grade,e.x,e.y,kind!=='normal');
+      // Upgrade 19: in its season, the seasonal chest ALSO falls —
+      // elites at its real chance, champions always — beside the U18
+      // chest, a step apart so the two never hide each other.
+      const sv=liveSeason(); if(sv&&rollSeasonalDrop(sv,kind)) this.dropChest(sv.id,e.x+22,e.y+14,kind!=='normal'); }
     this.tweens.add({targets:e.spr,alpha:0,scale:0.3,duration:250,onComplete:()=>e.spr.destroy()}); e.bar.destroy(); this.refreshHUD(); }
   // A chest on the field: it lies where the foe fell until the hero
   // walks over it and banks it. Unbanked chests belong to the field and
@@ -2722,7 +2924,7 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
     const spr=this.add.image(x,y,'chest_'+grade).setDepth(6);
     if(this.tweens) this.tweens.add({targets:spr,y:y-6,duration:800,yoyo:true,repeat:-1,ease:'Sine.inOut'});
     this.fieldChests.push({grade:grade,x:x,y:y,spr:spr});
-    if(announce) this.floatText(x,y-34,grade==='gold'?'A golden chest!':'A chest!',CHEST_GRADES[grade].css);
+    if(announce) this.floatText(x,y-34,grade==='gold'?'A golden chest!':(SEASON_BY_ID[grade]?('The '+chestDisplay(grade).name+' falls!'):'A chest!'),chestDisplay(grade).css);
     return grade; }
   collectChests(){ if(!this.fieldChests||!this.fieldChests.length||!this.hero||this.hero.down>0) return; const h=this.hero;
     this.fieldChests=this.fieldChests.filter(c=>{ if(Math.hypot(c.x-h.x,c.y-h.y)>=30) return true;
@@ -2933,16 +3135,19 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
   revealAdd(o){ if(!this.revealItems) this.revealItems=[]; this.revealItems.push(o); if(o&&o.setScrollFactor) o.setScrollFactor(0); return o; }
   clearReveal(){ (this.revealItems||[]).forEach(o=>{ try{o.destroy();}catch(e){} }); this.revealItems=[]; }
   renderRevealCard(){ this.clearReveal(); const grade=this.revealQueue[0]; if(!grade){ this.closeReveal(); return; }
-    const G=CHEST_GRADES[grade];
+    const G=chestDisplay(grade), sv=SEASON_BY_ID[grade]||null;
     const g=this.add.graphics().setDepth(60); g.fillStyle(0x140c07,0.97); g.fillRoundedRect(W/2-320,170,640,380,12); g.lineStyle(3,G.color,1); g.strokeRoundedRect(W/2-320,170,640,380,12); this.revealAdd(g);
-    this.revealAdd(txt(this,W/2,208,'A chest from the field',26,GOLD).setOrigin(0.5).setDepth(61));
-    this.revealAdd(txt(this,W/2,240,G.name+(this.revealQueue.length>1?'  •  '+this.revealQueue.length+' waiting':''),16,G.css).setOrigin(0.5).setDepth(61));
+    this.revealAdd(txt(this,W/2,208,sv?G.name:'A chest from the field',26,GOLD).setOrigin(0.5).setDepth(61));
+    this.revealAdd(txt(this,W/2,240,sv?sv.tagline:(G.name+(this.revealQueue.length>1?'  •  '+this.revealQueue.length+' waiting':'')),16,G.css,{align:'center',wordWrap:{width:600}}).setOrigin(0.5).setDepth(61));
     const im=this.add.image(W/2,326,'chest_'+grade).setDepth(61); if(im.setScale) im.setScale(2.2); this.revealAdd(im);
-    this.revealAdd(txt(this,W/2,392,'What the field gave up is opened here, between waves —\nnever in the middle of the fight.',15,PARCH,{align:'center'}).setOrigin(0.5).setDepth(61));
+    this.revealAdd(txt(this,W/2,392,sv?'Cards, arms and treats wait inside. It opens here, between waves —\nnever in the middle of the fight.':'What the field gave up is opened here, between waves —\nnever in the middle of the fight.',15,PARCH,{align:'center'}).setOrigin(0.5).setDepth(61));
     const b=button(this,W/2,486,280,52,'Open the chest',()=>this.revealOpenChest(),{size:19}); b.setDepth(61); this.revealAdd(b);
     this.fixUI(); }
   revealOpenChest(){ if(!this.shopOpen||!this.revealPanel) return false; // intermission only — the reveal's whole law
     const grade=this.revealQueue[0]; if(!grade) return false;
+    // Upgrade 19: a seasonal chest opens on the seasonal roll — the
+    // same panel, the same law, another table of gifts.
+    if(SEASON_BY_ID[grade]) return this.revealOpenSeasonal(SEASON_BY_ID[grade]);
     SFX.chestOpen();
     const loot=rollLoot(grade,null,Rack.owns('bible'));
     this.revealQueue.shift(); Rack.setPending(this.revealQueue);
@@ -2968,14 +3173,66 @@ class Game extends Phaser.Scene{ constructor(){super('Game');}
       const kb=button(this,W/2+150,506,270,46,'Keep in the Rack',()=>this.revealNext(),{size:17}); kb.setDepth(61); this.revealAdd(kb); }
     else { const cb=button(this,W/2,506,270,46,'Continue',()=>this.revealNext(),{size:17}); cb.setDepth(61); this.revealAdd(cb); }
     this.fixUI(); }
-  revealEquip(key){ if(Rack.equip(key)){ const p=parseWeaponKey(key); this.weaponKey=key; this.weapon=resolveWeapon(p.family,p.tier); this.bibleT=null;
+  revealEquip(key){ if(Rack.equip(key)){ const p=parseWeaponKey(key); this.weaponKey=key; this.weapon=resolveWeapon(p.family,p.tier,p.variant); this.bibleT=null;
       if(this.hero){ if(this.hero.ring&&this.hero.ring.setRadius) this.hero.ring.setRadius(this.weapon.range);
-        if(this.hero.wpn){ this.hero.wpnShown=true; if(this.hero.wpn.setVisible) this.hero.wpn.setVisible(true); if(this.hero.wpn.setTexture) this.hero.wpn.setTexture('wpn_'+this.weapon.family); } }
+        if(this.hero.wpn){ this.hero.wpnShown=true; if(this.hero.wpn.setVisible) this.hero.wpn.setVisible(true); if(this.hero.wpn.setTexture) this.hero.wpn.setTexture('wpn_'+this.weapon.family);
+          if(this.hero.wpn.setTint){ if(this.weapon.flame) this.hero.wpn.setTint(0xf28c3c); else if(this.hero.wpn.clearTint) this.hero.wpn.clearTint(); } } }
       this.toast('Carrying: '+this.weapon.name); }
     this.revealNext(); }
   revealNext(){ if(this.revealQueue&&this.revealQueue.length) this.renderRevealCard(); else this.closeReveal(); }
   closeReveal(){ this.revealPanel=false; this.revealQueue=[]; this.clearReveal(); Rack.setPending(this.pendingChests||[]); }
   persistChests(){ Rack.setPending((this.pendingChests||[]).concat(this.revealQueue||[])); }
+  // --- Upgrade 19: the seasonal reveal ---
+  // A seasonal chest opens on rollSeasonalGift and its gift lands in
+  // the keeping built for it: a CARD into the Album (a duplicate melts
+  // to Manna; the card that finishes a set pays the set's gift at this
+  // very reveal — Manna here, Grokonians through the earn path), a
+  // WEAPON onto the Rack under U18's exact rules (the shared weapon
+  // result panel, Equip-it-now included), a TREAT straight into the
+  // run (Manna to the purse, Grokonians earned, an orb treat banked
+  // as a free orb touch). No branch here can deal the Bible — the
+  // seasonal roll has no such outcome, at any weight.
+  revealOpenSeasonal(sv){ SFX.chestOpen();
+    const gift=rollSeasonalGift(sv,null);
+    this.revealQueue.shift(); Rack.setPending(this.revealQueue);
+    if(gift.kind==='card'){ const res=Album.grantCard(gift.card.id), set=CARD_SETS[gift.card.set];
+      if(res==='dup'){ const gain=CARD_DUP_MANNA[gift.card.tier]; this.manna+=gain;
+        this.lootFound.push(gift.card.name+' card (already in the Album → +'+gain+' Manna)');
+        this.renderRevealGift({season:sv,gift:gift,kind:'dup',gain:gain}); }
+      else { this.lootFound.push(gift.card.name+' — a card for the Album');
+        let done=null;
+        if(Album.setComplete(set.id)&&Album.claimSetGift(set.id)){ done=set; this.manna+=set.giftManna; this.earn('setgift:'+set.id,set.giftGrok);
+          this.lootFound.push(set.name+' complete! +'+set.giftManna+' Manna, +'+set.giftGrok+' Grokonians'); }
+        this.renderRevealGift({season:sv,gift:gift,kind:'new',setDone:done}); } }
+    else if(gift.kind==='weapon'){ const w=resolveWeapon(gift.family,gift.tier,gift.variant), res=Rack.grant(w.key);
+      if(res==='dup'){ const gain=WEAPON_TIERS[w.tier].dupManna; this.manna+=gain;
+        this.lootFound.push(w.name+' (already held → +'+gain+' Manna)'); this.renderRevealResult(w,'dup',gain); }
+      else { this.lootFound.push(w.name); this.renderRevealResult(w,'new'); } }
+    else { const b=gift.bundle;
+      if(b.kind==='manna'){ this.manna+=b.amount; this.lootFound.push('Treat: +'+b.amount+' Manna'); }
+      else if(b.kind==='grok'){ this.earn('treat',b.amount); this.lootFound.push('Treat: +'+b.amount+' Grokonians'); }
+      else if(b.kind==='orbs'){ this.freeOrbs=(this.freeOrbs||0)+b.amount; this.lootFound.push('Treat: a free orb at any station, this run'); }
+      this.renderRevealGift({season:sv,gift:gift,kind:'bundle'}); }
+    this.refreshHUD(); return true; }
+  renderRevealGift(o){ this.clearReveal(); const gift=o.gift, sv=o.season;
+    const g=this.add.graphics().setDepth(60); g.fillStyle(0x140c07,0.97); g.fillRoundedRect(W/2-320,170,640,380,12); g.lineStyle(3,sv.color,1); g.strokeRoundedRect(W/2-320,170,640,380,12); this.revealAdd(g);
+    if(gift.kind==='card'){ const c=gift.card, T=WEAPON_TIERS[c.tier], set=CARD_SETS[c.set], pr=Album.setProgress(c.set);
+      this.revealAdd(txt(this,W/2,204,o.kind==='dup'?'Already in your Album':(T.name+' Card'),24,T.css).setOrigin(0.5).setDepth(61));
+      const im=this.add.image(W/2,282,c.glyph).setDepth(61); if(im.setScale) im.setScale(0.92); this.revealAdd(im);
+      this.revealAdd(txt(this,W/2,352,c.name,22,T.css).setOrigin(0.5).setDepth(61));
+      this.revealAdd(txt(this,W/2,384,set.name+'  •  '+pr.owned+' of '+pr.total+' gathered',15,PARCH).setOrigin(0.5).setDepth(61));
+      if(o.kind==='dup') this.revealAdd(txt(this,W/2,424,'Your Album already holds this card. It melts down to +'+o.gain+' Manna —\nno opening is ever wasted.',15,'#f2c14e',{align:'center'}).setOrigin(0.5).setDepth(61));
+      else { this.revealAdd(txt(this,W/2,416,c.epithet,15,'#cdbd95',{align:'center',wordWrap:{width:580}}).setOrigin(0.5).setDepth(61));
+        this.revealAdd(txt(this,W/2,446,'The Scripture: '+c.ref,14,'#a08a6a').setOrigin(0.5).setDepth(61));
+        if(o.setDone) this.revealAdd(txt(this,W/2,472,'THE SET IS COMPLETE — its gift is paid: +'+o.setDone.giftManna+' Manna, +'+o.setDone.giftGrok+' Grokonians.',14,'#fff3c0',{align:'center',wordWrap:{width:600}}).setOrigin(0.5).setDepth(61)); } }
+    else { const b=gift.bundle, icon=b.kind==='manna'?'ico_bowl':(b.kind==='grok'?'coing':'orb_thunder');
+      this.revealAdd(txt(this,W/2,204,'A Treat from the '+sv.name,24,sv.css).setOrigin(0.5).setDepth(61));
+      const im=this.add.image(W/2,282,icon).setDepth(61); if(im.setScale) im.setScale(b.kind==='grok'?2.4:0.92); this.revealAdd(im);
+      const line=b.kind==='manna'?('+'+b.amount+' Manna for the war purse'):b.kind==='grok'?('+'+b.amount+' Grokonians, earned through the Hub\'s path'):('A free orb at any station — the treat pays the touch, this run.');
+      this.revealAdd(txt(this,W/2,352,line,18,PARCH,{align:'center',wordWrap:{width:580}}).setOrigin(0.5).setDepth(61));
+      this.revealAdd(txt(this,W/2,392,'Treats are spent where they land — the purse, the wallet, the run.',14,'#cdbd95').setOrigin(0.5).setDepth(61)); }
+    const cb=button(this,W/2,516,270,46,'Continue',()=>this.revealNext(),{size:17}); cb.setDepth(61); this.revealAdd(cb);
+    this.fixUI(); }
   waveClear(){ this.waveActive=false; this.wavesCleared=this.wave;
     let bonus=60+this.wave*8; if(this.banquet){ bonus=Math.round(bonus*this.banquet); this.banquet=0; } // banquet stores its multiplier (1.5 at Ready; a Held cast strengthens it, Upgrade 8)
     const perfect=!this.campHurtThisWave; this.manna+=bonus; this.lastBonus=bonus;
@@ -3295,7 +3552,11 @@ class Armory extends Phaser.Scene{ constructor(){super('Armory');}
   init(d){ this.from=(d&&d.from)||'Menu'; this.fromData=(d&&d.fromData)||null; this.page=(d&&d.page)||0; }
   create(){ backdrop(this,0.78); Music.play(this,'menu');
     txt(this,W/2,40,'The Rack — Armory',38,GOLD).setOrigin(0.5);
-    txt(this,W/2,78,'Weapons are found in chests on the field — never bought. The Bible is found, never sold.',16,'#cdbd95').setOrigin(0.5);
+    txt(this,W/2,78,'Weapons come out of chests — found on the field, or seasonal chests bought with Grokonians. The Bible is found, never sold.',16,'#cdbd95').setOrigin(0.5);
+    // Upgrade 19: the Armory's other doors — the Chests calendar and
+    // the card Album stand beside the Rack.
+    button(this,1005,42,180,40,'Chests',()=>this.scene.start('Chests',{from:'Armory',fromData:{from:this.from,fromData:this.fromData,page:this.page}}),{size:15});
+    button(this,1195,42,150,40,'Album',()=>this.scene.start('Album',{from:'Armory',fromData:{from:this.from,fromData:this.fromData,page:this.page}}),{size:15});
     const eq=Rack.equippedKey(), ew=Rack.equippedWeapon();
     txt(this,W/2,108,eq==='sling:0'?'Carrying: the starter — every hero fights with his own hand until a found weapon is carried':'Carrying: '+ew.name,18,'#f2c14e').setOrigin(0.5);
     const pend=Rack.pending();
@@ -3316,6 +3577,83 @@ class Armory extends Phaser.Scene{ constructor(){super('Armory');}
     if(pages>1){ button(this,520,680,56,42,'◀',()=>this.scene.restart({from:this.from,fromData:this.fromData,page:(this.page+pages-1)%pages}),{size:16});
       txt(this,W/2,680,(this.page+1)+'/'+pages,16,PARCH).setOrigin(0.5);
       button(this,760,680,56,42,'▶',()=>this.scene.restart({from:this.from,fromData:this.fromData,page:(this.page+1)%pages}),{size:16}); }
+    button(this,90,680,140,46,'Back',()=>this.scene.start(this.from,this.fromData||undefined));
+  } }
+
+// ---------- Chests & Seasons (Upgrade 19) ----------
+// The calendar panel: what season stands open, what its chest holds,
+// its price in Grokonians, and when the year brings the next one. The
+// standing U18 chests are shown for what they are — found on the
+// field, never sold — and every defined season stands on the calendar
+// with its window, in season or greyed until it returns. Buying spends
+// through Tokens and queues the chest in the Rack: it opens at the
+// next intermission, in the one reveal flow, bought or found alike.
+class Chests extends Phaser.Scene{ constructor(){super('Chests');}
+  init(d){ this.from=(d&&d.from)||'Menu'; this.fromData=(d&&d.fromData)||null; this.msg=(d&&d.msg)||null; }
+  create(){ backdrop(this,0.78); Music.play(this,'menu');
+    txt(this,W/2,40,'Chests & Seasons',38,GOLD).setOrigin(0.5);
+    txt(this,W/2,76,'Grokonians: '+Tokens.balance()+'   •   Seasonal chests open at your next intermission — never mid-battle',16,GOLD).setOrigin(0.5);
+    const now=new Date(), live=liveSeason(now);
+    const pend=Rack.pending().filter(g=>SEASON_BY_ID[g]).length;
+    if(pend) txt(this,W/2,104,pend+' seasonal chest'+(pend>1?'s':'')+' waiting in your Rack',14,'#f2c14e').setOrigin(0.5);
+    if(this.msg) txt(this,W/2,104,this.msg,14,'#f2c14e',{align:'center',wordWrap:{width:1000}}).setOrigin(0.5);
+    let y=176;
+    if(live){ const st=seasonState(live,now);
+      const g=this.add.graphics(); g.fillStyle(0x2a1a10,0.95); g.fillRoundedRect(170,y-62,940,158,12); g.lineStyle(3,live.color,1); g.strokeRoundedRect(170,y-62,940,158,12);
+      const im=this.add.image(252,y+16,'chest_'+live.id); if(im.setScale) im.setScale(1.7);
+      txt(this,336,y-40,live.name+' — in season',24,live.css);
+      txt(this,336,y-10,live.tagline,14,PARCH,{wordWrap:{width:520}});
+      txt(this,336,y+52,'Gift cards, arms and treats inside  •  ends in '+st.daysLeft+' day'+(st.daysLeft===1?'':'s'),14,'#cdbd95');
+      const afford=Tokens.balance()>=live.price;
+      button(this,995,y+16,190,54,afford?('Buy — '+live.price+' G'):('Short — '+live.price+' G'),()=>{ const r=purchaseSeasonalChest(live.id);
+        const m=r==='ok'?('A '+live.name+' waits in your Rack — it opens at your next intermission.'):r==='funds'?('Not enough Grokonians — the chest costs '+live.price+'.'):('The season has turned — the chest is gone until it returns.');
+        this.scene.restart({from:this.from,fromData:this.fromData,msg:m}); },{size:16,disabled:!afford});
+      y+=136;
+    } else { txt(this,W/2,y,'No seasonal chest stands open today — the year turns, and each returns in its season.',16,PARCH).setOrigin(0.5); y+=30; }
+    txt(this,W/2,y,'From the field — the standing chests',20,GOLD).setOrigin(0.5); y+=46;
+    [['wood','Wooden','Fallen foes leave them rarely; elites, often; champions, always.'],['iron','Iron','Champions leave Iron or Gold — and even Iron can hide a Mythic.'],['gold','Golden','Gold alone may hold the Bible — found on the field, never sold.']].forEach(([gr,nm,line],i)=>{ const x=250+i*390;
+      const im=this.add.image(x,y,'chest_'+gr); if(im.setScale) im.setScale(1.3);
+      txt(this,x,y+46,nm+' Chest',16,CHEST_GRADES[gr].css).setOrigin(0.5);
+      txt(this,x,y+78,line,12,PARCH,{align:'center',wordWrap:{width:340}}).setOrigin(0.5); });
+    y+=140;
+    txt(this,W/2,y,'The year of chests',20,GOLD).setOrigin(0.5); y+=38;
+    SEASONS.forEach(sv=>{ const st=seasonState(sv,now);
+      txt(this,W/2,y,sv.name+'  •  '+seasonWindowLabel(sv)+'  •  '+(st.live?('in season — '+st.daysLeft+' day'+(st.daysLeft===1?'':'s')+' left'):('opens '+seasonDateLabel(st.nextStart)))+'  •  '+sv.price+' Grokonians in season',15,st.live?sv.css:'#8a7a6a').setOrigin(0.5); y+=27; });
+    const nx=nextSeason(now);
+    if(nx) txt(this,W/2,y+8,'Next to open: '+nx.season.name+' — '+seasonDateLabel(nx.state.nextStart),15,'#f2c14e').setOrigin(0.5);
+    button(this,W/2+170,680,300,46,'The Card Album',()=>this.scene.start('Album',{from:'Chests',fromData:{from:this.from,fromData:this.fromData}}),{size:17});
+    button(this,90,680,140,46,'Back',()=>this.scene.start(this.from,this.fromData||undefined));
+  } }
+
+// ---------- The Card Album (Upgrade 19) ----------
+// The gift cards' gallery: one set to a page, owned cards standing in
+// their tier colors with their epithet and Scripture reference, the
+// unfound as dark silhouettes — the chase made visible. Set progress
+// is counted at the top; a finished set's gift is named here and paid
+// at the reveal that completes it (Album.claimSetGift guards the once).
+class CardAlbum extends Phaser.Scene{ constructor(){super('Album');}
+  init(d){ this.from=(d&&d.from)||'Armory'; this.fromData=(d&&d.fromData)||null; this.setId=(d&&d.set)||CARD_SET_ORDER[0]; }
+  create(){ backdrop(this,0.78); Music.play(this,'menu');
+    txt(this,W/2,40,'The Card Album',38,GOLD).setOrigin(0.5);
+    txt(this,W/2,76,'Gift cards from the seasonal chests, kept set by set. A duplicate melts into Manna; a finished set pays its gift, once.',14,'#cdbd95').setOrigin(0.5);
+    CARD_SET_ORDER.forEach((sid,i)=>{ const set=CARD_SETS[sid], pr=Album.setProgress(sid);
+      button(this,W/2+(i-(CARD_SET_ORDER.length-1)/2)*340,118,320,42,set.name+'  •  '+pr.owned+'/'+pr.total,()=>this.scene.restart({from:this.from,fromData:this.fromData,set:sid}),{size:15,disabled:this.setId===sid}); });
+    const set=CARD_SETS[this.setId];
+    txt(this,W/2,156,set.blurb,14,PARCH,{align:'center',wordWrap:{width:1000}}).setOrigin(0.5);
+    txt(this,W/2,184,Album.setComplete(this.setId)?('✓ The set is complete — its gift of '+set.giftManna+' Manna + '+set.giftGrok+' Grokonians '+(Album.giftClaimed(this.setId)?'has been paid.':'pays at the reveal that completes it.')):('Finish the set: '+set.giftManna+' Manna + '+set.giftGrok+' Grokonians, paid once at the completing reveal.'),14,'#f2c14e').setOrigin(0.5);
+    set.cards.forEach((c,i)=>{ const col=i%4,row=Math.floor(i/4),x=170+col*315,y=300+row*196;
+      const own=Album.owns(c.id), T=WEAPON_TIERS[c.tier];
+      const g=this.add.graphics(); g.fillStyle(own?0x2a1a10:0x171008,0.95); g.fillRoundedRect(x-148,y-86,296,172,10); g.lineStyle(own?3:2,own?T.color:0x4a3a28); g.strokeRoundedRect(x-148,y-86,296,172,10);
+      if(own){ const im=this.add.image(x,y-40,c.glyph); if(im.setScale) im.setScale(0.5);
+        txt(this,x,y+10,c.name,17,T.css,{align:'center',wordWrap:{width:280}}).setOrigin(0.5);
+        txt(this,x,y+34,T.name+'  •  '+set.name,12,'#cdbd95').setOrigin(0.5);
+        txt(this,x,y+54,c.epithet,12,PARCH,{align:'center',wordWrap:{width:280}}).setOrigin(0.5);
+        txt(this,x,y+76,c.ref,12,'#a08a6a').setOrigin(0.5);
+        const n=Album.count(c.id); if(n>1) txt(this,x+120,y-68,'×'+n,13,'#f2c14e').setOrigin(0.5);
+      } else { txt(this,x,y-18,'?',34,'#5a4a3a').setOrigin(0.5);
+        txt(this,x,y+26,'Not yet found',14,'#8a7a6a').setOrigin(0.5);
+        txt(this,x,y+50,T.name+' card of '+set.name,12,'#6a5a4a').setOrigin(0.5); }
+    });
     button(this,90,680,140,46,'Back',()=>this.scene.start(this.from,this.fromData||undefined));
   } }
 
@@ -3475,4 +3813,4 @@ class Settings extends Phaser.Scene{ constructor(){super('Settings');}
 
 window.__game=new Phaser.Game({type:Phaser.AUTO,parent:'game',width:W,height:H,backgroundColor:'#0d0906',
   scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{activePointers:3},
-  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,Armory,BattlePass,Profile,Game,End]});
+  scene:[Boot,Menu,Settings,EraSelect,HeroSelect,Unlocks,Armory,BattlePass,Chests,CardAlbum,Profile,Game,End]});

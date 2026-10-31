@@ -45,9 +45,15 @@ ok(main.includes("normal:  { chance:0.02") && main.includes("elite:   { chance:0
 ok(main.includes("const BIBLE_ODDS=0.03") && main.includes("if(grade==='gold'&&!hasBible&&R()<BIBLE_ODDS) return { bible:true };"),
   'the Bible: Gold chests alone, 3%, and only while the Rack lacks it');
 { const grants = main.match(/Rack\.grant\(/g) || [];
-  const revealBody = main.slice(main.indexOf('revealOpenChest(){'), main.indexOf('renderRevealResult(w,kind,gain)'));
-  ok(grants.length === 2 && revealBody.includes("Rack.grant('bible')") && revealBody.includes('Rack.grant(w.key)'),
-    'Rack.grant has exactly two call sites and both live in the reveal — no shop path, no other road to a weapon');
+  // Upgrade 19 re-point (reason recorded): the seasonal reveal is a
+  // third grant site — a branch OF the reveal (revealOpenSeasonal),
+  // under the same intermission gate. The law this check guards is
+  // unchanged: every grant lives inside the reveal system (the slice
+  // from revealOpenChest to waveClear holds all three), and no shop
+  // or purchase path grants a weapon.
+  const revealBody = main.slice(main.indexOf('revealOpenChest(){'), main.indexOf('waveClear(){'));
+  ok(grants.length === 3 && revealBody.includes("Rack.grant('bible')") && (revealBody.match(/Rack\.grant\(w\.key\)/g) || []).length === 2,
+    'Rack.grant has exactly three call sites and all live in the reveal (the U18 chest and the seasonal chest) — no shop path, no other road to a weapon');
   ok(!/Tokens\.spend\('(weapon|bible)/.test(main) && !main.slice(main.indexOf('renderShop(first)'), main.indexOf('updateShopHead()')).includes('resolveWeapon'),
     'no Grokonian path: the shop never sells a weapon and nothing spends tokens on one');
   ok(main.includes("if(!this.shopOpen||!this.revealPanel) return false; // intermission only"),
@@ -57,9 +63,19 @@ ok(main.includes("const BIBLE_ODDS=0.03") && main.includes("if(grade==='gold'&&!
     'the Armory scene exists, is registered, and is reachable'); }
 
 // ---------- runtime scaffolding (the U17 pattern) ----------
+// Upgrade 19 re-point (reason recorded): seasons are date-driven now,
+// and this suite was written in a seasonless world — its chest chain
+// counts the U18 chest alone. The harness therefore pins the game's
+// clock to 2026-11-14: outside every season's window (Hallows ends
+// Nov 7, Tidings opens Dec 18) and at the SAME weekly-twist parity as
+// the suite's first green run (2026-10-31: weekIndex 2965, odd —
+// Nov 14 is 2967, odd), so the benchmark's world is unchanged.
+// In-season behavior is proven by tools/verify_upgrade19.js.
+const PIN_MS = new Date(2026, 10, 14, 12, 0, 0).getTime();
+class PinnedDate extends Date { constructor(...a) { super(...(a.length ? a : [PIN_MS])); } static now() { return PIN_MS; } }
 const store = {};
 const ctx = {
-  console, performance, setTimeout, clearInterval, setInterval,
+  console, performance, setTimeout, clearInterval, setInterval, Date: PinnedDate,
   Math: Object.assign(Object.create(Math), { random: () => 0.99 }),
   localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
   Phaser: {

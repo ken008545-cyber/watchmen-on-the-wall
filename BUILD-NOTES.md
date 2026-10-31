@@ -2556,3 +2556,176 @@ press grammar is later work.
 - The U17 glyph flags carry into the circles unchanged
   (ico_follow busiest, ico_volley arrowheads small, ico_flank can
   read as brackets) — and ico_guard is new beside them.
+
+## Upgrade 19 — Seasonal Chests & Gift Cards: the year of chests (built 2026-10-31)
+
+kennin's commissions, verbatim: "I want to make a chest system where
+you can get gifts in like the madden player cards. I want to make
+Halloween themed chest and base the chest system off of seasons and
+holidays." — and, minutes later: "You gotta make it where you can buy
+them with the grokonians." Built on the U20 tree (fc8d12c) after
+kennin shipped the controls first by his ruling; the U20 press
+grammar is untouched.
+
+### Seasons are data
+
+`SEASONS` is a table, not a codebase: each row carries an id, a name,
+a **yearly window by month/day** (windows may wrap the year end — the
+window math resolves a Dec 28 – Jan 3 season from both sides of New
+Year), a visual identity (color + chest texture), a gift pool, drop
+chances, bundle table, and a Grokonian price. One calendar —
+`seasonState` — serves the panel, the drops, and the shop: a season
+is LIVE when the player's own date stands inside its window, both
+named days whole, `daysLeft` counting today. Adding a future holiday
+is a new row. The U18 Wood/Iron/Gold chests stand exactly as they
+were: seasonal chests join the Rack's ONE pending queue (its filter
+now admits season ids beside grades) and open in the SAME
+intermission reveal — bought or found alike, battle is never
+interrupted by loot, and `revealOpenChest`'s intermission gate rules
+both. `chestDisplay` gives every chest, grade or season, one face.
+
+### The Hallows Chest — first, live in its season
+
+**Oct 25 – Nov 7, every year** (LIVE on ship day, 2026-10-31, with 8
+days left). It wears kennin's own settled meaning of the day —
+celebrating the living in Christ, and those who died in Christ who
+live with Him now — so it is a chest of **remembrance** in torch-flame
+gold (the Night of the Torches' fire), ember-brown with a gold latch.
+No horror, no devil theming anywhere in it. Price: **60 Grokonians**
+(first pass, flagged). In play it drops beside the U18 chests:
+**elites 35%, champions guaranteed**; ordinary foes never (the
+standing chests remain U18's roll). Its pool:
+
+| Gift | Rate | What it is |
+|---|---|---|
+| A Witness card | **45%** | One of the WITNESSES set, dealt weighted by tier (weights 30/26/20/13/8/3) |
+| A Torchlit weapon | **30%** | A family dealt on Iron's rarity ladder, as the `@hallows` variant (below) |
+| A treat bundle | **25%** | Manna 120 (w4) / Grokonians 10 (w3) / an orb treat (w2) / Manna 60 (w2) / Grokonians 25 (w1) |
+
+### Gift cards — the Madden heart
+
+A card is a name, a tier on kennin's six-rung ladder, a set, and a
+face drawn from the game's EXISTING glyph family (no new icon
+textures: David wears the lyre, Deborah the palm, Gideon the flame,
+Samson the pillars, Peter the stone, John the star-burst, Stephen the
+stones, Paul the sword). **THE WITNESSES** (8): Gideon (Common),
+Samson (Uncommon), Deborah (Rare), Peter (Rare), John (Epic),
+Stephen (Epic), Paul (Legendary), David (Mythic). Each card carries
+an epithet in plain words and a **Scripture REFERENCE — no new verse
+text is quoted** (the only quoted words in the game remain the
+verified U18 Word cycle). Cards persist in **THE ALBUM**
+(`gxhub_wotw_album_v1`, the Rack's guarded pattern): a scene reached
+from the Armory and the Chests panel, one set to a page — owned cards
+in tier colors with epithet and reference, the unfound as silhouettes
+with their tier named, find-counts kept (×n). **Duplicates melt into
+Manna at reveal on the weapon ladder: 25 / 40 / 70 / 120 / 200 / 325.**
+**Finishing a set pays its gift ONCE**, at the completing reveal:
+Witnesses **+150 Manna and +25 Grokonians** — the Grokonians through
+`Tokens.earn`, so the hub's caps apply as they do to every earn;
+`Album.claimSetGift` guards the once, and later openings never
+re-pay (proven). Treats land where they're spent: Manna into the
+run's purse, Grokonians earned, and an **orb treat** banks a free orb
+touch for the run (`freeOrbs`, checked in `tryBuyOrb` before any
+Tokens spend — a tutorial buy is still a grant and never touches it).
+
+### Torchlit weapons — variants under U18 rules
+
+`resolveWeapon(family, tier, 'hallows')` returns the same weapon —
+same numbers, same trait — under a new Rack key (`family:tier@hallows`),
+a **Torchlit** name, and blows that land as **fire** (the damage type
+the camp's Watch Fire already speaks; armor tables already know it).
+It racks beside its plain twin (the Rack's list now resolves every
+owned key, variants after their twins), equips the same way, and its
+glyph burns orange at the hero's shoulder and in the reveal. A found
+variant changes no balance number of its base weapon.
+
+### Buying, and the calendar surface
+
+The **CHESTS panel** (Menu → Chests; also from the Armory) shows:
+the in-season chest on a card with its tagline, days left, and a
+**Buy — 60 G** button (spend via `purchaseSeasonalChest`, riding
+`Tokens.spend('chest:<id>', price)` — the orb path; short balance
+refuses with the reason, out of season the button is not offered at
+all), the standing U18 chests with how they're found, and **the year
+of chests**: every defined season with its window and state, plus the
+next opening named. A bought chest queues in the Rack and opens at
+the next intermission — one reveal flow for bought and found alike
+(a design fork, stated: the panel never opens a chest itself, so
+loot's one law — intermission only — has no second door).
+
+**THE TIDINGS CHEST** proves the framework as pure data: Christmas,
+**Dec 18–27**, starlight blue, price 60 G, dormant on ship day. Its
+pool shares the framework's generic gifts (cards 45% on the TIDINGS
+set of 6 — the Shepherds, Joseph, Anna, Simeon, Mary, the Magi,
+tiers Common→Legendary; weapons 30% dealt PLAIN on Wood's ladder, no
+variant; treats 25% of the same shape). Set gift: +100 Manna + 20
+Grokonians, once. It simply sleeps until December.
+
+### The hard law — the Bible
+
+The Bible enters **no seasonal pool and no purchasable chest, at any
+tier, ever** — not as a low odds row but as an ABSENCE: no seasonal
+table names it, `rollSeasonalGift` has no such branch, and the suite
+measures its rate at **exactly 0 across 300,000 seeded rolls** of both
+seasons' pools plus every purchase path (a purchase grants a chest
+id, never a weapon). U18's law stands with it: `Rack.grant` now has
+three call sites, ALL inside the reveal system (the U18 chest and the
+seasonal chest) — the U18 suite's check was re-pointed to say so,
+with the reason recorded in place. U18's Gold reveal remains the
+Bible's only road.
+
+### Verification (2026-10-31, this machine)
+
+- tools/verify_upgrade19.js (new; stubbed Phaser, REAL main.js,
+  recording Tokens, a movable pinned clock): **58/58** — statics
+  (seasons-as-data, the Bible's absence from every seasonal table and
+  roll, rooms clean, scenes registered and reachable); the calendar
+  matrix (edges inclusive both ends, Hallows live on 2026-10-31 with
+  8 days left, Tidings dormant then and live Dec 18–27, year-wrap on
+  a synthetic season from both sides); purchase (exact spend item and
+  price, refusal at 59 G with nothing charged or queued, out-of-
+  season purchase impossible — spend never called — the dormant
+  chest unbuyable in October); seeded pools (45.0 / 30.1 / 24.9
+  against the 45/30/25 law; every card a Witness; every weapon
+  Torchlit and fire; the Mythic dealt but rare — 2,095 of 200,000);
+  Album persistence, corruption guard, duplicate melt (+25 at
+  reveal), set completion paying once (+150 Manna, +25 Grokonians on
+  the recorded earn path) and never twice; the bought chest opening
+  at the next run's intermission in the shared reveal; the orb treat
+  paying for a real orb touch with zero Tokens spends; in-season
+  champion and elite drops beside U18's, and their absence on
+  Nov 14; the seasonal reveal refusing mid-battle.
+- **All nineteen suites green: 1,123 checks** (1,065 standing + 58
+  new). The champion benchmark reproduces in this suite's own sim at
+  the pinned out-of-season date: **starter 32.8s, camp 500/500**.
+  js/gxhub.js, js/tokens.js, js/net.js and all data files are
+  byte-untouched (empty git diff); the U20 press grammar untouched.
+- Two prior checks re-pointed, none deleted, each with its reason
+  recorded in place in verify_upgrade18.js: the grant-sites law
+  (three sites, all in the reveal — above), and that suite's harness
+  clock is now pinned to 2026-11-14 (out of season, SAME weekly-twist
+  parity as its first green run) because seasons are date-driven and
+  its chest chain counts the U18 chest alone; in-season behavior is
+  this suite's office.
+- NOT verified (no live browser here): the Hallows chest's look on
+  the field beside a gold one, card faces at album size, and the
+  Chests panel's calendar in the hand. kennin's eyes rule next.
+
+### Flags for kennin's tuning
+
+- **Window dates** — Hallows Oct 25 – Nov 7 and Tidings Dec 18–27
+  are first passes; the rows are one-line edits.
+- **Price** — 60 Grokonians for both chests (his "buy them with the
+  grokonians" ruling; the number is a first pass).
+- **Pool rates** — 45 cards / 30 weapons / 25 treats, the card tier
+  weights (30/26/20/13/8/3), and the elite drop chance (35%, matching
+  U18's elite chest chance) are all single-table numbers.
+- **Set gifts** — Witnesses 150 Manna + 25 G; Tidings 100 + 20 G.
+- **The orb treat** is run-scoped by design (banked at a reveal,
+  spent at a station in the same run); if kennin wants treats to keep
+  across runs, the Album is where they'd live.
+- **Rooms** keep their fixed loadout: seasonal chests are solo-side
+  this pass, like weapons were — the room port is later work.
+- Further holidays (Thanksgiving, New Year, Easter…) are future DATA
+  rows with their own sets to design at kennin's word — the framework
+  takes them without new code, but no pools were invented for them.

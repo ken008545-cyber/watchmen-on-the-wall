@@ -62,6 +62,10 @@ window.makeArt = function(scene){
     g.fillStyle(band,1); g.fillRect(23,6,8,34); g.fillRect(4,24,46,5); g.lineStyle(2,INK); g.strokeRect(23,6,8,34);
     g.fillStyle(latch,1); g.fillCircle(27,22,4.5); g.lineStyle(2,INK); g.strokeCircle(27,22,4.5); }); }
   chestTex('chest_wood',0x8a6a3c,0x5a4020,0xb08d4a); chestTex('chest_iron',0x8a8f98,0x5a5f68,0xc8ccd4); chestTex('chest_gold',0xc9a227,0x8a6420,0xfff3c0);
+  // Upgrade 19: the seasonal chests — Hallows in ember-brown with a
+  // torch-gold latch (the remembrance chest), Tidings in deep night
+  // blue with a pale star latch. Same chest, the season's colors.
+  chestTex('chest_hallows',0x6a3410,0x3a1c08,0xf2c14e); chestTex('chest_tidings',0x2a4a6a,0x16283c,0xf2e8c8);
 };
 window.makeArt2=function(scene){ const INK=0x140c07;
  function tex(k,w,h,fn){const g=scene.make.graphics({add:false});fn(g);g.generateTexture(k,w,h);g.destroy();}
